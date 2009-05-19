@@ -285,6 +285,7 @@ $rmgr{"local"} = {
 };
 
 $rmgr{"local-qsnet"} = {
+    'is_installed'    => \&local_q_is_installed,
     'get_active_jobs' => \&local_q_get_jobs,
     'job_is_running'  => \&local_job_is_running,
     'setup_pcmd'      => \&local_setup_pcmd,
@@ -2199,6 +2200,10 @@ sub local_fd_get_jobs {
     return local_fd_get_jobs_real( $user, $conf{"local-fd-name"} );
 }
 
+sub local_q_is_installed {
+    return ( -d "/proc/qsnet" );
+}
+
 sub local_q_get_jobs {
     my $user = shift;
     return local_fd_get_jobs_real( $user, "/proc/qsnet/elan/user" );
@@ -2393,7 +2398,6 @@ sub find_rmgr {
         printf(
 "Error, multiple resource managers detected, use -Ormgr=<resource manager>\n"
         );
-        push @ok, "local-qsnet";
         push @ok, "local-fd";
         push @ok, "local";
         printf("@ok\n");
