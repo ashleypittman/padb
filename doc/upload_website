@@ -1,0 +1,13 @@
+#!/bin/sh
+
+set -e
+
+echo Uploading website to http://padb.pittman.org.uk
+
+# Load the password from a non-public file ;)
+. upload_website.password
+
+ftp-upload --host padb.pittman.org.uk -u padb@pittman.co.uk --password $PASSWORD index.html
+
+echo All done.
+exit 0
