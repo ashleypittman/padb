@@ -5,9 +5,19 @@ set -e
 echo Uploading website to http://padb.pittman.org.uk
 
 # Load the password from a non-public file ;)
-. upload_website.password
+. ~/padb-website-password.txt
 
-ftp-upload --host padb.pittman.org.uk -u padb@pittman.co.uk --password $PASSWORD index.html
+FILES="index.html usage.html download.html email.html extensions.html"
+
+for FILE in $FILES
+do
+  echo Uploading $FILE
+  TFILE=`mktemp`
+  cat header.html > $TFILE
+  cat $FILE >> $TFILE
+  ftp-upload --host padb.pittman.org.uk -u padb@pittman.co.uk --password $PASSWORD --as $FILE $TFILE
+  rm $TFILE
+done
 
 echo All done.
 exit 0
