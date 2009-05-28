@@ -19,5 +19,7 @@ do
   rm $TFILE
 done
 
+ftp-upload --host padb.pittman.org.uk -u padb@pittman.co.uk --password $PASSWORD OpenMPI-padb-groups.patch
+
 echo All done.
 exit 0
