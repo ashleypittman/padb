@@ -27,6 +27,7 @@
 #  * Completely new build and packing procedure to go with the new
 #    maintainer.
 #  * Added "ompi" to the list of resource managers supported
+#  * Don't enable local-qsnet on non-qsnet systems.
 #
 # Version 2.2
 #  * Add a --core-stack option along with --core and --exe to extract stack
@@ -3968,6 +3969,7 @@ sub gdb_string {
     my $offset = 0;
     my $str    = "";
     my @s      = gdb_read_raw( $gdb, $strp, 128 );
+    return undef if ( $s[0] eq undef );
     foreach my $d (@s) {
         my $v = hex($d);
         return $str if ( $v == 0 );
