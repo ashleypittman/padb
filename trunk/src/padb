@@ -384,6 +384,10 @@ sub find_i_dir {
     # I don't know how it got installed so assume everything
     # is in the current directory.
     # This allows -Oedb=/path/to/edb to override.
+
+    # This probably needs re-writing for a non-Quadrics world,
+    # if we aren't installed somewhere however look for the
+    # helper code in the current directory.
     my $installdir = "usr/bin/padb";
     my $edb;
     if ( $0 =~ /(.*)$installdir/ ) {
@@ -393,7 +397,7 @@ sub find_i_dir {
           if ( -d "$1usr/lib64/qsnet/elan4/bin/" );
     }
 
-    return "";
+    return "./";
 }
 
 sub find_edb {
