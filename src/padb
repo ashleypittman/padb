@@ -24,6 +24,9 @@
 #
 # Version 2.5
 #  * First Non-Quadrics version
+#  * Various stability/bug fixes.
+#  * Deadlock detect at the MPI Layer rather than the Elan layer
+#    if running with a patched MPI (Work in progress)
 #  * Completely new build and packing procedure to go with the new
 #    maintainer.
 #  * Added "ompi" to the list of resource managers supported
@@ -4113,6 +4116,23 @@ sub fetch_mpi_queue {
     return @mq;
 }
 
+# As above but take a gdb handle
+sub fetch_mpi_queue_gdb {
+    my ( $vp, $pid, $g ) = @_;
+
+    if ( $confInner{"mpi-dll"} ne "auto" ) {
+        $ENV{MPINFO_DLL} = $confInner{"mpi-dll"};
+    } else {
+        my $base = gdb_var_addr( $g, "MPIR_dll_name" );
+        if ( !defined $base ) {
+            return;
+        }
+    }
+
+    my @mq = launch_h( $g, $vp );
+    return @mq;
+}
+
 sub show_mpi_queue {
     my ( $vp, $pid ) = @_;
 
@@ -4120,6 +4140,231 @@ sub show_mpi_queue {
     foreach my $o (@mq) {
         output( $vp, $o );
     }
+}
+
+# Should do something clever here with handler_all so we get a single
+# consistent sample from the individual nodes, the handler_all code
+# doesn't do anything with output_dtype() yet however so give that
+# a miss for the time being.
+sub show_mpi_queue_for_deadlock {
+    my ( $vp, $pid ) = @_;
+
+    my @mq = fetch_mpi_queue( $vp, $pid );
+    return \@mq;
+}
+
+# Ideally handle all this at a higher level...
+sub show_mpi_queue_for_deadlock_all {
+    my ($list) = @_;
+
+    my @all;
+
+    foreach my $proc ( @{$list} ) {
+        my $vp  = $proc->{vp};
+        my $pid = $proc->{pid};
+
+        debug $vp, "Attaching to $pid";
+        my $gdb = gdb_start();
+        kill( "CONT", $pid );
+        if ( gdb_attach( $gdb, $pid ) ) {
+            $proc->{gdb} = $gdb;
+            push( @all, $proc );
+        } else {
+            output $vp, "Failed to attach to to process";
+        }
+
+    }
+
+    foreach my $proc (@all) {
+        my $tries = 0;
+
+        my @threads;
+
+        my $vp  = $proc->{vp};
+        my $pid = $proc->{pid};
+        my $gdb = $proc->{gdb};
+
+        my @mq = fetch_mpi_queue_gdb( $vp, $pid, $gdb );
+        output_dtype( $vp, \@mq );
+    }
+
+    foreach my $proc (@all) {
+        my $gdb = $proc->{gdb};
+        gdb_detach($gdb);
+        gdb_quit($gdb);
+    }
+}
+
+sub go_deadlock_detect {
+    my ($cd) = @_;
+
+    # print Dumper $cd;
+    my %ad;
+
+    my @tg;
+
+    if ( $#target_groups != -1 ) {
+        foreach my $gid (@target_groups) {
+            $tg[$gid]++;
+        }
+    }
+
+    foreach my $process ( keys( %{$cd} ) ) {
+        my $rd = $cd->{$process};
+        foreach my $g ( keys( %{$rd} ) ) {
+            my $gd  = $rd->{$g};
+            my $gid = $gd->{id};
+
+            if ( $#target_groups != -1 ) {
+                next unless defined $tg[$gid];
+            }
+
+            if ( $gd->{size} > 1 ) {
+                $ad{$gid}{map}[ $gd->{rank} ] = $process;
+            }
+            $ad{$gid}{size} = $gd->{size};
+            $ad{$gid}{name} = $gd->{name};
+            foreach my $coll ( keys( %{ $gd->{coll} } ) ) {
+                my $count = $gd->{coll}{$coll}{count};
+                if ( defined $gd->{coll}{$coll}{active} ) {
+                    $ad{$gid}{active}{$coll}++;
+                    $ad{$gid}{idents}{ $gd->{rank} }{'active'}{$coll} = $count;
+                } else {
+                    $ad{$gid}{idents}{ $gd->{rank} }{'inactive'}{$coll} =
+                      $count;
+                }
+            }
+        }
+    }
+
+    #print Dumper \%ad;
+    my $ret     = "";
+    my $i_count = 0;    # Interesting groups.
+    foreach my $gid ( sort { $a <=> $b } keys %ad ) {
+
+        if ( $#target_groups != -1 ) {
+            next unless defined $tg[$gid];
+        }
+
+        my $gstr = "Information for group '$gid' ($ad{$gid}{name})\n";
+
+        # Maybe show the group members, hope that the user doesn't turn
+        # this on unless also setting target_groups!
+        if ( $conf{"show-group-members"} ) {
+            $gstr .= "group has $ad{$gid}{size} members\n";
+            if ( defined $ad{$gid}{size} and $gid != 1 ) {
+                for ( my $ident = 0 ; $ident < $ad{$gid}{size} ; $ident++ ) {
+                    $gstr .=
+                      "group member[$ident] => vp[$ad{$gid}{map}[$ident]]\n";
+                }
+            }
+        }
+
+        if ( $ad{$gid}{'active'} ) {
+            $i_count++;
+
+            # For all collective calls which we are interested in
+            foreach my $s ( keys %{ $ad{$gid}{'active'} } ) {
+                my %active;
+                my %inactive;
+
+                foreach my $ident ( keys %{ $ad{$gid}{'idents'} } ) {
+                    if ( defined $ad{$gid}{'idents'}{$ident}{'active'}
+                        and $ad{$gid}{'idents'}{$ident}{'active'}{$s} )
+                    {
+                        my $number = $ad{$gid}{'idents'}{$ident}{'active'}{$s};
+                        push( @{ $active{$number} }, $ident );
+                    } elsif ( $ad{$gid}{'idents'}{$ident}{'inactive'}{$s} ) {
+                        my $number =
+                          $ad{$gid}{'idents'}{$ident}{'inactive'}{$s};
+                        push( @{ $inactive{$number} }, $ident );
+                    }
+                }
+                foreach my $number ( sort ( keys %active ) ) {
+                    $ret .= $gstr
+                      . group_status_helper( "in call $number to $s",
+                        0, $ad{$gid}{size}, @{ $active{$number} } );
+                    $gstr = "";
+
+                }
+                foreach my $number ( sort ( keys %inactive ) ) {
+                    $ret .= group_status_helper( "completed call $number to $s",
+                        1, $ad{$gid}{size}, @{ $inactive{$number} } );
+                }
+            }
+        } else {
+            next unless ( $conf{"show-all-groups"} );
+        }
+
+        {
+            my @inactive;
+            foreach my $ident ( sort keys %{ $ad{$gid}{'idents'} } ) {
+
+    #                if ( $ad{$gid}{'idents'}{$ident}{'statistics'}
+    #                    and not defined $ad{$gid}{'idents'}{$ident}{'active'} )
+                if ( not defined $ad{$gid}{'idents'}{$ident}{'active'} ) {
+                    push( @inactive, $ident );
+                }
+            }
+            if ( $#inactive != -1 ) {
+                $ret .= $gstr
+                  . group_status_helper( "not in a call to the collectives",
+                    0, $ad{$gid}{size}, @inactive );
+                $gstr = "";
+            }
+        }
+    }
+
+    my $count = keys(%ad);
+
+    if ( $count == 1 ) {
+        my $use_str = ( $i_count == 1 ) ? "" : " not";
+        $ret .= "Total: $count group which is$use_str in use.\n";
+    } else {
+        my $i_str = ( $i_count == 1 ) ? "is" : "are";
+        $ret .= "Total: $count groups of which $i_count $i_str in use.\n";
+    }
+
+    return "$ret";
+
+    # print Dumper \%ad;
+}
+
+sub deadlock_detect {
+    my ( $handle, $lines ) = @_;
+    my $data = $lines->{raw};
+
+    # print Dumper $data;
+    my %coll_data;
+    foreach my $rank ( keys( %{$data} ) ) {
+        my $r = $data->{$rank};
+        my %lid;
+        foreach my $line ( @{$r} ) {
+            if ( $line =~ /^comm(\d+): (\w+): \'(.*)\'$/ ) {
+                $lid{$1}{$2} = $3;
+            } elsif ( $line =~ /^comm(\d+): Rank: local (\d+) global (\d+)$/ ) {
+                $lid{$1}{ranks}{$2} = $3;
+            } elsif ( $line =~
+/^comm(\d+): Collective \'(\w+)\': call count (\d+), ([not ]*)active$/
+              )
+            {
+                $lid{$1}{coll}{$2}{count} = $3;
+                if ( $4 eq "" ) {
+                    $lid{$1}{coll}{$2}{active} = 1;
+                }
+            } elsif ( $line =~ /^msg\d+/ ) {
+                ;    # nop
+            } else {
+                print("Failed to match minfo output: $line\n");
+            }
+        }
+        $coll_data{$rank} = \%lid;
+    }
+
+    # print Dumper \%coll_data;
+
+    my $r = go_deadlock_detect \%coll_data;
+    print $r;
 }
 
 # For reference the other interesting options here are these two.
@@ -5525,6 +5770,14 @@ sub common_main {
         'arg_long'  => 'mpi-queue',
         'arg_short' => 'Q',
         'help'      => "Show MPI message queues"
+    };
+
+    $allfns{deadlock} = {
+        'handler_all' => \&show_mpi_queue_for_deadlock_all,
+        'arg_long'    => 'deadlock',
+        'arg_short'   => 'j',
+        'help'        => "Run deadlock detection algorithm",
+        'out_handler' => \&deadlock_detect,
     };
 
     $allfns{pinfo} = {
