@@ -2092,7 +2092,7 @@ sub slurm_is_installed {
 
 sub slurm_get_jobs {
     my $user = shift;
-    my @res  = `squeue -t running -u $user -h -o "%i"`;
+    my @res  = `squeue -t running -u $user -h -o "%i" 2>/dev/null`;
     chomp @res;
     return @res;
 }
