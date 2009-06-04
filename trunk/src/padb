@@ -356,11 +356,12 @@ $conf{"interval"}            = 10;
 $conf{"watch-clears-screen"} = 1;
 $conf{"stats-name"}          = undef;
 $conf{"stats-raw"}           = 0;
-$conf{"stack-strip-above"}   = "elan_waitWord,elan_pollWord,elan_deviceCheck,opal_condition_wait";
 $conf{"scripts"}             = "bash,sh,dash,ash,perl,xterm";
 $conf{"stack-strip-below"}   = "main";
 $conf{"lsf-job-offset"}      = 1;
 $conf{"local-fd-name"}       = "/dev/null";
+$conf{"stack-strip-above"} =
+  "elan_waitWord,elan_pollWord,elan_deviceCheck,opal_condition_wait";
 
 # $conf{stack-format}        = undef;
 
@@ -4576,7 +4577,7 @@ sub stack_trace_from_pids {
             $proc->{gdb} = $gdb;
             push( @all, $proc );
         } else {
-            output $vp, "Failed to attach to to process";
+            output $vp, "Failed to attach to process";
         }
 
     }
@@ -5304,6 +5305,7 @@ sub inner_main {
     $confInner{"rmgr"}           = "auto";
     $confInner{"edb"}            = find_edb();
     $confInner{"minfo"}          = find_minfo();
+    $confInner{"open-ps"}        = "";
 
     # The different options this script can perform.  One (and only one) of
     # these must be set.
