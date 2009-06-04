@@ -3993,8 +3993,11 @@ sub handle_query {
         $res = gdb_type_offset( $gdb, $params[0], $params[1] );
         $stats->{offset}++;
     } elsif ( $cmd eq "string" ) {
-        $res = gdb_string( $gdb, $params[1] );
-        $stats->{string}++;
+        my $str = gdb_string( $gdb, $params[1] );
+        if ( defined $str ) {
+            $stats->{string}++;
+            $res = $str;
+        }
     } elsif ( $cmd eq "func" ) {
         $res = gdb_func_addr( $gdb, $params[0] );
         $stats->{function}++;
@@ -4003,12 +4006,19 @@ sub handle_query {
         $stats->{symbol}++;
     } elsif ( $cmd eq "data" ) {
         my @r = gdb_read_raw( $gdb, $params[0], $params[1] );
-        $res = "@r";
-        $stats->{datareads}++;
-        $stats->{databytes} += $params[1];
+        if ( $r[0] ne undef ) {
+            $res = "@r";
+            $stats->{datareads}++;
+            $stats->{databytes} += $params[1];
+        }
     } elsif ( $cmd eq "rank" ) {
         $res = $vp;
         $stats->{rank}++;
+    } elsif ( $cmd eq "image" ) {
+        my $image = readlink("/proc/$gdb->{tracepid}/exe");
+        if ( defined $image ) {
+            $res = $image;
+        }
     } else {
         printf("Unhandled query $query\n");
     }
@@ -4050,6 +4060,9 @@ sub launch_h {
             my $res = handle_query( $gdb, $vp, $r, \%stats );
             if ( defined $res ) {
                 print $out "$res\n";
+            }
+            if ( $res eq "fail" ) {
+		printf("Failed dll request $r\n");
             }
         } else {
             push @mq, $r;
