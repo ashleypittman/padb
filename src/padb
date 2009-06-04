@@ -805,8 +805,7 @@ sub show_bin {
                 $scale++;
             }
 
-            $ret .=
-              sprintf(
+            $ret .= sprintf(
 "%16s: min $d->{$bin}{raw}[32] max $d->{$bin}{raw}[33] total $d->{$bin}{raw}[34] (%0.2f $scales[$scale])\n",
                 $d->{$bin}{name}, $total );
 
@@ -1117,8 +1116,7 @@ sub total {
                         {
 
                             $summed_structure->{'subsystems'}{$name}{$id}
-                              {'statistics'} =
-                              dclone(
+                              {'statistics'} = dclone(
                                 $current_structure->{'subsystems'}{$name}{$id}
                                   {'statistics'} );
                             next;
@@ -1164,8 +1162,7 @@ sub total {
                             }
                         }
                     } else {
-                        $summed_structure->{'subsystems'}{$name}{$id} =
-                          dclone(
+                        $summed_structure->{'subsystems'}{$name}{$id} = dclone(
                             $current_structure->{'subsystems'}{$name}{$id} );
                     }
                 }
@@ -3975,8 +3972,7 @@ sub gdb_dump_frames {
     }
     if ( defined $detail ) {
         foreach my $frame ( @{ $data->{stack} } ) {
-            my %r =
-              gdb_n_send( $gdb,
+            my %r = gdb_n_send( $gdb,
                 "-stack-list-arguments 0 $frame->{level} $frame->{level}" );
             my $args = gdb_parse_reason( $r{reason}, "name" );
 
@@ -4153,7 +4149,8 @@ sub stack_from_core {
                     }
                 }
             } else {
-                printf( ( $$frame{func} || "?" ) . "() at "
+                printf( ( $$frame{func} || "?" ) 
+                    . "() at "
                       . ( $$frame{file} || "?" ) . ":"
                       . ( $$frame{line} || "?" )
                       . "\n" );
@@ -4548,7 +4545,8 @@ sub stack_trace_from_pids {
                     }
                 } else {
                     output( $vp,
-                            ( $$frame{func} || "?" ) . "() at "
+                            ( $$frame{func} || "?" ) 
+                          . "() at "
                           . ( $$frame{file} || "?" ) . ":"
                           . ( $$frame{line} || "?" ) );
                 }
@@ -4573,8 +4571,7 @@ sub show_queue {
           "$remote_env{LD_LIBRARY_PATH}:$confInner{myld}";
     }
 
-    my $lines =
-      run_ptrack_cmd( $vp, $pid,
+    my $lines = run_ptrack_cmd( $vp, $pid,
         "$confInner{edb} --queues --pid=$pid $confInner{edbopt}" );
 
     return if ( $lines != 0 );
@@ -4932,7 +4929,7 @@ sub vp_from_pid {
 
     while ( defined $ppid and $ppid != 1 ) {
         return $gids->{$ppid} if ( defined $gids->{$ppid} );
-        return undef          if ( defined $resmgrs->{$ppid} );
+        return undef if ( defined $resmgrs->{$ppid} );
         $ppid = find_from_status( $ppid, "PPid" );
     }
     return undef;
