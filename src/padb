@@ -1410,7 +1410,7 @@ sub show_stats {
 
     if ( not $d ) {
         print("Statistics not valid\n");
-        exit(1);
+        return;
     }
 
     if ($stats_total) {
@@ -3293,6 +3293,8 @@ sub outer_main {
         printf("full job report for job $full_report\n\n");
 
         # Bit of a cheat here, do two things at once...
+        # This should probably me modified to work better on
+        # non Quadrics systems.
         my $res;
         $stats_total = 1;
         $group       = 1;
@@ -3300,9 +3302,10 @@ sub outer_main {
         undef $stats_total;
         undef $group;
 
-        if ( $res != 0 ) {
-            exit 1;
-        }
+        # Don't exit on failure here.
+        #if ( $res != 0 ) {
+        #    exit 1;
+        #}
 
         printf("\n");
 
@@ -4061,8 +4064,11 @@ sub launch_h {
             if ( defined $res ) {
                 print $out "$res\n";
             }
+
+            # Some things *do* fail here, symbol lookups
+            # and we don't need to report it.
             if ( $res eq "fail" ) {
-		printf("Failed dll request $r\n");
+                debug( $vp, "Failed dll request $r\n" );
             }
         } else {
             push @mq, $r;
