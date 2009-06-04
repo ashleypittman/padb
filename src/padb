@@ -4468,7 +4468,7 @@ sub stack_trace_from_pids {
                 if ( gdb_attach( $g, $pid ) ) {
                     $gdb = $g;
                 } else {
-                    output $vp, "Failed to attach to to process";
+                    output $vp, "Failed to attach to process";
                 }
             } else {
                 $gdb = $proc->{gdb};
