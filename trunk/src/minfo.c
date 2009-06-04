@@ -215,6 +215,9 @@ int _find_data (mqs_process *proc, mqs_taddr_t addr, int size, void *base)
     char *local = base;
     
     char *ptr;
+    if ( size == 0 )
+	return mqs_ok;
+    
     sprintf(req,"data %p %d",(void *)addr,size);
     
     i = ask(req,ans);
@@ -279,6 +282,16 @@ int fetch_string (void *bc,void *local, mqs_taddr_t remote, int size)
     return 0;
 }
 
+int fetch_image (char *local)
+{
+    char ans[QUERY_SIZE];
+    int i = ask("image", ans);
+    if ( i != 0 )
+	return -1;
+    strncpy(local,ans,QUERY_SIZE);
+    return 0;
+}
+
 void die (char *msg)
 {
     printf("Error: %s\n",msg);
@@ -291,16 +304,14 @@ int msgid = 0;
 int show_comm (struct process *p,mqs_communicator *comm)
 {
     static int c = 0;
-#if 0
-    /* Works well for merging output, not as easy to read however. */
-    if ( comm->local_rank == p->rank )
-	printf("comm%d: '%s' rank: g/%d id: %p\n",
-	       c,comm->name,(int)comm->size,(void *)comm->unique_id);
-    else
-#endif
-	printf("comm%d: '%s' rank: %d/%d id: %p\n",
-	       c,comm->name,(int)comm->local_rank,(int)comm->size,(void *)comm->unique_id);
-    
+    printf("comm%d: name: '%s'\n",
+	   c,comm->name);
+    printf("comm%d: rank: '%d'\n",
+	   c,(int)comm->local_rank);
+    printf("comm%d: size: '%d'\n",
+	   c,(int)comm->size);
+    printf("comm%d: id: '%p'\n",
+	   c,(void *)comm->unique_id);
     msgid=0;
     return c++; /* This is not a political statement although if it was I'd stand by it */
 }
@@ -356,6 +367,8 @@ void load_ops (mqs_process *p,int type)
     mqs_pending_operation op;
     int res = soi((mqs_process *)p,type);
     if ( res != mqs_ok ) {
+	if ( res != mqs_ok && res != mqs_no_information )
+	    printf("Setup operation iterator failed %d for type %d\n",res,type);
 	return;
     }
     
@@ -364,7 +377,10 @@ void load_ops (mqs_process *p,int type)
 	res = no((mqs_process *)p,&op);
 	if ( res == mqs_ok ) {
 	    show_op(&op,type);
+	} else if ( res != mqs_end_of_list ) {
+	    printf("Res from mqs_pending_operation is %d type %d\n",res,type);
 	}
+	
     } while ( res == mqs_ok );
 }
 
@@ -389,6 +405,7 @@ main ()
     int (*nc)(mqs_process *process);
     int (*gr)(mqs_process *process);
     int (*gcs)(mqs_process *, int, int *, int *);
+    int (*gcg)(mqs_process *, int *);
     
     struct image i;
     struct process p;
@@ -427,6 +444,7 @@ main ()
     soi = dlsym(dlhandle,"mqs_setup_operation_iterator");
     no  = dlsym(dlhandle,"mqs_next_operation");
     gcs = dlsym(dlhandle,"mqs_get_comm_coll_state");
+    gcg = dlsym(dlhandle,"mqs_get_comm_group");
     
     bcb.mqs_malloc_fp           = malloc;
     bcb.mqs_free_fp             = free;
@@ -454,13 +472,19 @@ main ()
     {
 	char *m = NULL;
 	res = ihq((mqs_image *)&i,&m);
-	if ( m )
-	    printf("%s\n",m);
+	if ( m ) {
+	    char image[QUERY_SIZE];
+	    if ( fetch_image(image) == 0 ) {
+		printf(m,image);
+		printf("\n");
+	    } else
+		printf("%s\n",m);
+	}
 	if ( res != mqs_ok ) {
 	    char *msg;
 	    msg = es(res);
 	    printf("message from DLL %d '%s'\n",res,msg);
-	    die("Failed image has_queue");
+	    die("Failed image_has_queues");
 	}
     }
     
@@ -478,7 +502,7 @@ main ()
     }
 
     if ( gr ) {
-	p.rank = gr((mqs_process *)&p);	
+	p.rank = gr((mqs_process *)&p);
     } else {
 	/* Load the rank into p */
 	req_to_int("rank", &p.rank);
@@ -515,13 +539,25 @@ main ()
 	    printf("%s\n",msg);
 	    die("gc");
 	}
-		
+	
 	if ( res == mqs_ok ) {
+	    /* Should check for comm.size here, open-mpi puts MPI_COMM_NULL in the list with a size of 0 */
 	    char *names[] = { "Barrier", "Bcast", "Allgather", "Allgatherv", "Allreduce", "Alltoall", "Alltoallv",
 			      "Reduce_Scatter", "Reduce", "Gather", "Gatherv", "Scan", "Scatter", "Scatterv" };
 	    int c;
 	    c = show_comm(&p,&comm);
-	    
+	    if ( comm.size > 1 ) {
+		if ( gcg ) {
+		    int *ranks = malloc(comm.size*sizeof(int));
+		    int r = gcg((mqs_process *)&p,ranks);
+		    if ( r == mqs_ok ) {
+			int i;
+			for ( i = 0 ; i < comm.size ; i++ ) {
+			    printf("comm%d: Rank: local %d global %d\n",c,i,ranks[i]);
+			}
+		    }
+		    free(ranks);
+		}
 		if ( gcs ) {
 		    int seq;
 		    int active;
@@ -542,11 +578,14 @@ main ()
 		    }
 		}
 		
-	    load_ops((mqs_process *)&p,mqs_pending_receives);
-	    load_ops((mqs_process *)&p,mqs_unexpected_messages);
-	    load_ops((mqs_process *)&p,mqs_pending_sends);
+		load_ops((mqs_process *)&p,mqs_pending_receives);
+		load_ops((mqs_process *)&p,mqs_unexpected_messages);
+		load_ops((mqs_process *)&p,mqs_pending_sends);
+		
+	    }
 	    
 	    nres = nc((mqs_process *)&p);
+	    
 	}
     } while ( res == mqs_ok && nres == mqs_ok );
     
