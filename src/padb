@@ -26,6 +26,7 @@
 #  * First Non-Quadrics version
 #  * Completely new build and packing procedure to go with the new
 #    maintainer.
+#  * Added "ompi" to the list of resource managers supported
 #
 # Version 2.2
 #  * Add a --core-stack option along with --core and --exe to extract stack
@@ -272,6 +273,12 @@ $rmgr{"mpd"} = {
     'setup_pcmd'      => \&mpd_setup_pcmd,
 };
 
+$rmgr{"ompi"} = {
+    'is_installed'    => \&open_is_installed,
+    'get_active_jobs' => \&open_get_jobs,
+    'setup_pcmd'      => \&open_setup_pcmd,
+};
+
 $rmgr{"lsf-rms"} = {
     'is_installed'    => \&lsf_is_installed,
     'get_active_jobs' => \&lsf_get_jobs,
@@ -349,7 +356,7 @@ $conf{"interval"}            = 10;
 $conf{"watch-clears-screen"} = 1;
 $conf{"stats-name"}          = undef;
 $conf{"stats-raw"}           = 0;
-$conf{"stack-strip-above"}   = "elan_waitWord,elan_pollWord,elan_deviceCheck";
+$conf{"stack-strip-above"}   = "elan_waitWord,elan_pollWord,elan_deviceCheck,opal_condition_wait";
 $conf{"scripts"}             = "bash,sh,dash,ash,perl,xterm";
 $conf{"stack-strip-below"}   = "main";
 $conf{"lsf-job-offset"}      = 1;
@@ -2297,6 +2304,133 @@ sub mpd_setup_pcmd {
     $dfile = $fn;
 
     my $cmd = "mpirun -machinefile $fn -np $i";
+
+    return ( $cmd, undef );
+}
+
+###############################################################################
+#
+# open support.
+#
+###############################################################################
+
+sub find_ompi_prefix {
+    my $name = "ompi-ps";
+    foreach my $dir ( split( ":", $ENV{PATH} ) ) {
+        next unless ( -x "$dir/$name" );
+        my @d = split( "/", $dir );
+        pop @d;
+        my $prefix = join( "/", @d );
+        return "--prefix $prefix";
+    }
+    return "";
+}
+
+sub open_is_installed {
+    return find_exe("ompi-ps");
+}
+
+my %open_jobs;
+
+sub open_get_data {
+    my ($filename) = @_;
+
+    my $hostname = hostname();
+    my $job;
+    my @out;
+    if ( defined $filename ) {
+        open( OPEN, $filename ) or return;
+        @out = <OPEN>;
+        close OPEN;
+    } else {
+        open( OPEN, "ompi-ps|" ) or return;
+        @out = <OPEN>;
+        close OPEN;
+    }
+
+    foreach my $l (@out) {
+        chomp $l;
+        next if ( $l eq "" );
+
+        if ( $l =~ /Information from mpirun \[(\d+)\,0\]/ ) {
+
+            $job = $1;
+        } else {
+            my @elems = split( /\|/, $l );
+
+            # print "$#elems\X@elems\Y\n";
+            if ( $#elems == 4 ) {
+
+                #print "@elems\n";
+            } elsif ( $#elems == 6 ) {
+
+                #print "@elems\n";
+                my $host = $elems[4];
+                $host =~ s/ //g;
+                $host =~ s/\t//g;
+                next if $host eq "Node";
+                $open_jobs{$job}{hosts}{$host}++;
+
+                #print "Host is $host\n";
+                if ( $host eq $hostname ) {
+                    my $name = $elems[1];
+                    $name =~ /\[\[(\d+)\,(\d+)\]\,(\d+)\]/;
+                    my $rank = $3;
+
+                    #	    my $rank = $elems[2];
+                    my $pid = $elems[3];
+                    $rank =~ s/ //g;
+                    $pid  =~ s/ //g;
+                    $open_jobs{$job}{ranks}{$host}{$rank} = $pid;
+                }
+            }
+        }
+
+        # print "$_";
+    }
+
+    if ( $conf{"verbose"} ) {
+        print Dumper \%open_jobs;
+    }
+
+    #    print keys %jobs;
+}
+
+sub open_get_jobs {
+    my $user = shift;
+
+    open_get_data();
+    return keys %open_jobs;
+}
+
+sub open_setup_pcmd {
+    my $job = shift;
+
+    open_get_data();
+
+    my ( $th, $tn ) = tempfile(".padb.XXXX");
+
+    open( my $oh, "ompi-ps|" );
+    while (<$oh>) {
+        print $th $_;
+    }
+    close $th;
+    $cinner{"open-ps"} = $tn;
+
+    my @hosts = keys %{ $open_jobs{$job}{hosts} };
+    my $i     = @hosts;
+
+    my ( $fh, $fn ) = tempfile("/tmp/padb.XXXXXXXX");
+
+    foreach my $host (@hosts) {
+        print $fh "$host\n";
+    }
+    close $fh;
+
+    $dfile = $fn;
+
+    my $prefix = find_ompi_prefix();
+    my $cmd    = "mpirun -machinefile $fn -np $i $prefix";
 
     return ( $cmd, undef );
 }
@@ -5077,6 +5211,16 @@ sub find_mpd_pids {
     }
 }
 
+sub find_open_pids {
+    my $job = shift;
+    open_get_data( $confInner{"open-ps"} );
+    my $hostname = hostname();
+
+    foreach my $rank ( keys( %{ $open_jobs{$job}{ranks}{$hostname} } ) ) {
+        maybe_show_pid( $rank, $open_jobs{$job}{ranks}{$hostname}{$rank} );
+    }
+}
+
 sub show_all_pids {
     my $jobid = shift;
 
@@ -5258,6 +5402,9 @@ sub inner_main {
 
     } elsif ( $confInner{"rmgr"} eq "mpd" ) {
         find_mpd_pids($jobid);
+
+    } elsif ( $confInner{"rmgr"} eq "ompi" ) {
+        find_open_pids($jobid);
 
     } elsif ( -d "/proc/rms" ) {
 
