@@ -2280,6 +2280,8 @@ sub mpd_get_data {
     return \%jobs;
 }
 
+# There is a bug here I think, $user isn't used anywhere
+# which is probably bad.
 sub mpd_get_jobs {
     my $user = shift;
 
