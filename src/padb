@@ -4799,7 +4799,7 @@ sub set_debug {
 
 my $mpi_watch_data = <<EOF;
 Barrier,b,elan_gsync,elan_hgsync,PMPI_Barrier,MPI_Barrier,shmem_barrier
-Broadcast,B,elan_hbcast,elan_bcast,PMPI_Broadcast,MPI_Broadcast,shmem_bcast
+Broadcast,B,elan_hbcast,elan_bcast,PMPI_Bcast,MPI_Bcast,shmem_bcast
 AllGather,G,PMPI_Allgather,MPI_ALLgather
 Gather,g,elan_gather,PMPI_Gather,MPI_Gather
 AllReduce,R,PMPI_Allreduce,MPI_Allreduce
