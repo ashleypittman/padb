@@ -376,9 +376,6 @@ $conf{"rmgr"}             = "auto";
 
 # These settings are passed onto inner only.
 $conf{"edbopt"}          = "";
-$conf{"proc-shows-proc"} = 1;
-$conf{"proc-shows-maps"} = 0;
-$conf{"proc-shows-fds"}  = 1;
 $conf{"mpi-dll"}         = "auto";
 
 $conf{"edb"}   = find_edb();
@@ -4730,6 +4727,35 @@ sub show_task_file {
     }
 }
 
+sub show_task_stat_file {
+    my ( $vp, $file, $prefix ) = @_;
+    if ( defined $prefix ) {
+        $prefix = "$prefix";
+    } else {
+        $prefix = "";
+    }
+    my @stat_names =
+      qw(pid comm state ppid pgrp session tty_nr tpgid flags minflt
+      cminflt majflt cmajflt utime stime cutime cstime priority nice
+      num_threads itrealvalue starttime vsize rss rlim startcode endcode
+      startstack kstkesp kstkeip signal blocked sigignore sigcatch wchan
+      nswap cnswap exit_signal processor rt_ptiority policy
+      delayacct_blkio_ticks guest_time cguest_time);
+    return unless ( -f $file );
+    open( FD, "$file" ) or return;
+    my @all = <FD>;
+    close FD;
+
+    foreach my $l (@all) {
+        chomp $l;
+        my @stats = split( / /, $l );
+        for ( my $i = 0 ; $i <= $#stats ; $i++ ) {
+            output( $vp, "$prefix.$stat_names[$i]: @stats[$i]" );
+        }
+
+    }
+}
+
 sub show_task_dir {
     my ( $vp, $dir ) = @_;
 
@@ -4741,7 +4767,10 @@ sub show_task_dir {
         show_task_file( $vp, "$dir/status" );
         show_task_file( $vp, "$dir/wchan", "wchan" );
         show_task_file( $vp, "$dir/stat", "stat" );
-
+	if ( $confInner{"proc-shows-stat"} ) {
+	    show_task_stat_file( $vp, "$dir/stat", "stat" );
+	}
+	
         if ( -f "$dir/maps" ) {
             open( MAP, "$dir/maps" );
             my @map = (<MAP>);
@@ -5787,7 +5816,8 @@ sub common_main {
         'options_i' => {
             "proc-shows-proc" => 1,
             "proc-shows-fds"  => 1,
-            "proc-shows-maps" => 0
+            "proc-shows-maps" => 0,
+            "proc-shows-stat" => 0
           }
 
     };
