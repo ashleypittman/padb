@@ -375,8 +375,8 @@ $conf{"prun-exittimeout"} = 120;
 $conf{"rmgr"}             = "auto";
 
 # These settings are passed onto inner only.
-$conf{"edbopt"}          = "";
-$conf{"mpi-dll"}         = "auto";
+$conf{"edbopt"}  = "";
+$conf{"mpi-dll"} = "auto";
 
 $conf{"edb"}   = find_edb();
 $conf{"minfo"} = find_minfo();
@@ -4757,20 +4757,30 @@ sub show_task_stat_file {
 }
 
 sub show_task_dir {
-    my ( $vp, $dir ) = @_;
+    my ( $vp, $pid, $dir ) = @_;
 
     if ( $confInner{"proc-shows-proc"} ) {
         my $exe = readlink "$dir/exe";
         if ( defined $exe ) {
             output $vp, "exe:$exe";
         }
+
+        # It should be possible to calculate this from info
+        # in /proc but I've not discovered a way so do it
+        # so for now just call ps.
+        my $pcpu = `ps --pid $pid -o pcpu=2>/dev/null`;
+        chomp($pcpu);
+        if ( $pcpu != "" ) {
+            output( $vp, "pcpu:$pcpu" );
+        }
+
         show_task_file( $vp, "$dir/status" );
         show_task_file( $vp, "$dir/wchan", "wchan" );
         show_task_file( $vp, "$dir/stat", "stat" );
-	if ( $confInner{"proc-shows-stat"} ) {
-	    show_task_stat_file( $vp, "$dir/stat", "stat" );
-	}
-	
+        if ( $confInner{"proc-shows-stat"} ) {
+            show_task_stat_file( $vp, "$dir/stat", "stat" );
+        }
+
         if ( -f "$dir/maps" ) {
             open( MAP, "$dir/maps" );
             my @map = (<MAP>);
@@ -4830,10 +4840,10 @@ sub show_proc {
         foreach my $task (@tasks) {
             next if ( $task eq "." );
             next if ( $task eq ".." );
-            show_task_dir( $vp, "/proc/$pid/task/$task" );
+            show_task_dir( $vp, $pid, "/proc/$pid/task/$task" );
         }
     } else {
-        show_task_dir( $vp, "/proc/$pid" );
+        show_task_dir( $vp, $pid, "/proc/$pid" );
     }
 }
 
