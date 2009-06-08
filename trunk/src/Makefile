@@ -12,5 +12,6 @@ tarfile:
 	/bin/rm -rf padb-2.5
 	mkdir padb-2.5
 	/bin/cp ${FILES} padb-2.5
+	svnversion > padb-2.5/svnversion
 	tar -czf padb-2.5.tgz padb-2.5
 
