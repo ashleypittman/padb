@@ -1,13 +1,12 @@
-<head><title>Padb: A parallel debugging tool</title></head>
 <h1>Padb: A parallel debugging tool</h1>
 
 <h2>About</h2>
 <i>Padb</i> is a <b>Job Inspection Tool</b> for examining and
-debugging parallel programs, primaraly it simplifies the process of
-gathering stack traces but also supports a wide range of other functions.
+debugging parallel programs, primarily it simplifies the process of
+gathering stack traces on compute clusters however it also supports a wide range of other functions.
 <i>Padb</i> supports a wide range of parallel environments and it's
 likely it'll work out-of-the-box on your cluster.  It's an
-open source, non-interactive, command line, scriptable tool intended
+open source, non-interactive, command line, script-able tool intended
 for use by programmers and system administrators alike.
 
 <h2>Features</h2>
@@ -16,8 +15,9 @@ for use by programmers and system administrators alike.
 <li>MPI Message queue display</li>
 <li>Deadlock detection</li>
 <li>Process interrogation</li>
-<li>Signal forwarding</li>
+<li>Signal forwarding/delivery</li>
 <li>MPI collective reporting</li>
+<li>Job monitoring</li>
 </ul>
 
 <h2>What padb isn't</h2>
@@ -29,17 +29,17 @@ environment.  <i>Padb</i>
 does not launch or wrap your jobs for you, it is not a job harness but
 rather attaches to or targets jobs which are already running.
 
-<h2>Licence</h2>
-<i>padb</i> is licenced under the
+<h2>License</h2>
+<i>padb</i> is licensed under the
 <a href=http://www.gnu.org/licenses/lgpl.html>LGPL</a> and as such is
-open-source and free to use.
+open-source and free to use and modify.
 
 <h2>History</h2>
-<i>Padb</i> was origionally concieved by software developers at
+<i>Padb</i> was originally conceived by software developers at
 <a href=http://www.quadrics.com/>Quadrics</a> around 2004 to solve the
 kind of problems facing them at the time.  It's been a part of the
 Quadrics software stack for a number of years and has recently been
-made avalaible to a wider audience.  It has been commercially supported
+made available to a wider audience.  It has been commercially supported
 for a number of years and is known to work at a scale of thousands of
 processes.
 
@@ -53,10 +53,11 @@ Runs natively on clusters running RMS.
 <li><a href=https://computing.llnl.gov/linux/slurm>Slurm</a></li>
 Runs natively on clusters running Slurm irrespective of the runtime used.
 <li><a href=http://www.open-mpi.org/>Open MPI</a></li>
-Supports orte or OMPI jobs run under slurm.
+Supports orte or OpenMPI jobs run under slurm.
 <li><a href=http://www.mcs.anl.gov/mpi/mpich/>MPICH2</a></li>
 Supports mpd or MPICH2 jobs run under slurm.
 </ul>
+<p>In addition padb can be told to target individual UNIX processes.
 
 <h2>Prerequisites</h2>
 <i>Padb</i> requires very little support from the OS or parallel
