@@ -29,7 +29,7 @@
 #    if running with a patched MPI (Work in progress)
 #  * Completely new build and packing procedure to go with the new
 #    maintainer.
-#  * Added "ompi" to the list of resource managers supported
+#  * Added "orte" to the list of resource managers supported
 #  * Don't enable local-qsnet on non-qsnet systems.
 #
 # Version 2.2
@@ -178,15 +178,12 @@
 # * Output parsing, {out_handler} is a good start but in stack traces the tree
 #   format is optional, maybe have the secondary arg have a {out_hander} attached?
 # * libunwind support?  lighter weight than gdb and possibly more reliable.
-# * gdb_parse_status() limps along, it's good enough for what we do but has to
-#   be verified and extended every time I do something clever with gdb.
 # * --watch should launch one persistant parallel job rather than a new one every go,
 #   this would require full-duplex comms between inner and outer however so could
 #   present scaling problems.  Maybe PMI would help here?
 # * POD? generated man page?
 # * mode specific defaults, for example --mpi-watch should enable --watch
 #   -Owatch-clears-screen=0
-# * Use ??::nstore to send data over the network instead of plain text?
 # * Make -q fallback to -Q if tports are not avaliable
 # * ???
 
@@ -3617,73 +3614,6 @@ sub gdb_send {
     return $p{status};
 }
 
-#########################################################################
-# These functions (gdb_parse_status,gdb_parse_status_value,gdb_parse_status_pair) aren't
-# perfect yet, there is still some output it struggles with, for this reason we store the
-# initial string in a global so we can give meaningful error messages.
-# my $current_parsed;
-#
-# Takes a string, returns $key,$val,$str
-#sub gdb_parse_status_pair {
-#    my $line = shift;
-#    if ( $line =~ /([\w\-]+)=(.*)/ ) {
-#        my $key = $1;
-#        my $value;
-#        ( $value, $line ) = gdb_parse_status_value($2);
-#        return $key, $value, $line;
-#    } else {
-#        printf("parse_status_pair: bad line '$current_parsed'\n");
-#        return undef, undef, undef;
-#    }
-#}
-#
-# Takes a string, returns $value, $remainder.
-#sub gdb_parse_status_value {
-#    my $str = shift;
-#    if ( $str =~ /^\[(.*)\](.*)/ ) {
-#        my $here = $1;
-#        my $line = $2;
-#        if ( $here =~ /^\{(.*)\}$/ ) {
-#
-#            # It's more key-value pairs.
-#            my ( $k, $v );
-#            my $r = gdb_parse_status($1);
-#            return $r;
-#        } else {
-#            # It's an array of values.
-#            my @vals = map { gdb_strip_quotes($_) } split( ",", $here );
-#            return \@vals, $line;
-#        }
-#    }
-#    if ( $str =~ /^\{(.*)\}$/ ) {
-#
-#        # It's more key-value pairs.
-#        my ( $k, $v );
-#        my $r = gdb_parse_status($1);
-#        return $r;
-#    }
-#    my @all = split( ",", $str );
-#    my $value = shift(@all);
-#    return gdb_strip_quotes($value), join( ",", @all );
-#}
-#
-#sub gdb_parse_status {
-#    my $line = shift;
-#    my %res;
-#    do {
-#        my ( $key, $value );
-#        ( $key, $value, $line ) = gdb_parse_status_pair($line);
-#        if ( defined $key ) {
-#            $res{$key} = $value;
-#        } else {
-#            printf("parse_status: bad line '$current_parsed'\n");
-#            return undef;
-#        }
-#    } while ( defined $line and length $line > 0 );
-#    return \%res;
-#}
-
-#########################################################################
 sub strip_square {
     my $str = shift;
     $str =~ /^\[(.*)\]$/;
