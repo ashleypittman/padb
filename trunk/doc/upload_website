@@ -15,6 +15,7 @@ do
   TFILE=`mktemp`
   cat header.html > $TFILE
   cat $FILE >> $TFILE
+  cat ga.html >> $TFILE
   ftp-upload --host padb.pittman.org.uk -u padb@pittman.co.uk --password $PASSWORD --as $FILE $TFILE
   rm $TFILE
 done
