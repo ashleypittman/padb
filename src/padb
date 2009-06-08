@@ -4768,10 +4768,13 @@ sub show_task_dir {
         # It should be possible to calculate this from info
         # in /proc but I've not discovered a way so do it
         # so for now just call ps.
-        my $pcpu = `ps --pid $pid -o pcpu=2>/dev/null`;
+        # Turns out this isn't great either, ps reports time
+        # as a percentage since the program started so
+        # isn't live as the top-reported figure is.
+        my $pcpu = `ps --pid $pid -o pcpu= 2>/dev/null`;
         chomp($pcpu);
         if ( $pcpu != "" ) {
-            output( $vp, "pcpu:$pcpu" );
+            output( $vp, "pcpu:$pcpu%" );
         }
 
         show_task_file( $vp, "$dir/status" );
