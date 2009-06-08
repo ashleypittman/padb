@@ -258,6 +258,7 @@ my @inner_conf = qw(edb edbopt minfo rmgr scripts slurm-job-step verbose);
 # is_job_running  job  Bool      no       Check if a given job is running.
 # job_to_key      job  key       no       Convert from jobId to shm key.
 # setup_pcmd      job  cmd|ncpus yes      Command needed to launch shadow jobs.
+# cleanup_pcmd    -    -         no       Cleans up and tempory files.
 
 # inner_rmgr      var  n/a       no       Resource manager to masquarade as.
 
@@ -275,12 +276,14 @@ $rmgr{"mpd"} = {
     'is_installed'    => \&mpd_is_installed,
     'get_active_jobs' => \&mpd_get_jobs,
     'setup_pcmd'      => \&mpd_setup_pcmd,
+    'cleanup_pcmd'    => \&mpd_cleanup_pcmd,
 };
 
 $rmgr{"ompi"} = {
     'is_installed'    => \&open_is_installed,
     'get_active_jobs' => \&open_get_jobs,
     'setup_pcmd'      => \&open_setup_pcmd,
+    'cleanup_pcmd'    => \&open_cleanup_pcmd,
 };
 
 $rmgr{"lsf-rms"} = {
@@ -337,7 +340,6 @@ my $countoutput    = 0;
 
 my %cinner;    # Config options to be passed to inner.
 my $rem_jobid;
-my $dfile;
 
 # Debug options.
 $conf{"verbose"}      = 0;
@@ -2291,6 +2293,8 @@ sub mpd_get_jobs {
     return @jobs;
 }
 
+my $mpd_dfile;
+
 sub mpd_setup_pcmd {
     my $job = shift;
 
@@ -2305,11 +2309,15 @@ sub mpd_setup_pcmd {
     }
     close $fh;
 
-    $dfile = $fn;
+    $mpd_dfile = $fn;
 
     my $cmd = "mpirun -machinefile $fn -np $i";
 
     return ( $cmd, undef );
+}
+
+sub mpd_cleanup_pcmd {
+    unlink($mpd_dfile) if ( defined($mpd_dfile) );
 }
 
 ###############################################################################
@@ -2407,6 +2415,9 @@ sub open_get_jobs {
     return keys %open_jobs;
 }
 
+my $open_dfile;
+my $open_tfile;
+
 sub open_setup_pcmd {
     my $job = shift;
 
@@ -2421,6 +2432,8 @@ sub open_setup_pcmd {
     close $th;
     $cinner{"open-ps"} = $tn;
 
+    $open_tfile = $tn;
+
     my @hosts = keys %{ $open_jobs{$job}{hosts} };
     my $i     = @hosts;
 
@@ -2431,12 +2444,17 @@ sub open_setup_pcmd {
     }
     close $fh;
 
-    $dfile = $fn;
+    $open_dfile = $fn;
 
     my $prefix = find_ompi_prefix();
     my $cmd    = "mpirun -machinefile $fn -np $i $prefix";
 
     return ( $cmd, undef );
+}
+
+sub open_cleanup_pcmd {
+    unlink($open_dfile) if ( defined($open_dfile) );
+    unlink($open_tfile) if ( defined($open_tfile) );
 }
 
 ###############################################################################
@@ -2591,6 +2609,13 @@ sub job_to_key {
 sub setup_pcmd {
     my $job = shift;
     return $rmgr{ $conf{"rmgr"} }{setup_pcmd}($job);
+}
+
+sub cleanup_pcmd {
+    my $job = shift;
+    if ( defined( $rmgr{ $conf{"rmgr"} }{cleanup_pcmd} ) ) {
+        $rmgr{ $conf{"rmgr"} }{cleanup_pcmd}();
+    }
 }
 
 ###############################################################################
@@ -3090,14 +3115,14 @@ sub go_job {
             my $errors =
               go_job_once( $jobid, $cmd, $ncpus, $raw, $stats, $mode, $h );
             if ( $errors != 0 ) {
-                unlink $dfile if defined $dfile;
+                cleanup_pcmd();
                 return $errors;
             }
             sleep( $conf{"interval"} );
         }
     }
     my $errors = go_job_once( $jobid, $cmd, $ncpus, $raw, $stats, $mode, $h );
-    unlink $dfile if defined $dfile;
+    cleanup_pcmd();
     return $errors;
 }
 
