@@ -279,7 +279,7 @@ $rmgr{"mpd"} = {
     'cleanup_pcmd'    => \&mpd_cleanup_pcmd,
 };
 
-$rmgr{"ompi"} = {
+$rmgr{"orte"} = {
     'is_installed'    => \&open_is_installed,
     'get_active_jobs' => \&open_get_jobs,
     'setup_pcmd'      => \&open_setup_pcmd,
@@ -5740,7 +5740,7 @@ sub inner_main {
     } elsif ( $confInner{"rmgr"} eq "mpd" ) {
         find_mpd_pids($jobid);
 
-    } elsif ( $confInner{"rmgr"} eq "ompi" ) {
+    } elsif ( $confInner{"rmgr"} eq "orte" ) {
         find_open_pids($jobid);
 
     } elsif ( -d "/proc/rms" ) {
