@@ -1,7 +1,9 @@
 #!/usr/bin/perl
 
 # padb. a simple parallel debugging aid from Quadrics.
-# http://padb.pittman.org.uk
+
+# For help and support visit http://padb.pittman.org.uk
+# or email padb-users@pittman.org.uk
 
 # Copyright (C) 2005-2007 Quadrics.
 # Copyright (C) 2009 Ashley Pittman.
@@ -22,7 +24,7 @@
 
 # Revision history
 #
-# Version 2.5
+# Version 2.5 (Beta)
 #  * First Non-Quadrics version
 #  * Various stability/bug fixes.
 #  * Deadlock detect at the MPI Layer rather than the Elan layer
@@ -46,7 +48,7 @@
 #  * Add support for "local-fd" as a way of launching jobs.
 #  * Add support for "mpd" as a way of launching jobs.
 #  * Add support for "lsf-rms" as a way of launching jobs.  Note the lsf/rms
-#    integration means this is highly unlikey to work for everyone.
+#    integration means this is highly unlikely to work for everyone.
 #  * Add a -Olsf-job-offset option for finding lsf jobs in the rms database.
 #  * Support for MPI message queues as well as libelan queues (-Q)
 #  * Add a -Ominfo=<exe> option for finding the new minfo.x command.
@@ -59,7 +61,7 @@
 #  * Correct printing of debug information from the inner.
 #  * Try and remove warnings when run with -w (still disabled)
 #  * Un-break it on slurm systems without RMS installed.
-#  * Preliminiary threading support (courtesy of LLNL)
+#  * Preliminary threading support (courtesy of LLNL)
 #  * Show per-rail sdram usage of processes.
 #  * Look at all descendant processes of slurmstepd rather than direct descendants
 #    and try and avoid scripts (perl/sh/bash/xterm)
@@ -72,7 +74,7 @@
 #  * Removed the -OscriptDir option as it's no longer used, use -Oedb instead.
 #  * Corrected the way tally statistics were being added.
 #  * Added a --show-jobs option to show possible jobs in a resource manager
-#    independant way.
+#    independent way.
 #  * Added a --local-stats option to show message statistics for all processes
 #    on the local node.
 #  * Added a --proc-format option which allows specific entries from /proc to be
@@ -103,7 +105,7 @@
 #  * Re-work the stack trace tree generation code do work via a intermediate
 #    data structure to make the code easier to parse.
 #  * Report errors loading stats from a running job cleanly.
-#  * Better backwards compatability with older RMS releases.
+#  * Better backwards compatibility with older RMS releases.
 #  * Add a padb-treeview script to the release, this takes most of it's code
 #    from padb and uses tk to provide the user with a X based view of the stack
 #    traces.
@@ -124,8 +126,8 @@
 #    warnings (-w) enabled.
 #  * Added a -Ostats-name= option to allow the extraction of one specific
 #    statistic from the command line.
-#  * Create seperate file descriptors for stdout and stderr when running in
-#    parallel to make it more resiliant.
+#  * Create separate file descriptors for stdout and stderr when running in
+#    parallel to make it more resilient.
 #
 # Version 1.3
 #  * Strip stack traces below main when possible, add a --nostrip-below-main
@@ -148,7 +150,7 @@
 #    but now have long alternatives
 #  * Removed the need to set -OscriptDir= when running in non-default locations
 #  * Added a --full-report=<jobId> option to gather all possible information
-#  * General tidyups in the stack trace tree generation code.
+#  * General tidy ups in the stack trace tree generation code.
 #  * Now reports processes that aren't present when generating stack traces.
 #  * Now reports errors properly when there are errors launching the parallel
 #    job
@@ -160,7 +162,7 @@
 # TODO:
 #
 # * More testing with -w turned on.
-# * Multi-pass argunment handling, --kill also accepts --signal for example,
+# * Multi-pass argument handling, --kill also accepts --signal for example,
 #   this should really be done at the getopt layer.  Also proper usage
 #   info for these secondary args.
 # * inner_main() should possibly use callbacks for resource manager support,
@@ -168,23 +170,23 @@
 # * find_slurm_pids() has some good code in it for finding parallel processes
 #   this should be extrapolated out and so it can be used in the mpd case,
 #   ideally on non-rms systems (RMS rocks in this regard) the rmgr callback
-#   should return a list of spawed pids and the code in find_slurm_pids() should
+#   should return a list of spawned pids and the code in find_slurm_pids() should
 #   pass this tree to find the most interesting one.
 # * The mode {handler} functions should only be called once per node, it could then
 #   correctly handle $confInner{gdb_file} and also attach to every process per node
-#   simultanously, this would help stack trace and message queue support as doing
-#   then one at a time results in weird artefacts.  (Done for stack traces but not
+#   simultaneously, this would help stack trace and message queue support as doing
+#   then one at a time results in weird artifacts.  (Done for stack traces but not
 #   message queues).
 # * Output parsing, {out_handler} is a good start but in stack traces the tree
 #   format is optional, maybe have the secondary arg have a {out_hander} attached?
 # * libunwind support?  lighter weight than gdb and possibly more reliable.
-# * --watch should launch one persistant parallel job rather than a new one every go,
+# * --watch should launch one persistent parallel job rather than a new one every go,
 #   this would require full-duplex comms between inner and outer however so could
 #   present scaling problems.  Maybe PMI would help here?
 # * POD? generated man page?
 # * mode specific defaults, for example --mpi-watch should enable --watch
 #   -Owatch-clears-screen=0
-# * Make -q fallback to -Q if tports are not avaliable
+# * Make -q fallback to -Q if tports are not available
 # * ???
 
 ###############################################################################
@@ -209,7 +211,7 @@ use MIME::Base64;
 # Formatted with the command 'perltidy -b -ce -w padb' to maintain a
 # vaguely readable form.
 
-# This (large) source file contains a number of loosely seperated segments,
+# This (large) source file contains a number of loosely separated segments,
 # namely...
 
 # Header.
@@ -231,7 +233,7 @@ use MIME::Base64;
 # Main.
 
 my $prog    = basename $0;
-my $version = "2.5";
+my $version = "2.5-beta";
 
 my %conf;
 
@@ -255,9 +257,9 @@ my @inner_conf = qw(edb edbopt minfo rmgr scripts slurm-job-step verbose);
 # is_job_running  job  Bool      no       Check if a given job is running.
 # job_to_key      job  key       no       Convert from jobId to shm key.
 # setup_pcmd      job  cmd|ncpus yes      Command needed to launch shadow jobs.
-# cleanup_pcmd    -    -         no       Cleans up and tempory files.
+# cleanup_pcmd    -    -         no       Cleans up and temporary files.
 
-# inner_rmgr      var  n/a       no       Resource manager to masquarade as.
+# inner_rmgr      var  n/a       no       Resource manager to masquerade as.
 
 my %rmgr;
 
@@ -388,7 +390,7 @@ sub find_i_dir {
     # If padb is running from anywhere that looks like
     # usr/bin then assume the RPM has been either installed
     # or unpacked somewhere and get scripts from the
-    # equivilent place.  If it doesn't match usr/bin then
+    # equivalent place.  If it doesn't match usr/bin then
     # I don't know how it got installed so assume everything
     # is in the current directory.
     # This allows -Oedb=/path/to/edb to override.
@@ -449,8 +451,10 @@ Usage: padb [-hv] [-c|-C|-t] -g|-q|-s|-x|-X [-O <opt>=<val>
 XXXX
    --full-report=JOBID All of the above.
 
-   --nostrip-below-main Dont strip stack traces below main.
-   --nostrip-above-wait Dont strip stack traces about elan_waitWord.
+   --nostrip-below-main Don't strip stack traces below main.
+   --nostrip-above-wait Don't strip stack traces about elan_waitWord.
+
+   --proc-format       Specify information to show about processes.
 
 -c --compress          Use dshbac -c format.
 -C --compress-long     Use other dshbak format.
@@ -476,7 +480,7 @@ XXXX
   Stack trace options:
   tree-verbose         turn on debugging for the stack trace tree generation code.
   gdb-retry-count      Number of times to try getting a 'good' stack trace from gdb.
-  stack-show-params    Show function paramaters in stack traces.
+  stack-show-params    Show function parameters in stack traces.
   stack-show-locals    Show locals in stack traces.
 
   Statistics options:
@@ -634,7 +638,7 @@ sub parse_args_outer {
 
 # Work around problems with the "hex" function and whilst we are
 # at it avoid warnings as well.
-# Unfortunaty hex can't deal with anything bigger than 2^31 without
+# Unfortunately hex can't deal with anything bigger than 2^31 without
 # giving an error so simply +0 on the string to convert it to a int
 # cleanly (GNAT 7945).
 sub _hex {
@@ -1462,10 +1466,10 @@ sub show_stats {
 ###############################################################################
 
 sub group_status_helper {
-    my $str       = shift;    # tagged onto the end of the line.
-    my $possesive = shift;    # syntax to use (possesive/attributive)
-    my $size      = shift;    # size of the group
-    my @identical = @_;       # member list
+    my $str        = shift;    # tagged onto the end of the line.
+    my $possessive = shift;    # syntax to use (possessive/attributive)
+    my $size       = shift;    # size of the group
+    my @identical  = @_;       # member list
     my $ret;
     my $sstr = defined $size ? " (size $size)" : "";
 
@@ -1479,7 +1483,7 @@ sub group_status_helper {
         $have    = "has";
     }
 
-    if ($possesive) {
+    if ($possessive) {
         $are = $have;
     }
 
@@ -2936,7 +2940,7 @@ sub go_job_once {
     };
 
     # According to the docs there is potential for deadlock here
-    # if the ammount of data coming in is enough to fill the buffers
+    # if the amount of data coming in is enough to fill the buffers
     # We should really use IO::select it's not clear to me how
     # you detect EOF in that case and this works for now.
 
@@ -3475,8 +3479,8 @@ sub outer_main {
 #
 ###############################################################################
 
-# The code below here used to be in a serperate script (padb-helper.pl) but
-# it's become apparant that for ease-of-distrobution padb works better if it
+# The code below here used to be in a separate script (padb-helper.pl) but
+# it's become apparent that for ease-of-distribution padb works better if it
 # is self-contained in one file.  Now we just have a big switch on ARGV[0]
 # and either run the inner or outer code depending on if it's set or not.
 
@@ -4614,10 +4618,10 @@ sub get_rms_jobid {
 
     return undef unless ( -d $rmsdir );
 
-    # This is a bit odd and isnt well tested (I don't have access to slurm)
+    # This is a bit odd and isn't well tested (I don't have access to slurm)
     # We have been given the slurm ID on the command line and need to convert
     # this to a RMS id (as the kernel module sees it).
-    # Foreach active RMS job on the node check if this pid translates to
+    # For each active RMS job on the node check if this pid translates to
     # a slurm pid for the job we have;
 
     my %gids = slurm_get_ids($slurmid);
@@ -4825,7 +4829,7 @@ sub gdb_int_from_pid {
 # then go back and query them each in turn, should mean that some processes are
 # not spinning whilst gdb is doing it's thing which will mean a quicker runtime
 # but also that the resulting stack traces will have less artifacts because running
-# processes buch up behind the non-running ones.
+# processes bunch up behind the non-running ones.
 sub stack_trace_from_pids {
     my ($list) = @_;
 
@@ -5362,7 +5366,7 @@ sub find_slurm_pids {
     my $jobid = shift;
 
     # Slurm has the concept of a "job" and a "job step" which are
-    # roughly analagous to "resource" and "job" in RMS terms,
+    # roughly analogous to "resource" and "job" in RMS terms,
     # the difference being that steps within a job are counted
     # from 0 in slurm whereas there is a global job namespace in
     # RMS.
@@ -5371,7 +5375,7 @@ sub find_slurm_pids {
     # -Oslurm-job-step=<step> to target individual job steps within
     # a job however.
 
-    # Moderm slurm systems have a scontol listpids option which we use however
+    # Modern slurm systems have a scontol listpids option which we use however
     # older systems require a little more legwork and aren't precise.
 
     # These are the key variables...
@@ -5456,7 +5460,7 @@ sub find_slurm_pids {
 sub find_local_pids {
     my $pid = shift;
 
-# Hardwire this to vp 0, probably not true but without the resource manager it's difficult
+# Hard-wire this to vp 0, probably not true but without the resource manager it's difficult
 # to tell.  We should really use elan_base->state->vp here.
     my $vp = gdb_int_from_pid( $pid, "elan_base->state->vp" );
     if ( not defined $vp or $vp eq "" ) {
@@ -5697,11 +5701,11 @@ sub inner_main {
 #
 ###############################################################################
 
-# Initialiase (some of) the options which are common to both the
+# Initialise (some of) the options which are common to both the
 # inner and outer instances of padb.  Attempt to make it easy
 # to add new options by keeping everything in one place.
 #
-# Additional work is needed to make this 100% consistant, some
+# Additional work is needed to make this 100% consistent, some
 # of these options have secondary options (e.g. --kill and --signal) and
 # this isn't dealt with yet.
 #
