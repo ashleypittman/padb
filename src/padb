@@ -35,6 +35,7 @@
 #  * Don't enable local-qsnet on non-qsnet systems.
 #  * inner_main() now uses callbacks for resource manager support.
 #  * --signal now takes names rather than numbers.
+#  * Check job is valid when using the --full-report option.
 
 # Version 2.2
 #  * Add a --core-stack option along with --core and --exe to extract stack
@@ -458,8 +459,8 @@ Usage: padb [-hv] [-c|-C|-t] -g|-q|-s|-x|-X [-O <opt>=<val>
 XXXX
    --full-report=JOBID All of the above.
 
-   --nostrip-below-main Don't strip stack traces below main.
-   --nostrip-above-wait Don't strip stack traces about elan_waitWord.
+   --nostrip-below-main Don\'t strip stack traces below main.
+   --nostrip-above-wait Don\'t strip stack traces about elan_waitWord.
 
    --proc-format       Specify information to show about processes.
 
@@ -1430,7 +1431,7 @@ sub show_stats {
     # vp's only, if it's not set then display a total for everyone.
 
     if ( not $d ) {
-        print("Statistics not valid\n");
+        print("QsNet Statistics not valid\n");
         return;
     }
 
@@ -2366,6 +2367,11 @@ my %open_jobs;
 sub open_get_data {
     my ($filename) = @_;
 
+    # Simply return if called more than once.
+    if ( keys(%open_jobs) != 0 ) {
+        return;
+
+    }
     my $hostname = hostname();
     my $job;
     my @out;
@@ -2379,6 +2385,11 @@ sub open_get_data {
         close OPEN;
     }
 
+    # Handle being called multiple times, zero the hash every
+    # time we are called.  Of course we could just return the
+    # existing hash which might be quicker.
+    %open_jobs = ();
+
     foreach my $l (@out) {
         chomp $l;
         next if ( $l eq "" );
@@ -2389,26 +2400,19 @@ sub open_get_data {
         } else {
             my @elems = split( /\|/, $l );
 
-            # print "$#elems\X@elems\Y\n";
-            if ( $#elems == 4 ) {
+            if ( $#elems == 6 ) {
 
-                #print "@elems\n";
-            } elsif ( $#elems == 6 ) {
-
-                #print "@elems\n";
                 my $host = $elems[4];
                 $host =~ s/ //g;
                 $host =~ s/\t//g;
                 next if $host eq "Node";
                 $open_jobs{$job}{hosts}{$host}++;
 
-                #print "Host is $host\n";
                 if ( $host eq $hostname ) {
                     my $name = $elems[1];
                     $name =~ /\[\[(\d+)\,(\d+)\]\,(\d+)\]/;
                     my $rank = $3;
 
-                    #	    my $rank = $elems[2];
                     my $pid = $elems[3];
                     $rank =~ s/ //g;
                     $pid  =~ s/ //g;
@@ -2417,14 +2421,11 @@ sub open_get_data {
             }
         }
 
-        # print "$_";
     }
 
     if ( $conf{"verbose"} ) {
         print Dumper \%open_jobs;
     }
-
-    #    print keys %jobs;
 }
 
 sub open_get_jobs {
@@ -2950,6 +2951,10 @@ sub go_job_once {
 
     my $errors = 0;
 
+    my $report_errors = 1;
+
+    $report_errors = 0 if ($full_report);
+
     my $pcmd = {
         pid => -1,
         in  => "",
@@ -2998,7 +3003,9 @@ sub go_job_once {
         my $handle = $pcmd->{err};
         while (<$handle>) {
             my $line = $_;
-            print( STDERR "Error ($jobid,$mode): $line" );
+            if ($report_errors) {
+                print( STDERR "Error ($jobid,$mode): $line" );
+            }
             $errors++;
         }
 
@@ -3015,7 +3022,10 @@ sub go_job_once {
         if ( $res != 0 ) {
             my %status = rc_status($res);
             if ( job_is_running($jobid) ) {
-                printf("Failed to run parallel command (rc = $status{rc})\n");
+                if ($report_errors) {
+                    printf(
+                        "Failed to run parallel command (rc = $status{rc})\n");
+                }
             } else {
                 printf("Job $jobid is no longer active\n");
                 return 1;
@@ -3333,6 +3343,14 @@ sub outer_main {
     }
 
     if ($full_report) {
+
+        if ( not job_is_running($full_report) ) {
+            printf( STDERR
+"Job $full_report is not active, use --show-jobs to see active jobs\n"
+            );
+            exit(1);
+        }
+
         printf("padb version $version\n");
         printf("full job report for job $full_report\n\n");
 
@@ -3342,7 +3360,7 @@ sub outer_main {
         my $res;
         $stats_total = 1;
         $group       = 1;
-        $res         = go_job( $full_report, undef );
+        $res         = go_job( $full_report, "full-report" );
         undef $stats_total;
         undef $group;
 
