@@ -33,7 +33,9 @@
 #    maintainer.
 #  * Added "orte" to the list of resource managers supported
 #  * Don't enable local-qsnet on non-qsnet systems.
-#
+#  * inner_main() now uses callbacks for resource manager support.
+#  * --signal now takes names rather than numbers.
+
 # Version 2.2
 #  * Add a --core-stack option along with --core and --exe to extract stack
 #    traces from core files.
@@ -165,12 +167,10 @@
 # * Multi-pass argument handling, --kill also accepts --signal for example,
 #   this should really be done at the getopt layer.  Also proper usage
 #   info for these secondary args.
-# * inner_main() should possibly use callbacks for resource manager support,
-#   it's starting to look a bit messy.
-# * find_slurm_pids() has some good code in it for finding parallel processes
+# * slurm_find_pids() has some good code in it for finding parallel processes
 #   this should be extrapolated out and so it can be used in the mpd case,
 #   ideally on non-rms systems (RMS rocks in this regard) the rmgr callback
-#   should return a list of spawned pids and the code in find_slurm_pids() should
+#   should return a list of spawned pids and the code in slurm_find_pids() should
 #   pass this tree to find the most interesting one.
 # * The mode {handler} functions should only be called once per node, it could then
 #   correctly handle $confInner{gdb_file} and also attach to every process per node
@@ -259,6 +259,7 @@ my @inner_conf = qw(edb edbopt minfo rmgr scripts slurm-job-step verbose);
 # job_to_key      job  key       no       Convert from jobId to shm key.
 # setup_pcmd      job  cmd|ncpus yes      Command needed to launch shadow jobs.
 # cleanup_pcmd    -    -         no       Cleans up and temporary files.
+# find_pids       job  -         maybe    Called on the inner to locate pids.
 
 # inner_rmgr      var  n/a       no       Resource manager to masquerade as.
 
@@ -270,6 +271,7 @@ $rmgr{"rms"} = {
     'job_is_running'  => \&rms_job_is_running,
     'job_to_key'      => \&rms_job_to_key,
     'setup_pcmd'      => \&rms_setup_pcmd,
+    'find_pids'       => \&rms_find_pids,
 };
 
 $rmgr{"mpd"} = {
@@ -277,6 +279,7 @@ $rmgr{"mpd"} = {
     'get_active_jobs' => \&mpd_get_jobs,
     'setup_pcmd'      => \&mpd_setup_pcmd,
     'cleanup_pcmd'    => \&mpd_cleanup_pcmd,
+    'find_pids'       => \&mpd_find_pids,
 };
 
 $rmgr{"orte"} = {
@@ -284,6 +287,7 @@ $rmgr{"orte"} = {
     'get_active_jobs' => \&open_get_jobs,
     'setup_pcmd'      => \&open_setup_pcmd,
     'cleanup_pcmd'    => \&open_cleanup_pcmd,
+    'find_pids'       => \&open_find_pids,
 };
 
 $rmgr{"lsf-rms"} = {
@@ -298,12 +302,14 @@ $rmgr{"slurm"} = {
     'get_active_jobs' => \&slurm_get_jobs,
     'job_is_running'  => \&slurm_job_is_running,
     'setup_pcmd'      => \&slurm_setup_pcmd,
+    'find_pids'       => \&slurm_find_pids,
 };
 
 $rmgr{"local"} = {
     'get_active_jobs' => \&local_get_jobs,
     'job_is_running'  => \&local_job_is_running,
     'setup_pcmd'      => \&local_setup_pcmd,
+    'find_pids'       => \&local_find_pids,
 };
 
 $rmgr{"local-qsnet"} = {
@@ -5414,7 +5420,7 @@ sub slurm_get_ids {
 }
 
 # Do the right thing with slurm...
-sub find_slurm_pids {
+sub slurm_find_pids {
     my $jobid = shift;
 
     # Slurm has the concept of a "job" and a "job step" which are
@@ -5509,7 +5515,7 @@ sub find_slurm_pids {
 }
 
 # Local processes per node, i.e. no resource manager support.
-sub find_local_pids {
+sub local_find_pids {
     my $pid = shift;
 
 # Hard-wire this to vp 0, probably not true but without the resource manager it's difficult
@@ -5522,7 +5528,7 @@ sub find_local_pids {
     maybe_show_pid( $vp, $pid );
 }
 
-sub find_mpd_pids {
+sub mpd_find_pids {
     my $job = shift;
     my $d   = mpd_get_data();
 
@@ -5533,7 +5539,7 @@ sub find_mpd_pids {
     }
 }
 
-sub find_open_pids {
+sub open_find_pids {
     my $job = shift;
     open_get_data( $confInner{"open-ps"} );
     my $hostname = hostname();
@@ -5543,7 +5549,7 @@ sub find_open_pids {
     }
 }
 
-sub show_all_pids {
+sub rms_find_pids {
     my $jobid = shift;
 
     my %vps;
@@ -5703,6 +5709,10 @@ sub inner_main {
 
     $confInner{"myld"} = $ENV{"LD_LIBRARY_PATH"};
 
+    # $rjobid is used for accessing the stats on slurm
+    # systems, on rms it's just the jobId but on combined
+    # slurm/rms systems it's modifed to be the rms id
+    # and the jobid is left as the slurm job id.
     my $rjobid = $jobid;
     if ( exists $ENV{"SLURM_PROCID"} ) {
         $rjobid = get_rms_jobid($jobid);
@@ -5719,25 +5729,23 @@ sub inner_main {
         exit(0);
     }
 
-    if ( $confInner{"rmgr"} eq "local" ) {
+    # Handle resource managers better, simply call a callback
+    # as the outer does.
+    # As usual there is a special case, on Slurm systems
+    # running QsNet you can have the RMS kernel module loaded
+    # and these need to be handled differently so deal with
+    # them first and then go to the standard callback.
 
-        # Takes a pid.
-        find_local_pids($jobid);
-
-    } elsif ( $confInner{"rmgr"} eq "mpd" ) {
-        find_mpd_pids($jobid);
-
-    } elsif ( $confInner{"rmgr"} eq "orte" ) {
-        find_open_pids($jobid);
-
-    } elsif ( -d "/proc/rms" ) {
+    if ( ( $confInner{rmgr} eq "slurm" ) and ( -d "/proc/rms" ) ) {
 
         # Takes a RMS job id.
-        show_all_pids($rjobid);
+        rms_find_pids($rjobid);
     } else {
-
-        # Takes a native job id.
-        find_slurm_pids($jobid);
+        if ( not defined $rmgr{ $confInner{rmgr} }{find_pids} ) {
+            printf("Error, rmgr $confInner{rmgr} has no find_pids callback\n");
+            exit(1);
+        }
+        $rmgr{ $confInner{rmgr} }{find_pids}($jobid);
     }
 
     if ( defined $allfns{$mode}{handler_all} ) {
