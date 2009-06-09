@@ -201,6 +201,7 @@ use Storable qw(dclone nfreeze thaw);
 use Sys::Hostname;
 use File::Temp qw(tempfile);
 use MIME::Base64;
+use Config;
 
 ###############################################################################
 #
@@ -566,6 +567,10 @@ my $strip_above_wait = 1;
 my @config_options;
 my %ic_names;
 
+# Populated in the outer args section so that outer code
+# can access secondary comamnd line argunments by name.
+my %secondary_args;
+
 sub parse_args_outer {
 
     Getopt::Long::Configure("bundling");
@@ -625,6 +630,13 @@ sub parse_args_outer {
         next unless defined $config_hash{$arg};
         $mode = $arg;
         $have_allfns_option++;
+    }
+
+    # Put the args in a hash so that they can be referenced by name.
+    if ( defined $allfns{$mode}{secondary} ) {
+        foreach my $sec ( @{ $allfns{$mode}{secondary} } ) {
+            $secondary_args{ $sec->{arg_long} } = $sec->{value};
+        }
     }
 
     return $mode;
@@ -3414,6 +3426,17 @@ sub outer_main {
         );
     }
 
+    # If delivering a signal check that it's valid.
+    if ( defined($mode) and ( $mode eq "kill" ) ) {
+        my $signal = $secondary_args{signal};
+        my %sig_names;
+        map { $sig_names{$_} = 1 } split( " ", $Config{"sig_name"} );
+
+        if ( not defined $sig_names{$signal} ) {
+            cmdline_error("$prog: Error: signal $signal is invalid\n");
+        }
+    }
+
     if ( $tree and !( ( defined $mode && $mode eq "stack" ) or $input_file ) ) {
         cmdline_error("$prog: Error: --tree only works with --stack-trace\n");
     }
@@ -5652,6 +5675,7 @@ sub inner_main {
 
     $confInner{"mode"} = $mode;
 
+    # Put the args in a hash so that they can be referenced by name.
     if ( defined $allfns{$mode}{secondary} ) {
         foreach my $sec ( @{ $allfns{$mode}{secondary} } ) {
             $confInner{"args"}{ $sec->{arg_long} } = $sec->{value};
@@ -5785,8 +5809,8 @@ sub common_main {
         'secondary' => [
             {
                 'arg_long' => 'signal',
-                'type'     => 'i',
-                'default'  => '15'
+                'type'     => 's',
+                'default'  => 'TERM'
             }
         ]
     };
