@@ -2693,31 +2693,6 @@ sub strip_stack_traces {
     }
 }
 
-sub stack_to_hash {
-    my $line = shift;
-    if ( $line =~ /([\w\?]*)\(\) at ([\?\w\/\.]*):(\d*)/ ) {
-        my %data;
-        $data{func} = $1;
-        $data{file} = $2;
-        $data{line} = $3;
-        return %data;
-    }
-    return undef;
-}
-
-sub munge_stack_traces {
-    my $lines = shift;
-
-    foreach my $tag ( keys %$lines ) {
-        for ( my $l = 0 ; $l <= $#{ $lines->{$tag} } ; $l++ ) {
-            my %data = stack_to_hash( $lines->{$tag}->[$l] );
-            if ( %data and $data{func} ) {
-                $lines->{$tag}->[$l] = "$data{func}()";
-            }
-        }
-    }
-}
-
 sub sort_proc_hashes {
     my $key = shift;
     my @all = @_;
@@ -2768,10 +2743,6 @@ sub show_results {
         if ( $strip_below_main or $strip_above_wait ) {
             strip_stack_traces($lines);
         }
-
-        #if ( defined $conf{stack_format} ) {
-        #    munge_stack_traces($lines);
-        #}
     }
 
     if ($tree) {
