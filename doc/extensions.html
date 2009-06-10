@@ -1,10 +1,109 @@
-<h2>Patches</h2>
-The advanced Group Deadlock Detection algorithm within <i>padb</i>
-requires modifications to the MPI library to function properly.
-At this time patches are available for Open MPI svn trunk
-only.
-Contact the <a href="mailto:padb-devel@pittman.org.uk">developer mailing list</a>
-for more information.
+
+<h2>MPI collective debugger extension proposal</h2>
+
+<h3>Overview</h3>
+The current 
+<a href="http://www.mcs.anl.gov/research/projects/mpi/mpi-debug/">MPI debugger interface</a>
+is used to export information from a running application to a debugger.  The current
+interface allow the debugger to look at a MPI Process, to iterate over communicators
+within that process and to view message queues associated with a communicator.
+
+<p>
+I propose an extension to this to export information about individual communicators
+within a process, in particular information about collective operations (MPI_Bcast,
+MPI_Reduce et. al.)
+
+<h2>Implementation</h2>
+The specific information I propose is to add a communicator specific counter for
+each possible collective where the counter simply records the number of times the 
+collective has been called on this communicator.  Along with this is keeping a second piece
+of data, that of if the process is still performing the collective operation.
+
+<p>
+
+A new enum is added to the interface, <i>mqs_comm_class</i> with values for each collective
+call.
+
+<p>
+
+A single extra callback function <i>mqs_get_comm_coll_state</i> is added to the
+interface and queries the current communicator in the same way as <i>mqs_next_operation</i>.
+This function takes the standard <i>process</i> parameter, a <i>mqs_comm_class</i> enum as input
+for which collective to query and two <i>int *</i>, the first of these is a pointer to a
+int set which should be set to the count of the number of calls to the collective, the second
+is a pointer to a int which should be set zero or one depending if the collective operation is still
+active.
+
+<p>
+
+A successful call to the <i>mqs_get_comm_coll_state</i> should return <i>mqs_ok</i> with 
+<i>mqs_no_information</i> being used in the case where information isn't available.  This allows
+further enum values to be added in the future should the mpi-forum approve new collective 
+functions without needing to change the debugger function interface.
+
+<h3>Performance Impact</h3>
+Maintaining this data does add code to the "critical path" of the MPI stack, in
+it's simplest form all it requires is a pair of counter increments per collective call,
+one on function entry and one on function exit so whilst there is a non-zero run-time cost
+associated with maintaining this information it's a minimal one.
+
+<h2>mpi_interface.h</h2>
+The additions required to mpi_interface.h are shown below.
+<pre>
+
+typedef enum
+{
+  mqs_comm_barrier,
+  mqs_comm_broadcast,
+  mqs_comm_allgather,
+  mqs_comm_allgatherv,
+  mqs_comm_allreduce,
+  mqs_comm_alltoall,
+  mqs_comm_alltoallv,
+  mqs_comm_reduce_scatter,
+  mqs_comm_reduce,
+  mqs_comm_gather,
+  mqs_comm_gatherv,
+  mqs_comm_scan,
+  mqs_comm_scatter,
+  mqs_comm_scatterv
+} mqs_comm_class;
+
+/***********************************************************************
+ * Collective extension
+ *
+ * This extension should be considered optional and the debugger should
+ * correctly the case where it doesn't exist.
+ *
+ */
+
+/*
+ * Return the state of collective operations for the currently active
+ * communicator, that is the number of times the collective has been
+ * called and if the operation is still in progress.
+ * 
+ * The first int is *really* mqs_comm_class.
+ */
+extern int mqs_get_comm_coll_state (mqs_process *, int, int *, int *);
+</pre>
+
+<h2>Benefits</h2>
+The extension allows a debugger or external program to know the state of collective
+calls with the parallel program.  In the typical scenario of debugging a hung
+application this knowledge allows the debugger and programmer to know instantly 
+which processes are stuck in collective calls and which aren't, either because they 
+have successful made the collective call and returned or because they haven't
+made the calls other ranks in a communicator have.  This information allows swift
+identification of problem areas within the job where further investigation may be 
+required.
+
+<p>
+This extension was originally developed in early 2007 whilst I was working at
+Quadrics and has proved it's value numerous times in real-life cases.
+
+<h2>Sample Implementation</h2>
+At this time a sample implementation is available for OpenMPI only although work 
+is being done a MPICH2 version.
 
 <p>
 Patch for OpenMPI <a href=OpenMPI-padb-groups.patch>trunk.</a>
