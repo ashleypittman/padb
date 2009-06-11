@@ -3455,7 +3455,7 @@ sub outer_main {
 
     # If delivering a signal check that it's valid.
     if ( defined($mode) and ( $mode eq "kill" ) ) {
-        my $signal = $secondary_args{signal};
+        my $signal = uc( $secondary_args{signal} );
         my %sig_names;
         map { $sig_names{$_} = 1 } split( " ", $Config{"sig_name"} );
 
@@ -5157,7 +5157,8 @@ sub stack_trace_from_pids {
 
 sub kill_proc {
     my ( $vp, $pid ) = @_;
-    kill( $confInner{args}{signal}, $pid );
+    my $signal = uc( $confInner{args}{signal} );
+    kill( $signal, $pid );
 }
 
 sub show_queue {
