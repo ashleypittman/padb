@@ -2727,6 +2727,79 @@ sub show_mpi_watch {
     print("$s\n");
 }
 
+sub show_proc_format {
+    my ( $nlines, $mode, $handle ) = @_;
+
+    my $lines = $nlines->{lines};
+
+    my @proc_format_array;
+    my $show_fields = 0;
+
+    my %proc_format_lengths;
+
+    # Split the command line options into a array.
+    foreach my $format (@proc_format) {
+        my @i = split( ",", $format );
+        foreach my $j (@i) {
+            my $key = lc($j);
+            push @proc_format_array, $key;
+            $proc_format_lengths{$key} = length($key);
+            $show_fields = 1 if ( $key eq "fields" );
+        }
+    }
+
+    my @all;
+    foreach my $tag ( sort ( keys %$lines ) ) {
+        my %hash;
+        $hash{vp} = $tag;
+        foreach my $data ( @{ $lines->{$tag} } ) {
+            if ( $data =~ /([\w\.]+)\:[ \t]*(.+)/ ) {
+                my $key = lc($1);
+
+                next unless defined $proc_format_lengths{$key};
+
+                if ( length($2) > $proc_format_lengths{$key} ) {
+                    $proc_format_lengths{$key} = length($2);
+                }
+
+                $hash{$key} = $2;
+            }
+        }
+        if ($show_fields) {
+            my @fields = sort ( keys(%hash) );
+            print "@fields\n";
+            exit(0);
+        }
+        push @all, \%hash;
+    }
+    @all = sort_proc_hashes( $conf{"proc-sort-key"}, @all );
+
+    if ( $conf{"proc-show-header"} ) {
+        my @res;
+        foreach my $key (@proc_format_array) {
+            my $l .= sprintf( "%$proc_format_lengths{$key}s", $key );
+            push @res, $l;
+        }
+        print "@res\n";
+
+        #print "@proc_format_array\n";
+    }
+    foreach my $hash (@all) {
+        my @res;
+        my @res;
+        foreach my $key (@proc_format_array) {
+            my $value = "?";
+            if ( defined $hash->{$key} ) {
+                $value = $hash->{$key};
+
+            }
+            push @res, sprintf( "%$proc_format_lengths{$key}s", $value );
+        }
+        print "@res\n";
+    }
+
+}
+
 sub show_results {
     my ( $nlines, $mode, $handle ) = @_;
 
@@ -2776,48 +2849,7 @@ sub show_results {
             }
         }
     } elsif ( $mode eq "pinfo" and $#proc_format != -1 ) {
-        my @proc_format_array;
-        my $show_fields = 0;
-
-        foreach my $format (@proc_format) {
-            my @i = split( ",", $format );
-            foreach my $j (@i) {
-                my $key = lc($j);
-                push @proc_format_array, $key;
-                $show_fields = 1 if ( $key eq "fields" );
-            }
-        }
-
-        my @all;
-        foreach my $tag ( sort ( keys %$lines ) ) {
-            my %hash;
-            $hash{vp} = $tag;
-            foreach my $data ( @{ $lines->{$tag} } ) {
-                if ( $data =~ /(\w+)\:[ \t]*(.+)/ ) {
-                    $hash{ lc($1) } = $2;
-                }
-            }
-            if ($show_fields) {
-                my @fields = sort ( keys(%hash) );
-                print "@fields\n";
-                exit(0);
-            }
-            push @all, \%hash;
-        }
-        @all = sort_proc_hashes( $conf{"proc-sort-key"}, @all );
-
-        if ( $conf{"proc-show-header"} ) {
-            print "@proc_format_array\n";
-        }
-        foreach my $hash (@all) {
-            my @res;
-            foreach my $key (@proc_format_array) {
-                if ( defined $hash->{$key} ) {
-                    push @res, $hash->{$key};
-                }
-            }
-            print "@res\n";
-        }
+        show_proc_format( $nlines, $mode, $handle );
     }
 }
 
@@ -4742,17 +4774,16 @@ sub show_task_dir {
             output $vp, "exe:$exe";
         }
 
-        # It should be possible to calculate this from info
-        # in /proc but I've not discovered a way so do it
-        # so for now just call ps.
-        # Turns out this isn't great either, ps reports time
+        # pcpu is calculated from /proc elsewhere.
+        # This isn't either, ps reports time
         # as a percentage since the program started so
         # isn't live as the top-reported figure is.
-        my $pcpu = `ps --pid $pid -o pcpu= 2>/dev/null`;
-        chomp($pcpu);
-        if ( $pcpu != "" ) {
-            output( $vp, "pcpu:$pcpu%" );
-        }
+
+        #my $pcpu = `ps --pid $pid -o pcpu= 2>/dev/null`;
+        #chomp($pcpu);
+        #if ( $pcpu != "" ) {
+        #    output( $vp, "pcpu:$pcpu%" );
+        #}
 
         show_task_file( $vp, "$dir/status" );
         show_task_file( $vp, "$dir/wchan", "wchan" );
@@ -4830,6 +4861,120 @@ sub show_task_dir {
     }
     if ( $confInner{"proc-shows-maps"} ) {
         show_task_file( $vp, "$dir/maps", "maps" );
+    }
+}
+
+# Convert the first line of /proc/stat to elapsed jiffies.
+sub string_to_jiffies {
+    my ($ps) = @_;
+
+    my @usecc = split( " ", $ps );
+
+    my $jiffies = 0;
+
+    # Remove the "cpu" prefix.
+    shift(@usecc);
+    foreach my $usecv (@usecc) {
+        $jiffies += $usecv;
+    }
+    return $jiffies;
+}
+
+sub add_and_divide_jiffies {
+    my ( $pre, $post ) = @_;
+
+    my $jiffies;
+
+    my @pre = split( " ", $pre );
+
+    return ( ( string_to_jiffies($pre) + string_to_jiffies($post) ) / 2 );
+}
+
+# Convert /proc/self/stat into used jiffies.
+sub stat_to_jiffies {
+    my $stat    = shift;
+    my @values  = split( " ", $stat );
+    my $jiffies = 0;
+    $jiffies += $values[13];    # utime
+    $jiffies += $values[14];    # stime
+    return $jiffies;
+}
+
+sub show_proc_all {
+    my ($list) = @_;
+
+    my @all;
+
+    foreach my $proc ( @{$list} ) {
+        my $pid = $proc->{pid};
+        open( $proc->{handle}, "/proc/$pid/stat" );
+    }
+
+    open( SFD, "/proc/stat\n" );
+
+    # Begin critical path.
+    my $stat = <SFD>;
+
+    foreach my $proc ( @{$list} ) {
+        my $pid = $proc->{pid};
+        my $h   = $proc->{handle};
+        $proc->{stat_start} = <$h>;
+        seek( $proc->{handle}, 0, 0 );
+    }
+
+    seek( SFD, 0, 0 );
+    my $stat2 = <SFD>;
+
+    # End critical path.
+
+    my $jiffies_start = add_and_divide_jiffies( $stat, $stat2 );
+
+    foreach my $proc ( @{$list} ) {
+        my $vp  = $proc->{vp};
+        my $pid = $proc->{pid};
+        show_proc( $vp, $pid );
+    }
+
+    sleep(1);
+
+    seek( SFD, 0, 0 );
+
+    # Begin critical path.
+    $stat = <SFD>;
+
+    foreach my $proc ( @{$list} ) {
+        my $pid = $proc->{pid};
+        my $h   = $proc->{handle};
+        $proc->{stat_end} = <$h>;
+        close( $proc->{handle} );
+    }
+
+    seek( SFD, 0, 0 );
+    $stat2 = <SFD>;
+
+    # End critical path.
+
+    my $cpucount = 0;
+    while (<SFD>) {
+        if ( $_ =~ /^cpu\d/ ) {
+            $cpucount++;
+        }
+    }
+    close(SFD);
+
+    my $jiffies_end = add_and_divide_jiffies( $stat, $stat2 );
+
+    my $elapsed = $jiffies_end - $jiffies_start;
+
+    foreach my $proc ( @{$list} ) {
+        my $vp       = $proc->{vp};
+        my $jpre     = stat_to_jiffies( $proc->{stat_start} );
+        my $jpost    = stat_to_jiffies( $proc->{stat_end} );
+        my $jused    = $jpost - $jpre;
+        my $used     = ( $jused / $elapsed ) * $cpucount * 100;
+        my $used_str = sprintf( "%d", $used );
+
+        output( $vp, "pcpu: $used_str" );
     }
 }
 
@@ -5832,10 +5977,10 @@ sub common_main {
     };
 
     $allfns{pinfo} = {
-        'handler'   => \&show_proc,
-        'arg_long'  => 'proc-info',
-        'help'      => "Show process information",
-        'options_i' => {
+        'handler_all' => \&show_proc_all,
+        'arg_long'    => 'proc-info',
+        'help'        => "Show process information",
+        'options_i'   => {
             "proc-shows-proc" => 1,
             "proc-shows-fds"  => 1,
             "proc-shows-maps" => 0,
