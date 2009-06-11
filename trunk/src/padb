@@ -2552,18 +2552,24 @@ sub lsf_setup_pcmd {
 #
 ###############################################################################
 
+sub setup_rmgr {
+    $conf{"rmgr"} = shift;
+
+    # Now setup the variable for the rest of the program.
+    if ( defined $rmgr{ $conf{"rmgr"} }{inner_rmgr} ) {
+        $cinner{rmgr} = $rmgr{ $conf{"rmgr"} }{inner_rmgr};
+    } else {
+        $cinner{rmgr} = $conf{"rmgr"};
+    }
+}
+
 sub find_rmgr {
 
 # If it's been set on the command line and it's valid then just use what we are given.
 # Don't do any sanity checks here to cope with non-default installs.
 
-    my $r = $conf{"rmgr"};
-
-    if ( defined $rmgr{$r} ) {
-        if ( defined $rmgr{ $conf{"rmgr"} }{inner_rmgr} ) {
-            $cinner{rmgr} = $rmgr{ $conf{"rmgr"} }{inner_rmgr};
-        }
-
+    if ( defined $rmgr{ $conf{"rmgr"} } ) {
+        setup_rmgr( $conf{"rmgr"} );
         return;
     }
 
@@ -2589,13 +2595,78 @@ sub find_rmgr {
         exit(1);
     }
 
-    # Now setup the variable for the test of the program.
-    $conf{"rmgr"} = $ok[0];
-    if ( defined $rmgr{ $conf{"rmgr"} }{inner_rmgr} ) {
-        $cinner{rmgr} = $rmgr{ $conf{"rmgr"} }{inner_rmgr};
-    } else {
-        $cinner{rmgr} = $conf{"rmgr"};
+    setup_rmgr( $ok[0] );
+}
+
+# Find any active resource manager, that is --any or --all
+# have been passed on the command line so look for any resource
+# manager that have active jobs, if there is one active resource
+# manager use that one, if there are zero or many exit with an
+# error.
+sub find_any_rmgr {
+
+# If it's been set on the command line and it's valid then just use what we are given.
+# Don't do any sanity checks here to cope with non-default installs.
+
+    if ( defined $rmgr{ $conf{"rmgr"} } ) {
+        setup_rmgr( $conf{"rmgr"} );
+        return;
     }
+
+    if ( $conf{"rmgr"} ne "auto" ) {
+        printf("Error, resource manager \"$conf{rmgr}\" not supported\n");
+        exit(1);
+    }
+
+    my @installed;
+    foreach my $res ( sort( keys %rmgr ) ) {
+        next unless defined $rmgr{$res}{is_installed};
+        if ( $rmgr{$res}{is_installed}() ) {
+            push @installed, $res;
+
+        }
+    }
+
+    # One resource manager is installed, good.
+    if ( $#installed == 0 ) {
+        setup_rmgr( $installed[0] );
+        return;
+    }
+
+    # No resource managers are installed, bad.
+    if ( $#installed == -1 ) {
+        printf(
+"Error, multiple resource managers detected, use -Ormgr=<resource manager>\n"
+        );
+        push @installed, "local-fd";
+        push @installed, "local";
+        printf("@installed\n");
+        exit(1);
+    }
+
+    my @active;
+    foreach my $res (@installed) {
+        my @jobs = $rmgr{$res}{get_active_jobs}($user);
+        if ( $#jobs != -1 ) {
+            push @active, $res;
+        }
+    }
+
+    # Only one resource manager has active jobs, let's use it.
+    if ( $#active == 0 ) {
+        setup_rmgr( $active[0] );
+        return;
+    }
+
+    # Multiple resource managers are installed and have jobs,
+    # bouce back to the user to specify which one they want.
+    printf(
+"Error, multiple active resource managers detected, use -Ormgr=<resource manager>\n"
+    );
+    push @installed, "local-fd";
+    push @installed, "local";
+    printf("@installed\n");
+    exit(1);
 }
 
 sub get_all_jobids {
@@ -3325,8 +3396,6 @@ sub outer_main {
         exit(0);
     }
 
-    find_rmgr();
-
     if ($core_stack) {
         if ( not defined $core_name or not defined $exe_name ) {
             printf(
@@ -3346,6 +3415,8 @@ sub outer_main {
     }
 
     if ($full_report) {
+
+        find_rmgr();
 
         if ( not job_is_running($full_report) ) {
             printf( STDERR
@@ -3392,12 +3463,14 @@ sub outer_main {
     }
 
     if ($show_jobs) {
+        find_rmgr();
         my @jobids = get_all_jobids($user);
         print("@jobids\n");
         exit(0);
     }
 
     if ($local_stats) {
+
         if ($watch) {
             while (1) {
                 maybe_clear_screen();
@@ -3488,6 +3561,8 @@ sub outer_main {
 
     if ( $any or $all ) {
 
+        find_any_rmgr();
+
         @jobids = get_all_jobids($user);
         printf( "Active jobs (%d) are @jobids\n", $#jobids + 1 )
           if $conf{"verbose"};
@@ -3500,6 +3575,8 @@ sub outer_main {
             exit 1;
         }
     } else {
+        find_rmgr();
+
         foreach my $jobid (@ARGV) {
             if ( job_is_running($jobid) ) {
                 push @jobids, $jobid;
