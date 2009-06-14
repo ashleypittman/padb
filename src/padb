@@ -561,7 +561,8 @@ my $show_jobs;
 my $core_name;
 my $exe_name;
 
-my @proc_format;
+my $proc_format =
+  "vp=vpid,hostname,pid,vmsize,vmrss,stat.state=S,pcpu=%cpu,name=command";
 
 my $input_file;
 my $compress;
@@ -608,7 +609,7 @@ sub parse_args_outer {
         "strip-above-wait!"              => \$strip_above_wait,
         "watch!"                         => \$watch,
         "local-stats"                    => \$local_stats,
-        "proc-format=s"                  => \@proc_format,
+        "proc-format=s"                  => \$proc_format,
         "show-jobs"                      => \$show_jobs,
         "norc"                           => \$norc,
         "config-file=s"                  => \$configfile
@@ -2798,24 +2799,36 @@ sub show_mpi_watch {
     print("$s\n");
 }
 
+# Nicely format process information.
+# XXX: proc-sort-key should probably sort on column headers as
+# well as keys.
 sub show_proc_format {
     my ( $nlines, $mode, $handle ) = @_;
 
     my $lines = $nlines->{lines};
 
     my @proc_format_array;
+    my %proc_format_header;
     my $show_fields = 0;
 
     my %proc_format_lengths;
 
-    # Split the command line options into a array.
-    foreach my $format (@proc_format) {
-        my @i = split( ",", $format );
-        foreach my $j (@i) {
-            my $key = lc($j);
-            push @proc_format_array, $key;
-            $proc_format_lengths{$key} = length($key);
-            $show_fields = 1 if ( $key eq "fields" );
+    my $separator = $conf{"column-seperator"};
+
+    my @columns = split( ",", $proc_format );
+    foreach my $column (@columns) {
+
+        $show_fields = 1 if ( $column eq "fields" );
+
+        my ( $name, $desc ) = split( "=", $column );
+        if ( defined $desc ) {
+            push @proc_format_array, lc($name);
+            $proc_format_header{ lc($name) }  = $desc;
+            $proc_format_lengths{ lc($name) } = length($desc);
+        } else {
+            push @proc_format_array, lc($column);
+            $proc_format_header{ lc($column) }  = $column;
+            $proc_format_lengths{ lc($column) } = length($column);
         }
     }
 
@@ -2827,7 +2840,7 @@ sub show_proc_format {
             if ( $data =~ /([\w\.]+)\:[ \t]*(.+)/ ) {
                 my $key = lc($1);
 
-                next unless defined $proc_format_lengths{$key};
+                next unless defined $proc_format_lengths{$key} or $show_fields;
 
                 if ( length($2) > $proc_format_lengths{$key} ) {
                     $proc_format_lengths{$key} = length($2);
@@ -2843,15 +2856,18 @@ sub show_proc_format {
         }
         push @all, \%hash;
     }
+
     @all = sort_proc_hashes( $conf{"proc-sort-key"}, @all );
 
     if ( $conf{"proc-show-header"} ) {
         my @res;
         foreach my $key (@proc_format_array) {
-            my $l .= sprintf( "%$proc_format_lengths{$key}s", $key );
+            my $l .= sprintf( "%-$proc_format_lengths{$key}s",
+                $proc_format_header{$key} );
             push @res, $l;
         }
-        print "@res\n";
+        my $line = join( $separator, @res );
+        print "$line\n";
 
         #print "@proc_format_array\n";
     }
@@ -2859,14 +2875,14 @@ sub show_proc_format {
         my @res;
         my @res;
         foreach my $key (@proc_format_array) {
-            my $value = "?";
+            my $value = "??";
             if ( defined $hash->{$key} ) {
                 $value = $hash->{$key};
-
             }
             push @res, sprintf( "%$proc_format_lengths{$key}s", $value );
         }
-        print "@res\n";
+        my $line = join( $separator, @res );
+        print "$line\n";
     }
 
 }
@@ -2919,7 +2935,7 @@ sub show_results {
                 print("$data\n");
             }
         }
-    } elsif ( $mode eq "pinfo" and $#proc_format != -1 ) {
+    } elsif ( $mode eq "proc-summary" ) {
         show_proc_format( $nlines, $mode, $handle );
     }
 }
@@ -3508,7 +3524,7 @@ sub outer_main {
         );
     }
 
-    if ( defined $mode && $mode eq "pinfo" && ( $#proc_format != -1 ) ) {
+    if ( defined $mode && $mode eq "proc-summary" ) {
         $line_formatted = 1;
     }
 
@@ -4865,7 +4881,9 @@ sub show_task_dir {
         show_task_file( $vp, "$dir/status" );
         show_task_file( $vp, "$dir/wchan", "wchan" );
         show_task_file( $vp, "$dir/stat", "stat" );
-        if ( $confInner{"proc-shows-stat"} ) {
+        if (   $confInner{"proc-shows-stat"}
+            or $confInner{mode} eq "proc-summary" )
+        {
             show_task_stat_file( $vp, "$dir/stat", "stat" );
         }
 
@@ -6064,6 +6082,14 @@ sub common_main {
             "proc-shows-maps" => 0,
             "proc-shows-stat" => 0
           }
+
+    };
+
+    $allfns{"proc-summary"} = {
+        'handler_all' => \&show_proc_all,
+        'arg_long'    => 'proc-summary',
+        'help'        => "Show process information in top format",
+        'options_i'   => { "column-seperator" => "  ", }
 
     };
 
