@@ -393,39 +393,19 @@ $conf{"minfo"} = find_minfo();
 my $norc       = 0;
 my $configfile = "/etc/padb.conf";
 
-sub find_i_dir {
-
-    # If padb is running from anywhere that looks like
-    # usr/bin then assume the RPM has been either installed
-    # or unpacked somewhere and get scripts from the
-    # equivalent place.  If it doesn't match usr/bin then
-    # I don't know how it got installed so assume everything
-    # is in the current directory.
-    # This allows -Oedb=/path/to/edb to override.
-
-    # This probably needs re-writing for a non-Quadrics world,
-    # if we aren't installed somewhere however look for the
-    # helper code in the current directory.
-    my $installdir = "usr/bin/padb";
-    my $edb;
-    if ( $0 =~ /(.*)$installdir/ ) {
-        return "$1usr/lib/qsnet/elan4/bin/"
-          if ( -d "$1usr/lib/qsnet/elan4/bin/" );
-        return "$1usr/lib64/qsnet/elan4/bin/"
-          if ( -d "$1usr/lib64/qsnet/elan4/bin/" );
-    }
-
-    return "./";
-}
-
+# Look for edb in the default install location only.
 sub find_edb {
-    my $dir = find_i_dir();
-    return $dir . "edb";
+    return "/usr/lib/qsnet/elan4/bin/"
+      if ( -d "/usr/lib/qsnet/elan4/bin/" );
+    return "/usr/lib64/qsnet/elan4/bin/"
+      if ( -d "/usr/lib64/qsnet/elan4/bin/" );
+    return "edb";
 }
 
+# Look for minfo.x in the same directory as padb.
 sub find_minfo {
-    my $dir = find_i_dir();
-    return $dir . "minfo.x";
+    my $dir = dirname($0);
+    return "$dir/minfo.x";
 }
 
 ###############################################################################
