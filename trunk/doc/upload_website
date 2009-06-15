@@ -22,7 +22,7 @@ do
 done
 
 ftp-upload --host padb.pittman.org.uk -u padb@pittman.co.uk --password $PASSWORD  OpenMPI-padb-groups.patch
-ftp-upload --host padb.pittman.org.uk -u padb@pittman.co.uk --password $PASSWORD --as download/OpenMPI-padb-groups.patch OpenMPI-padb-groups.patch
+ftp-upload --host padb.pittman.org.uk -u padb@pittman.co.uk --password $PASSWORD --as extensions/OpenMPI-padb-groups.patch OpenMPI-padb-groups.patch
 
 echo All done.
 exit 0
