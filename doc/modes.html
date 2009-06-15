@@ -27,7 +27,7 @@ this option can be specified multiple times to specify multiple ranks.
 <p>
 
 <i>Padb</i> can be told to loop, performing the same query over and over again.  This is enabled by the <b>--watch</b> flag
-and further controlled by <b>--config-option=interval=&lt;seconds&gt;</b> and <b>--config-option=watch-clears-screen=&lt;bool&gt;</b>
+and further controlled by <b>--config-option interval=&lt;seconds&gt;</b> and <b>--config-option watch-clears-screen=&lt;bool&gt;</b>
 options, the default values for these options are 10 and 1 respectively.
 
 <p>
@@ -178,9 +178,14 @@ taking a comma separated list of function names.
 
 <h2>MPI Specific modes</h3>
 
-<a name=message-queue><h3>MPI message queues</h3></a>
-The option <b>--message-queue</b> will tell <i>padb</i> to read the MPI message
+<a name=mpi-queue><h3>MPI message queues</h3></a>
+<a name=message-queue></a>
+The option <b>--mpi-queue</b> will tell <i>padb</i> to read the MPI message
 queues from your application if possible.  Here shown with the <b>--compress</b> option.
+
+<p>
+The option <b>--message-queue</b> shows the tport queues on QsNet systems.  On non-QsNet systems it automatically falls back
+to <b>--mpi-queue</b>.
 <table border=1>
 <tr><td>
 <pre>
@@ -272,6 +277,10 @@ Total: 6 groups of which 2 are in use.
 </pre>
 </tr></td>
 </table>
+
+<a name=kill><h3>Signal delivery</h2></a>
+To deliver signals to processes in a job use the <b>--kill</b> mode together with the optional
+<b>--signal=&ltname&gt></b> option.  No output is produced by this mode.
 
 <h2>Quadrics specific modes</h2>
 The <b>--set-debug</b>, <b>--group</b> and <b>--statistics</b> modes are QsNet specific.  The <b>--deadlock</b> mode
