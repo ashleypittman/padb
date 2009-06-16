@@ -36,6 +36,8 @@
 #  * inner_main() now uses callbacks for resource manager support.
 #  * --signal now takes names rather than numbers.
 #  * Check job is valid when using the --full-report option.
+#  * Add a --proc-summary option to replace --proc-info --proc-format
+#    This gives a very efficient "job top" program.
 
 # Version 2.2
 #  * Add a --core-stack option along with --core and --exe to extract stack
