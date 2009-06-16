@@ -3554,8 +3554,12 @@ sub outer_main {
     $countoutput = 1
       if ( ( defined $mode and $mode eq "stack" ) or $conf{"verbose"} );
 
-    if ($input_file) {
-        go_file( $input_file, "input" );
+    if ( defined($input_file) ) {
+        my $m = "input";
+        if ( defined $mode ) {
+            $m = $mode;
+        }
+        go_file( $input_file, $m );
         exit(0);
     }
 
@@ -4417,7 +4421,17 @@ sub go_deadlock_detect {
 
 sub deadlock_detect {
     my ( $handle, $lines ) = @_;
-    my $data = $lines->{raw};
+    my $data;
+
+    # XXX This is a bit of a hack to make the deadlock
+    # code work with input files, the whole thing is due
+    # a tidy-up on the full-duplex branch where this should
+    # be solved properly.
+    if ( defined $lines->{raw} ) {
+        $data = $lines->{raw};
+    } else {
+        $data = $lines->{lines};
+    }
 
     # print Dumper $data;
     my %coll_data;
