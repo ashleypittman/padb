@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/perl -w
 
 # padb. a simple parallel debugging aid from Quadrics.
 
@@ -2862,7 +2862,6 @@ sub show_proc_format {
     }
     foreach my $hash (@all) {
         my @res;
-        my @res;
         foreach my $key (@proc_format_array) {
             my $value = "??";
             if ( defined $hash->{$key} ) {
@@ -5083,7 +5082,7 @@ sub show_task_stat_file {
         chomp $l;
         my @stats = split( / /, $l );
         for ( my $i = 0 ; $i <= $#stats ; $i++ ) {
-            output( $vp, "$prefix.$stat_names[$i]: @stats[$i]" );
+            output( $vp, "$prefix.$stat_names[$i]: $stats[$i]" );
         }
 
     }
@@ -6105,7 +6104,7 @@ sub command_from_parent {
         $res->{request} = $cmd;
     }
 
-    if ( $cmd->{quit} == 1 ) {
+    if ( defined( $cmd->{quit} ) and ( $cmd->{quit} == 1 ) ) {
         exit(0);
     }
 
@@ -6188,8 +6187,7 @@ sub connect_to_outer {
     $netdata->{server} = $server;
     $netdata->{key}    = $key;
 
-    my $sel    = $netdata->{sel};
-    my $server = $netdata->{server};
+    my $sel = $netdata->{sel};
 
     while ( my @data = $sel->can_read() ) {
         foreach my $s (@data) {
