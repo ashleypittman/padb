@@ -24,7 +24,7 @@
 
 # Revision history
 #
-# Version 2.5 (Beta)
+# Version 2.5
 #  * First Non-Quadrics version
 #  * Various stability/bug fixes.
 #  * Deadlock detect at the MPI Layer rather than the Elan layer
@@ -237,7 +237,7 @@ use Config;
 # Main.
 
 my $prog    = basename $0;
-my $version = "2.5-beta";
+my $version = "2.5";
 
 my %conf;
 
