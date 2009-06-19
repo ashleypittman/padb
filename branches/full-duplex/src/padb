@@ -2796,7 +2796,7 @@ sub show_mpi_watch {
 # XXX: proc-sort-key should probably sort on column headers as
 # well as keys.
 sub show_proc_format {
-    my ( $nlines, $mode, $handle ) = @_;
+    my ( $handle, $nlines ) = @_;
 
     my $lines = $nlines->{lines};
 
@@ -2927,8 +2927,6 @@ sub show_results {
                 print("$data\n");
             }
         }
-    } elsif ( $mode eq "proc-summary" ) {
-        show_proc_format( $nlines, $mode, $handle );
     }
 }
 
@@ -3128,7 +3126,7 @@ sub command_from_inner {
         $req->{mode}            = "signon";
         $req->{connection_tree} = $handle->{connection_tree};
         $req->{remote}          = $handle->{remote};
-	issue_command_to_inner( $cdata, $req );
+        issue_command_to_inner( $cdata, $req );
         return;
     }
 
@@ -3139,7 +3137,7 @@ sub command_from_inner {
         $handle->{state} = "live";
         my $req;
         $req->{mode}   = $handle->{mode};
-	$req->{jobid}  = $handle->{jobid};
+        $req->{jobid}  = $handle->{jobid};
         $req->{cinner} = \%cinner;
         issue_command_to_inner( $cdata, $req );
         return;
@@ -3150,8 +3148,7 @@ sub command_from_inner {
         my $req;
         $req->{mode} = "exit";
         issue_command_to_inner( $cdata, $req );
-	
-        
+
         $allfns{ $handle->{mode} }{out_handler}( undef, $d );
         return;
     }
@@ -3228,7 +3225,7 @@ sub go_parallel {
 
                         my $host = $words[1];
 
-			$comm_data->{remote}{$host}{port} = $words[2];
+                        $comm_data->{remote}{$host}{port} = $words[2];
                         $comm_data->{remote}{$host}{key}  = $words[3];
                         $comm_data->{signons}++;
 
@@ -3261,7 +3258,7 @@ sub go_parallel {
                     my $data;
                     my $nb = sysread( $h, $data, 1024 );
 
-		    if ( not defined $data or $nb == 0 ) {
+                    if ( not defined $data or $nb == 0 ) {
                         if ( not $comm_data->{state} eq "shutdown" ) {
                             printf("EOF from child socket ($nb)\n");
                         }
@@ -3278,15 +3275,17 @@ sub go_parallel {
                     exit(1);
                 }
             }
-            my $count = $sel->count();
-            if ( $count == 1 ) {
-                printf("All sockets closed?\n");
-            }
+
+            #my $count = $sel->count();
+            #if ( $count == 1 ) {
+            #    printf("All sockets closed?\n");
+            #}
         }
         my $t2    = time() - $start;
         my $count = $sel->count();
         if ( $count > 0 ) {
-            printf("Still here, time:$t2 comm_count:$count\n");
+
+            #printf("Still here, time:$t2 comm_count:$count\n");
             if ( $comm_data->{signons} != $comm_data->{hosts} ) {
                 my $missing = $comm_data->{hosts} - $comm_data->{signons};
                 print("Waiting for signon from $missing hosts.\n");
@@ -5127,28 +5126,24 @@ sub get_rms_jobid {
 
 sub show_task_file {
     my ( $vp, $file, $prefix ) = @_;
-    if ( defined $prefix ) {
-        $prefix = "$prefix: ";
-    } else {
-        $prefix = "";
-    }
     return unless ( -f $file );
     open( FD, "$file" ) or return;
     my @all = <FD>;
     close FD;
     foreach my $l (@all) {
         chomp $l;
-        output( $vp, "$prefix$l" );
+        if ( defined $prefix ) {
+            proc_output( $vp, $prefix, $l );
+        } else {
+            my ( $key, $value ) = split( ":", $l );
+            $value =~ s/^[ \t]+//g;
+            proc_output( $vp, $key, $value );
+        }
     }
 }
 
 sub show_task_stat_file {
-    my ( $vp, $file, $prefix ) = @_;
-    if ( defined $prefix ) {
-        $prefix = "$prefix";
-    } else {
-        $prefix = "";
-    }
+    my ( $vp, $file ) = @_;
     my @stat_names =
       qw(pid comm state ppid pgrp session tty_nr tpgid flags minflt
       cminflt majflt cmajflt utime stime cutime cstime priority nice
@@ -5165,7 +5160,7 @@ sub show_task_stat_file {
         chomp $l;
         my @stats = split( / /, $l );
         for ( my $i = 0 ; $i <= $#stats ; $i++ ) {
-            output( $vp, "$prefix.$stat_names[$i]: $stats[$i]" );
+            proc_output( $vp, "stat.$stat_names[$i]", $stats[$i] );
         }
 
     }
@@ -5177,19 +5172,8 @@ sub show_task_dir {
     if ( $confInner{"proc-shows-proc"} ) {
         my $exe = readlink "$dir/exe";
         if ( defined $exe ) {
-            output $vp, "exe:$exe";
+            proc_output( $vp, "exe", $exe );
         }
-
-        # pcpu is calculated from /proc elsewhere.
-        # This isn't either, ps reports time
-        # as a percentage since the program started so
-        # isn't live as the top-reported figure is.
-
-        #my $pcpu = `ps --pid $pid -o pcpu= 2>/dev/null`;
-        #chomp($pcpu);
-        #if ( $pcpu != "" ) {
-        #    output( $vp, "pcpu:$pcpu%" );
-        #}
 
         show_task_file( $vp, "$dir/status" );
         show_task_file( $vp, "$dir/wchan", "wchan" );
@@ -5197,7 +5181,7 @@ sub show_task_dir {
         if (   $confInner{"proc-shows-stat"}
             or $confInner{mode} eq "proc-summary" )
         {
-            show_task_stat_file( $vp, "$dir/stat", "stat" );
+            show_task_stat_file( $vp, "$dir/stat" );
         }
 
         if ( -f "$dir/maps" ) {
@@ -5223,7 +5207,7 @@ sub show_task_dir {
             }
             foreach my $rail ( sort keys %totals ) {
                 my $total = $totals{$rail} / 1024;
-                output( $vp, "sdram$rail: $total kb" );
+                proc_output( $vp, "sdram$rail", "$total kb" );
             }
         }
     }
@@ -5260,10 +5244,10 @@ sub show_task_dir {
         }
         foreach my $fd (@all_fddata) {
             if ( defined $fd->{pos} ) {
-                output( $vp,
-                    "fd$fd->{fd}: $fd->{target} \($fd->{pos} $fd->{flags}\)" );
+                proc_output( $vp, "fd$fd->{fd}",
+                    "$fd->{target} \($fd->{pos} $fd->{flags}\)" );
             } else {
-                output( $vp, "fd$fd->{fd}: $fd->{target}" );
+                proc_output( $vp, "fd$fd->{fd}", $fd->{target} );
             }
         }
     }
@@ -5306,6 +5290,11 @@ sub stat_to_jiffies {
     $jiffies += $values[13];    # utime
     $jiffies += $values[14];    # stime
     return $jiffies;
+}
+
+sub proc_output {
+    my ( $vp, $key, $value ) = @_;
+    output( $vp, "$key: $value" );
 }
 
 sub show_proc_all {
@@ -5382,7 +5371,7 @@ sub show_proc_all {
         my $used     = ( $jused / $elapsed ) * $cpucount * 100;
         my $used_str = sprintf( "%d", $used );
 
-        output( $vp, "pcpu: $used_str" );
+        proc_output( $vp, "pcpu", $used_str );
     }
 }
 
@@ -5390,7 +5379,7 @@ sub show_proc {
     my ( $vp, $pid ) = @_;
 
     if ( $confInner{"proc-shows-proc"} ) {
-        output( $vp, "hostname:$confInner{hostname}" );
+        proc_output( $vp, "hostname", $confInner{hostname} );
     }
 
     if ( -d "/proc/$pid/task" and $confInner{"proc-shows-proc"} ) {
@@ -6225,7 +6214,7 @@ sub reply_from_child {
     my $reply = $handle->{all_replys};
 
     reply_to_parent( $handle, $reply );
-    if ($handle->{shutdown} ) {
+    if ( $handle->{shutdown} ) {
         inner_cleanup_and_exit($handle);
     }
 
@@ -6243,42 +6232,46 @@ sub reply_from_child {
 # 3) If we have no children send reply.
 sub command_from_parent {
     my ( $netdata, $cmd ) = @_;
-    
+
     if ( $cmd->{mode} eq "signon" ) {
         $netdata->{signon_cmd} = my_encode($cmd);
-	
-	if ( not exists $cmd->{connection_tree}{$confInner{hostname}}{children} ) {
-	    $netdata->{children} = 0;
-	    return;
-	}
-	
-	my @children = @{ $cmd->{connection_tree}{$confInner{hostname}}{children} };
-	$netdata->{children} = $#children + 1;
-	
-	# Only one child is tested so far.
-	foreach my $chostname (@children) {
-	    my $socket = connect_to_child(
-		$chostname,
-		$cmd->{remote}{$chostname}{port},
-		$cmd->{remote}{$chostname}{key}
-		);
-	    my %cdata;
-	    $cdata{socket}   = $socket;
-	    $cdata{hostname} = $chostname;
-	    $cdata{line_cb}  = \&reply_from_child;
-	    $cdata{state}    = "init";
-	    $netdata->{sel}->add($socket);
-	    $netdata->{connections}{$socket} = \%cdata;
-	    push @{ $netdata->{child_sockets} }, $socket;
-	}
-	return;
+
+        if (
+            not
+            exists $cmd->{connection_tree}{ $confInner{hostname} }{children} )
+        {
+            $netdata->{children} = 0;
+            return;
+        }
+
+        my @children =
+          @{ $cmd->{connection_tree}{ $confInner{hostname} }{children} };
+        $netdata->{children} = $#children + 1;
+
+        # Only one child is tested so far.
+        foreach my $chostname (@children) {
+            my $socket = connect_to_child(
+                $chostname,
+                $cmd->{remote}{$chostname}{port},
+                $cmd->{remote}{$chostname}{key}
+            );
+            my %cdata;
+            $cdata{socket}   = $socket;
+            $cdata{hostname} = $chostname;
+            $cdata{line_cb}  = \&reply_from_child;
+            $cdata{state}    = "init";
+            $netdata->{sel}->add($socket);
+            $netdata->{connections}{$socket} = \%cdata;
+            push @{ $netdata->{child_sockets} }, $socket;
+        }
+        return;
     }
 
     # Forward on to our children before doing any more processing.
     if ( $netdata->{children} ) {
-	my $req = my_encode($cmd) . "\n";
+        my $req = my_encode($cmd) . "\n";
         foreach my $child ( @{ $netdata->{child_sockets} } ) {
-	    $child->printf($req);
+            $child->printf($req);
             $child->flush();
         }
     }
@@ -6360,18 +6353,18 @@ sub command_from_outer {
         }
         return;
     }
-    
+
     command_from_parent( $netdata, my_decode($line) );
-    
+
     if ( $netdata->{children} == 0 ) {
-	my $res;
-	$res->{target_responce} = $netdata->{target_responce};
-	reply_to_parent( $netdata, $res );
-	$netdata->{target_responce} = undef;
-	
-	if ($netdata->{shutdown} ) {
-	    inner_cleanup_and_exit($netdata);
-	}
+        my $res;
+        $res->{target_responce} = $netdata->{target_responce};
+        reply_to_parent( $netdata, $res );
+        $netdata->{target_responce} = undef;
+
+        if ( $netdata->{shutdown} ) {
+            inner_cleanup_and_exit($netdata);
+        }
     }
 }
 
@@ -6379,8 +6372,8 @@ sub command_from_outer {
 sub inner_loop_for_comms {
 
     my $server = IO::Socket::INET->new(
-        Reuse => 1,
-        Proto => 'tcp',
+        Reuse  => 1,
+        Proto  => 'tcp',
         Listen => 2,
     ) or die("Failed to create local port");
 
@@ -6395,8 +6388,8 @@ sub inner_loop_for_comms {
     my $netdata;
     $netdata->{sel} = IO::Select->new();
     $netdata->{sel}->add($server);
-    $netdata->{server} = $server;
-    $netdata->{key}    = $key;
+    $netdata->{server}   = $server;
+    $netdata->{key}      = $key;
     $netdata->{shutdown} = 0;
 
     my $sel = $netdata->{sel};
@@ -6695,6 +6688,7 @@ sub common_main {
 
     $allfns{"proc-summary"} = {
         'handler_all' => \&show_proc_all,
+        'out_handler' => \&show_proc_format,
         'arg_long'    => 'proc-summary',
         'help'        => "Show process information in top format",
         'options_i'   => { "column-seperator" => "  ", }
