@@ -2392,7 +2392,11 @@ sub open_get_data {
         } else {
             my @elems = split( /\|/, $l );
 
-            if ( $#elems == 6 ) {
+            if ( $#elems == 4 ) {
+                my $nprocs = $elems[3];
+                $nprocs =~ s/ //g;
+                $open_jobs{$job}{nprocs} = $nprocs;
+            } elsif ( $#elems == 6 ) {
 
                 my $host = $elems[4];
                 $host =~ s/ //g;
@@ -2416,7 +2420,7 @@ sub open_get_data {
     }
 
     #if ( $conf{"verbose"} ) {
-    #    print Dumper \%open_jobs;
+    #print Dumper \%open_jobs;
     #}
 }
 
@@ -2462,7 +2466,7 @@ sub open_setup_pcmd {
     my $cmd    = "orterun -machinefile $fn -np $i $prefix";
     my $hosts  = $#hosts + 1;
 
-    return ( $cmd, undef, $hosts );
+    return ( $cmd, $open_jobs{$job}{nprocs}, $hosts );
 }
 
 sub open_cleanup_pcmd {
@@ -2795,10 +2799,10 @@ sub show_mpi_watch {
 # Nicely format process information.
 # XXX: proc-sort-key should probably sort on column headers as
 # well as keys.
+# Idealy we'd know what format we wanted and only ask the nodes
+# to report relevent info, for now they still report everything.
 sub show_proc_format {
     my ( $handle, $nlines ) = @_;
-
-    my $lines = $nlines->{lines};
 
     my @proc_format_array;
     my %proc_format_header;
@@ -2826,21 +2830,21 @@ sub show_proc_format {
     }
 
     my @all;
+    my $lines = $nlines->{target_responce};
     foreach my $tag ( sort ( keys %$lines ) ) {
         my %hash;
         $hash{vp} = $tag;
-        foreach my $data ( @{ $lines->{$tag} } ) {
-            if ( $data =~ /([\w\.]+)\:[ \t]*(.+)/ ) {
-                my $key = lc($1);
+        foreach my $key ( keys( %{ $lines->{$tag} } ) ) {
 
-                next unless defined $proc_format_lengths{$key} or $show_fields;
+            my $value = $lines->{$tag}{$key};
+            next unless defined $proc_format_lengths{$key} or $show_fields;
 
-                if ( length($2) > $proc_format_lengths{$key} ) {
-                    $proc_format_lengths{$key} = length($2);
-                }
-
-                $hash{$key} = $2;
+            if ( length($value) > $proc_format_lengths{$key} ) {
+                $proc_format_lengths{$key} = length($value);
             }
+
+            $hash{$key} = $value;
+
         }
         if ($show_fields) {
             my @fields = sort ( keys(%hash) );
@@ -2861,8 +2865,6 @@ sub show_proc_format {
         }
         my $line = join( $separator, @res );
         print "$line\n";
-
-        #print "@proc_format_array\n";
     }
     foreach my $hash (@all) {
         my @res;
@@ -2876,7 +2878,6 @@ sub show_proc_format {
         my $line = join( $separator, @res );
         print "$line\n";
     }
-
 }
 
 sub show_results {
@@ -2963,6 +2964,11 @@ sub post_process_lines {
         $lines->{raw}{$tag} =
           thaw( decode_base64( join( "\n", @{ $lines->{base64}{$tag} } ) ) );
     }
+}
+
+sub default_output_handler {
+    my $d = shift;
+    print Dumper $d;
 }
 
 sub go_file {
@@ -3115,17 +3121,33 @@ sub connect_to_children {
 sub issue_command_to_inner {
     my ( $cdata, $cmd ) = @_;
     my $str = my_encode($cmd);
+    if ( $conf{"full-duplex"} eq "debug" ) {
+        printf( "Sending command to inner, %d bytes\n", length($str) );
+        print( Dumper($cmd) );
+
+    }
     $cdata->{socket}->print("$str\n");
 }
 
 sub command_from_inner {
-    my ( $handle, $cdata, $line ) = @_;
+    my ( $comm_data, $cdata, $line ) = @_;
 
     if ( $line eq "Welcome" ) {
         my $req;
         $req->{mode}            = "signon";
-        $req->{connection_tree} = $handle->{connection_tree};
-        $req->{remote}          = $handle->{remote};
+        $req->{connection_tree} = $comm_data->{connection_tree};
+        $req->{remote}          = $comm_data->{remote};
+
+        # Also send over some of the per-run (as opposed to per-mode)
+        # configuration  options.
+        # XXX: Need to send over scripts and other stuff here as well.
+        $req->{jobconfig}{jobid} = $comm_data->{jobid};
+        $req->{jobconfig}{rmgr}  = $conf{rmgr};
+
+        if ( $conf{rmgr} eq "orte" ) {
+            $req->{jobconfig}{"orte-data"} = $open_jobs{ $comm_data->{jobid} };
+        }
+
         issue_command_to_inner( $cdata, $req );
         return;
     }
@@ -3133,33 +3155,46 @@ sub command_from_inner {
     # A reply from inner.
     my $d = my_decode($line);
 
-    if ( $handle->{state} eq "connecting" ) {
-        $handle->{state} = "live";
+    if ( $conf{"full-duplex"} eq "debug" ) {
+        printf( "Reply from inner, %d bytes\n", length($line) );
+        print( Dumper($d) );
+    }
+
+    if ( $comm_data->{state} eq "connecting" ) {
+
+        #XXX: Check all target_processes are here.
+        print Dumper $d;
+
+        $comm_data->{state} = "live";
         my $req;
-        $req->{mode}   = $handle->{mode};
-        $req->{jobid}  = $handle->{jobid};
+        $req->{mode}   = $comm_data->{mode};
+        $req->{jobid}  = $comm_data->{jobid};
         $req->{cinner} = \%cinner;
         issue_command_to_inner( $cdata, $req );
         return;
     }
 
-    if ( $handle->{state} eq "live" ) {
-        $handle->{state} = "shutdown";
+    if ( $comm_data->{state} eq "live" ) {
+        $comm_data->{state} = "shutdown";
         my $req;
         $req->{mode} = "exit";
         issue_command_to_inner( $cdata, $req );
 
-        $allfns{ $handle->{mode} }{out_handler}( undef, $d );
+	if ( defined($allfns{ $comm_data->{mode} }{out_handler})) {
+	    $allfns{ $comm_data->{mode} }{out_handler}( undef, $d );
+	} else {
+	    default_output_handler($d);
+	}
         return;
     }
 
-    if ( $handle->{state} eq "shutdown" ) {
+    if ( $comm_data->{state} eq "shutdown" ) {
 
         # Nothing to do here.
         return;
     }
 
-    print("Hmm, unknown state! $handle->{state}\n");
+    print("Hmm, unknown state! $comm_data->{state}\n");
     return;
 
 }
@@ -5292,13 +5327,23 @@ sub stat_to_jiffies {
     return $jiffies;
 }
 
+my $proc_info;
+
 sub proc_output {
     my ( $vp, $key, $value ) = @_;
-    output( $vp, "$key: $value" );
+    if ( $confInner{mode} eq "proc-summary" ) {
+        $proc_info->{$vp}{ lc($key) } = $value;
+    } else {
+        output( $vp, "$key: $value" );
+    }
 }
 
 sub show_proc_all {
     my ($list) = @_;
+
+    if ( $confInner{mode} eq "proc-summary" ) {
+        $proc_info = undef;
+    }
 
     my @all;
 
@@ -5372,6 +5417,10 @@ sub show_proc_all {
         my $used_str = sprintf( "%d", $used );
 
         proc_output( $vp, "pcpu", $used_str );
+    }
+
+    if ( $confInner{mode} eq "proc-summary" ) {
+        return $proc_info;
     }
 }
 
@@ -5823,16 +5872,18 @@ sub show_pid {
 
     debug( $vp, "Looking at $vp, pid: $pid" );
 
-    if ( defined $allfns{ $confInner{mode} }{handler} ) {
-        my $res = $allfns{ $confInner{mode} }{handler}( $vp, $pid );
-        if ( defined $allfns{ $confInner{mode} }{out_handler} ) {
-            output_dtype( $vp, $res );
-        }
-    } else {
+    if ( $confInner{pre}
+        or not defined( $allfns{ $confInner{mode} }{handler} ) )
+    {
         my %d;
         $d{pid} = $pid;
         $d{vp}  = $vp;
         push( @{ $confInner{"all-pids"} }, \%d );
+    } else {
+        my $res = $allfns{ $confInner{mode} }{handler}( $vp, $pid );
+        if ( defined $allfns{ $confInner{mode} }{out_handler} ) {
+            output_dtype( $vp, $res );
+        }
     }
 }
 
@@ -6084,7 +6135,15 @@ sub mpd_find_pids {
 
 sub open_find_pids {
     my $job = shift;
-    open_get_data( $confInner{"open-ps"} );
+
+    # Be careful here, we are the inner process then load data from
+    # the outer.
+    if ( defined $confInner{"orte-data"} ) {
+        %open_jobs = ();
+        $open_jobs{$job} = $confInner{"orte-data"};
+    } else {
+        open_get_data( $confInner{"open-ps"} );
+    }
     my $hostname = hostname();
 
     foreach my $rank ( keys( %{ $open_jobs{$job}{ranks}{$hostname} } ) ) {
@@ -6224,6 +6283,34 @@ sub reply_from_child {
     $handle->{target_responce} = undef;
 }
 
+# Find and report pids as part of the signon protocol, we should
+# also report name
+sub inner_find_pids {
+    my ( $netdata, $cmd ) = @_;
+
+    # Cache config data and search for pids, storing
+    # data in $netdata->{target_responce} and $netdata->??
+
+    if ( $cmd->{jobconfig}{rmgr} eq "orte" ) {
+        $confInner{"orte-data"}{ $cmd->{jobconfig}{jobid} } =
+          $cmd->{jobconfig}{"orte-data"};
+        $confInner{"orte-data"} = $cmd->{jobconfig}{"orte-data"};
+    }
+    $confInner{pre} = 1;
+
+    $rmgr{ $cmd->{jobconfig}{rmgr} }{find_pids}( $cmd->{jobconfig}{jobid} );
+
+    foreach my $proc ( @{ $confInner{"all-pids"} } ) {
+        my $pid   = $proc->{pid};
+        my $vp    = $proc->{vp};
+        my $name  = readlink("/proc/$pid/exe");
+        my $state = find_from_status( $pid, "State" );
+        $netdata->{target_responce}{$vp}->{pid}   = $pid;
+        $netdata->{target_responce}{$vp}->{name}  = $name;
+        $netdata->{target_responce}{$vp}->{state} = $state;
+    }
+}
+
 # Receive a command (perl reference) from our parent.
 #
 # When we receive a command:
@@ -6241,6 +6328,7 @@ sub command_from_parent {
             exists $cmd->{connection_tree}{ $confInner{hostname} }{children} )
         {
             $netdata->{children} = 0;
+            inner_find_pids( $netdata, $cmd );
             return;
         }
 
@@ -6264,6 +6352,7 @@ sub command_from_parent {
             $netdata->{connections}{$socket} = \%cdata;
             push @{ $netdata->{child_sockets} }, $socket;
         }
+        inner_find_pids( $netdata, $cmd );
         return;
     }
 
@@ -6288,14 +6377,11 @@ sub command_from_parent {
 
     $confInner{mode} = $cmd->{mode};
 
-    # Find the pids and register them all.
-    $rmgr{ $confInner{rmgr} }{find_pids}( $cmd->{jobid} );
-
     # Now do the work.
-    my $z = $allfns{ $cmd->{mode} }{handler_all}( $confInner{"all-pids"} );
+    my $res = $allfns{ $cmd->{mode} }{handler_all}( $confInner{"all-pids"} );
 
-    $netdata->{target_responce} = $z;
-    $netdata->{all_replys}{target_responce} = $z;
+    $netdata->{target_responce} = $res;
+    $netdata->{all_replys}{target_responce} = $res;
 
     return;
 }
