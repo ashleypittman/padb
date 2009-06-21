@@ -2967,8 +2967,58 @@ sub post_process_lines {
 }
 
 sub default_output_handler {
-    my $d = shift;
-    print Dumper $d;
+    my ( $mode, $d ) = @_;
+
+    # Could warn on missing output here...
+
+    my $lines = $d->{target_output};
+
+    if ( $mode eq "stack" or $input_file ) {
+        if ( $strip_below_main or $strip_above_wait ) {
+            strip_stack_traces($lines);
+        }
+    }
+
+    if ($tree) {
+        print show_tree go_p( 0, $lines,
+            ( sort { $a <=> $b } ( keys %$lines ) ) );
+
+    } elsif ($compress) {
+
+        foreach my $tag ( sort { $a <=> $b } ( keys %$lines ) ) {
+            next if ( !defined( $lines->{$tag} ) );
+            my @identical = ();
+            foreach my $tag2 ( keys %$lines ) {
+                next if ( $tag2 eq $tag );
+                if ( cmp_list( \@{ $lines->{$tag} }, \@{ $lines->{$tag2} } ) ) {
+                    push( @identical, $tag2 );
+                    delete( $lines->{$tag2} );
+                }
+            }
+            print("----------------\n");
+            printf( "%s\n", join( ",", compress( @identical, $tag ) ) );
+            print("----------------\n");
+            foreach my $data ( @{ $lines->{$tag} } ) {
+                print("$data\n");
+            }
+        }
+    } elsif ($compress_C) {
+        foreach my $tag ( sort { $a <=> $b } ( keys %$lines ) ) {
+            print("----------------\n");
+            print("$tag\n");
+            print("----------------\n");
+            foreach my $data ( @{ $lines->{$tag} } ) {
+                print("$data\n");
+            }
+        }
+    } else {
+        foreach my $process ( sort( keys( %{ $d->{target_output} } ) ) ) {
+            foreach my $line ( @{ $d->{target_output}{$process} } ) {
+                print "$process:$line\n";
+            }
+        }
+
+    }
 }
 
 sub go_file {
@@ -3160,15 +3210,38 @@ sub command_from_inner {
         print( Dumper($d) );
     }
 
-    if ( $comm_data->{state} eq "connecting" ) {
+    if (   ( $comm_data->{state} eq "connecting" )
+        or ( $comm_data->{state} eq "live" and $watch ) )
+    {
 
-        #XXX: Check all target_processes are here.
-        print Dumper $d;
+        if ( $comm_data->{state} eq "connecting" ) {
+
+            #XXX: Check all target_processes are here.
+            # print Dumper $d;
+        }
+
+        # Watch mode, show the output and then loop.
+        if ( $comm_data->{state} eq "live" ) {
+            maybe_clear_screen();
+            if ( defined( $allfns{ $comm_data->{mode} }{out_handler} ) ) {
+                $allfns{ $comm_data->{mode} }{out_handler}( undef, $d );
+            } else {
+                default_output_handler( $comm_data->{mode}, $d );
+            }
+            sleep( $conf{interval} );
+        }
 
         $comm_data->{state} = "live";
         my $req;
-        $req->{mode}   = $comm_data->{mode};
-        $req->{jobid}  = $comm_data->{jobid};
+        $req->{mode} = $comm_data->{mode};
+
+        # Send along the secondary args.
+        if ( defined $allfns{ $comm_data->{mode} }{secondary} ) {
+            foreach my $sec ( @{ $allfns{ $comm_data->{mode} }{secondary} } ) {
+                $req->{cargs}{ $sec->{arg_long} } = $sec->{value};
+            }
+        }
+
         $req->{cinner} = \%cinner;
         issue_command_to_inner( $cdata, $req );
         return;
@@ -3180,11 +3253,11 @@ sub command_from_inner {
         $req->{mode} = "exit";
         issue_command_to_inner( $cdata, $req );
 
-	if ( defined($allfns{ $comm_data->{mode} }{out_handler})) {
-	    $allfns{ $comm_data->{mode} }{out_handler}( undef, $d );
-	} else {
-	    default_output_handler($d);
-	}
+        if ( defined( $allfns{ $comm_data->{mode} }{out_handler} ) ) {
+            $allfns{ $comm_data->{mode} }{out_handler}( undef, $d );
+        } else {
+            default_output_handler( $comm_data->{mode}, $d );
+        }
         return;
     }
 
@@ -3310,11 +3383,6 @@ sub go_parallel {
                     exit(1);
                 }
             }
-
-            #my $count = $sel->count();
-            #if ( $count == 1 ) {
-            #    printf("All sockets closed?\n");
-            #}
         }
         my $t2    = time() - $start;
         my $count = $sel->count();
@@ -3550,18 +3618,18 @@ sub go_job {
     }
 
     # This makes thing easier...
-    if ($watch) {
-        while (1) {
-            maybe_clear_screen();
-            my $errors =
-              go_job_once( $jobid, $cmd, $ncpus, $raw, $stats, $mode, $h );
-            if ( $errors != 0 ) {
-                cleanup_pcmd();
-                return $errors;
-            }
-            sleep( $conf{"interval"} );
-        }
-    }
+    #if ($watch) {
+    ##    while (1) {
+    #        maybe_clear_screen();
+    #        my $errors =
+    #          go_job_once( $jobid, $cmd, $ncpus, $raw, $stats, $mode, $h );
+    #        if ( $errors != 0 ) {
+    #            cleanup_pcmd();
+    #            return $errors;
+    #        }
+    #        sleep( $conf{"interval"} );
+    #    }
+    #}
     my $errors;
     if ( $conf{"full-duplex"} ) {
         if ( not defined $hosts ) {
@@ -3988,17 +4056,13 @@ sub output_dtype {
     }
 }
 
+my %inner_output;
+
 sub output {
     my ( $vp, $str ) = @_;
-    if ( $confInner{"lineformatted"} ) {
-        if ( defined $vp ) {
-            print "$vp:$str\n";
-        } else {
-            print "$confInner{hostname}.-1:ERROR: $str\n";
-        }
-    } else {
-        print "$str\n";
-    }
+
+    push( @{ $inner_output{$vp} }, $str );
+
 }
 
 sub p_die {
@@ -4570,7 +4634,7 @@ sub fetch_mpi_queue_gdb {
 }
 
 sub show_mpi_queue {
-    my ( $vp, $pid ) = @_;
+    my ( $carg, $vp, $pid ) = @_;
 
     my @mq = fetch_mpi_queue( $vp, $pid );
     foreach my $o (@mq) {
@@ -4591,7 +4655,7 @@ sub show_mpi_queue_for_deadlock {
 
 # Ideally handle all this at a higher level...
 sub show_mpi_queue_for_deadlock_all {
-    my ($list) = @_;
+    my ( $carg, $list ) = @_;
 
     my @all;
 
@@ -5339,7 +5403,7 @@ sub proc_output {
 }
 
 sub show_proc_all {
-    my ($list) = @_;
+    my ( $carg, $list ) = @_;
 
     if ( $confInner{mode} eq "proc-summary" ) {
         $proc_info = undef;
@@ -5469,7 +5533,7 @@ sub gdb_int_from_pid {
 # but also that the resulting stack traces will have less artifacts because running
 # processes bunch up behind the non-running ones.
 sub stack_trace_from_pids {
-    my ($list) = @_;
+    my ( $carg, $list ) = @_;
 
     my @all;
 
@@ -5602,13 +5666,13 @@ sub stack_trace_from_pids {
 }
 
 sub kill_proc {
-    my ( $vp, $pid ) = @_;
-    my $signal = uc( $confInner{args}{signal} );
+    my ( $cargs, $vp, $pid ) = @_;
+    my $signal = uc( $cargs->{signal} );
     kill( $signal, $pid );
 }
 
 sub show_queue {
-    my ( $vp, $pid ) = @_;
+    my ( $carg, $vp, $pid ) = @_;
 
     # Nobble the LD_LIBRARY_PATH to give etrace the best chance of working.
     my %remote_env = get_remote_env($pid);
@@ -5623,7 +5687,7 @@ sub show_queue {
 
     return if ( $lines != 0 );
 
-    show_mpi_queue( $vp, $pid );
+    show_mpi_queue( $carg, $vp, $pid );
 }
 
 sub show_clever_full_stack {
@@ -5676,7 +5740,7 @@ sub show_full_stack {
 }
 
 sub show_full_stacks {
-    my ($list) = @_;
+    my ( $carg, $list ) = @_;
 
     if (0) {
 
@@ -5700,7 +5764,7 @@ sub show_full_stacks {
 }
 
 sub set_debug {
-    my ( $vp, $pid ) = @_;
+    my ( $carg, $vp, $pid ) = @_;
     run_command( $vp,
 "edb --key $confInner{key} --debug=$confInner{args}{dflag} --target-vp=$vp"
     );
@@ -5857,7 +5921,7 @@ sub mpi_watch {
 }
 
 sub mpi_watch_all {
-    my ($list) = @_;
+    my ( $carg, $list ) = @_;
     my %res;
     foreach my $proc ( @{$list} ) {
         my $vp  = $proc->{vp};
@@ -6226,6 +6290,18 @@ sub inner_show_stats {
     );
 }
 
+sub default_handler_all {
+    my ( $cmd, $list ) = @_;
+    my %gres;
+    foreach my $proc ( @{$list} ) {
+        my $vp  = $proc->{vp};
+        my $pid = $proc->{pid};
+        $gres{$vp} =
+          $allfns{ $cmd->{mode} }{handler}( $cmd->{cargs}, $vp, $pid );
+    }
+    return \%gres;
+}
+
 # Receive a reply from a child.
 # If it's the last reply then combine
 # with others and forward to parent.
@@ -6261,6 +6337,13 @@ sub reply_from_child {
               $r->{target_responce}{$tp};
         }
     }
+
+    # Save any output we've got from this node.
+    foreach my $key ( keys(%inner_output) ) {
+        $r->{target_output}{$key} = $inner_output{$key};
+    }
+
+    %inner_output = ();
 
     # If this is the last reply from a child then report upstream.
     # print Dumper $handle;
@@ -6378,8 +6461,14 @@ sub command_from_parent {
     $confInner{mode} = $cmd->{mode};
 
     # Now do the work.
-    my $res = $allfns{ $cmd->{mode} }{handler_all}( $confInner{"all-pids"} );
-
+    my $res;
+    if ( defined $allfns{ $cmd->{mode} }{handler_all} ) {
+        $res =
+          $allfns{ $cmd->{mode} }{handler_all}( $cmd->{cargs},
+            $confInner{"all-pids"} );
+    } else {
+        $res = default_handler_all( $cmd, $confInner{"all-pids"} );
+    }
     $netdata->{target_responce} = $res;
     $netdata->{all_replys}{target_responce} = $res;
 
@@ -6445,6 +6534,14 @@ sub command_from_outer {
     if ( $netdata->{children} == 0 ) {
         my $res;
         $res->{target_responce} = $netdata->{target_responce};
+
+        # Save any output we've got from this node.
+        foreach my $key ( keys(%inner_output) ) {
+            $res->{target_output}{$key} = $inner_output{$key};
+        }
+
+        %inner_output = ();
+
         reply_to_parent( $netdata, $res );
         $netdata->{target_responce} = undef;
 
@@ -6705,27 +6802,32 @@ sub to_arg {
 
 sub common_main {
 
-    # Long command line option.
-    $allfns{queue}{arg_long} = "message-queue";
+    # The quasi-authorative list of modes padb can operate in.
 
-    # Short command line option (optional).
-    $allfns{queue}{arg_short} = "q";
+    # Notes on the callback functions and paramaters.
 
-    # Handler to be called for each vp, called with ($vp,$pid) on the
-    # correct host for each vp.
-    $allfns{queue}{handler} = \&show_queue;
+    # handler     Called in the inner for each target process.
+    # param:      ??, $vp, $pid
 
-    # Handler to be called in the outer when command line option is set.
-    # $allfns{queue}{cmdline} = \&command_line_queue;
+# handler_all Called once in the the inner and should iterate over each target process.
+#             ??, $vp, $pid
 
-    # Output handlers,
-    # If {out_handler} is set (to a function) assume $line_formatted and
-    # call that fn with the output.
-    # If {pre_out_handler} is set call this function once at start of day,
-    # save it's return value and pass this to {out_handler} later.
+# These two functions can eitehr return a value, and have it passed to the output handler
+# or call output() and use the default_output_handler().
 
-    # Help text for this function.
-    $allfns{queue}{help} = "Show the message queues";
+    # out_handler Called once in the outer to display the output
+    # pre_out_handler Called once in the outer to display any header.
+
+    # TODO:
+    # --mode=<mode> on the command line?
+    # Sort out secondary and options_i so they are handled in the same way.
+
+    $allfns{queue} = {
+        'arg_long'  => "message-queue",
+        'arg_short' => "q",
+        'handler'   => \&show_queue,
+        'help'      => "Show the message queues",
+    };
 
     $allfns{kill} = {
         'handler'   => \&kill_proc,
@@ -6739,10 +6841,6 @@ sub common_main {
             }
         ]
     };
-
-    # There are a number of things to consider though, are there any output
-    # filters that can be used with this function and are the args options
-    # to the inner code or the output filter (or can they just be set for both)
 
     $allfns{mqueue} = {
         'handler'   => \&show_mpi_queue,
@@ -6836,7 +6934,6 @@ sub common_main {
             }
         }
     }
-
 }
 
 # Now run some actual code.
