@@ -349,9 +349,6 @@ $rmgr{"local-fd"} = {
 
 my %allfns;
 
-my $line_formatted = 0;
-my $countoutput    = 0;
-
 my %cinner;    # Config options to be passed to inner.
 my $rem_jobid;
 
@@ -2884,6 +2881,7 @@ sub show_proc_format {
     }
 }
 
+# XXX: Now only called when loading things from file.
 sub show_results {
     my ( $nlines, $mode, $handle ) = @_;
 
@@ -3045,10 +3043,6 @@ sub go_file {
         return;
     }
 
-    if ( not $line_formatted ) {
-        die("input file specified but no formatting selected\n");
-    }
-
     open( PCMD, "$file" ) or die "$prog: cant open file $file: $!\n";
     my @data = <PCMD>;
     close(PCMD);
@@ -3199,6 +3193,10 @@ sub command_from_inner {
         $req->{jobconfig}{jobid} = $comm_data->{jobid};
         $req->{jobconfig}{rmgr}  = $conf{rmgr};
 
+        if ( $#ranks != -1 ) {
+            @{ $req->{ranks} } = @ranks;
+        }
+
         if ( $conf{rmgr} eq "orte" ) {
             $req->{jobconfig}{"orte-data"} = $open_jobs{ $comm_data->{jobid} };
         }
@@ -3322,7 +3320,6 @@ sub go_parallel {
     my $jobid = shift;
     my $cmd   = shift;
     my $ncpus = shift;
-    my $raw   = shift;
     my $stats = shift;
     my $mode  = shift;
     my $h     = shift;
@@ -3478,127 +3475,7 @@ sub go_parallel {
         }
     }
 
-    cleanup_pcmd();
-
-    exit(0);
-}
-
-sub go_job_once {
-    my $jobid = shift;
-    my $cmd   = shift;
-    my $ncpus = shift;
-    my $raw   = shift;
-    my $stats = shift;
-    my $mode  = shift;
-    my $h     = shift;
-
-    my $errors = 0;
-
-    my $report_errors = 1;
-
-    $report_errors = 0 if ($full_report);
-
-    my $pcmd = {
-        pid => -1,
-        in  => "",
-        out => *OUT,
-        err => *ERR,
-    };
-
-    # According to the docs there is potential for deadlock here
-    # if the amount of data coming in is enough to fill the buffers
-    # We should really use IO::select it's not clear to me how
-    # you detect EOF in that case and this works for now.
-
-    $pcmd->{pid} = open3( $pcmd->{in}, *OUT, *ERR, $cmd )
-      or die "Unable to open3() pcmd: $!\n";
-
-    close $pcmd->{in};
-
-    {
-        my %lines;
-        my @data;
-
-        if ($raw) {
-            my $handle = $pcmd->{out};
-            while (<$handle>) {
-                my $line = $_;
-                print("$line");
-            }
-        } else {
-            if ($stats) {
-                local $/ = "\n\n";
-                my $handle = $pcmd->{out};
-                while (<$handle>) {
-                    s/\n//g;
-                    push @data, $_;
-                }
-            } elsif ($line_formatted) {
-                my $handle = $pcmd->{out};
-                while (<$handle>) {
-                    my $line = $_;
-                    process_line( $line, \%lines );
-                }
-                post_process_lines( \%lines );
-            }
-        }
-
-        my $handle = $pcmd->{err};
-        while (<$handle>) {
-            my $line = $_;
-            if ($report_errors) {
-                print( STDERR "Error ($jobid,$mode): $line" );
-            }
-            $errors++;
-        }
-
-        close $pcmd->{in};
-        close $pcmd->{out};
-        close $pcmd->{err};
-
-        waitpid( $pcmd->{pid}, 0 );
-        my $res = $?;
-
-        printf("result from parallel command was $res\n")
-          if ( $conf{"verbose"} );
-
-        if ( $res != 0 ) {
-            my %status = rc_status($res);
-            if ( job_is_running($jobid) ) {
-                if ($report_errors) {
-                    printf(
-                        "Failed to run parallel command (rc = $status{rc})\n");
-                }
-            } else {
-                printf("Job $jobid is no longer active\n");
-                return 1;
-            }
-        }
-
-        if ($stats) {
-            if ( $conf{"stats-raw"} ) {
-                local $, = "\n\n";
-                print @data;
-                print "\n";
-            } else {
-                my $s = read_stats(@data);
-                show_stats($s);
-            }
-        } elsif ($line_formatted) {
-            if ( defined $ncpus ) {
-                for ( my $vp = 0 ; $vp < $ncpus ; $vp++ ) {
-                    push(
-                        @{ $lines{lines}{$vp} },
-                        "no output for this process"
-                    ) if ( not defined $lines{lines}{$vp}[0] );
-                }
-            }
-            show_results( \%lines, $mode, $h );
-        }
-    }
-
-    return $errors;
-
+    return 0;
 }
 
 sub find_padb_secret {
@@ -3632,19 +3509,6 @@ sub find_padb_secret {
 sub go_job {
     my $jobid = shift;
     my $mode  = shift;
-    my $rops  = "";
-
-    if ( defined $mode ) {
-        $rops .= " --$allfns{$mode}{arg_long}";
-
-        if ( defined $allfns{$mode}{secondary} ) {
-            foreach my $sec ( @{ $allfns{$mode}{secondary} } ) {
-                $rops .= " --$sec->{arg_long}=$sec->{value}";
-            }
-        }
-    }
-
-    my $key = job_to_key($jobid);
 
     my $stats;
 
@@ -3662,10 +3526,6 @@ sub go_job {
             exit(1);
         }
 
-    }
-
-    foreach my $rank (@ranks) {
-        $rops .= " --rank=$rank";
     }
 
     $conf{"verbose"} && print "Attaching to job $jobid\n";
@@ -3687,69 +3547,41 @@ sub go_job {
     $conf{"verbose"} && defined $ncpus && print "Job has $ncpus cpus\n";
     $conf{"verbose"} && defined $hosts && print "Job has $hosts hosts\n";
 
-    # Some versions of perl like to have a space after the O and report that
-    # -ormgr isn't a valid option if it's not there, perhaps this is a bug
-    # in GetOptions but for now just work around it.
-    foreach my $opt ( keys %cinner ) {
-        $rops .= " -O $opt=\"$cinner{$opt}\"";
-    }
-
   # Maybe do it this way, edb works best when run with the same LD_LIBRARY_PATH
   # as the application.  It's very important when running the message queue
   # extraction code but less so here.  You may find you get linker errors though
   # although they shouldn't be to hard to work around.
 
-    # Another problem, if using slurm then the key isn't valid, you need to
-    # convert from jobId to key locally on the node, hence you need to use
-    # a padb-helper process
-    if ( $stats_total or $group ) {
-        $stats = 1;
-        if ( defined $key ) {
-            $cmd .=
-              " $conf{edb} --stats-raw --parallel --key=$key $conf{edbopt}";
-        } else {
-            $cmd .=
-              " $0 --inner --jobid=$rem_jobid $rops --stats-full $conf{edbopt}";
-        }
-    } else {
-        $rops .= " --line-formatted" if ( $line_formatted or $#ranks != 0 );
-        $cmd .= " $0 --inner --jobid=$rem_jobid" . $rops;
-    }
+   # Another problem, if using slurm then the key isn't valid, you need to
+   # convert from jobId to key locally on the node, hence you need to use
+   # a padb-helper process
+   #if ( $stats_total or $group ) {
+   #    $stats = 1;
+   #    if ( defined $key ) {
+   #        $cmd .=
+   #          " $conf{edb} --stats-raw --parallel --key=$key $conf{edbopt}";
+   #    } else {
+   #        $cmd .=
+   #          " $0 --inner --jobid=$rem_jobid $rops --stats-full $conf{edbopt}";
+   #    }
+   #} else {
+    $cmd .= " $0 --inner --full-duplex";
+
+    #}
 
     ( $conf{"verbose"} > 1 or $conf{"showcmd"} ) && print "$cmd\n";
-
-    my $raw = ( ( not $stats ) and ( not $line_formatted ) );
 
     my $h;
     if ( defined $allfns{$mode}{pre_out_handler} ) {
         $h = $allfns{$mode}{pre_out_handler}($ncpus);
     }
 
-    # This makes thing easier...
-    #if ($watch) {
-    ##    while (1) {
-    #        maybe_clear_screen();
-    #        my $errors =
-    #          go_job_once( $jobid, $cmd, $ncpus, $raw, $stats, $mode, $h );
-    #        if ( $errors != 0 ) {
-    #            cleanup_pcmd();
-    #            return $errors;
-    #        }
-    #        sleep( $conf{"interval"} );
-    #    }
-    #}
-    my $errors;
-    if ( $conf{"full-duplex"} ) {
-        if ( not defined $hosts ) {
-            printf("Full duplex mode needs to know the host count\n");
-            printf("Which is doesn't for this resource manager: $conf{rmgr}\n");
-            return 1;
-        }
-        $errors = go_parallel( $jobid, "$cmd --full-duplex",
-            $ncpus, $raw, $stats, $mode, $h, $hosts );
-    } else {
-        $errors = go_job_once( $jobid, $cmd, $ncpus, $raw, $stats, $mode, $h );
+    if ( not defined $hosts ) {
+        printf("Full duplex mode needs to know the host count\n");
+        printf("Which is doesn't for this resource manager: $conf{rmgr}\n");
+        return 1;
     }
+    my $errors = go_parallel( $jobid, $cmd, $ncpus, $stats, $mode, $h, $hosts );
     cleanup_pcmd();
     return $errors;
 }
@@ -3956,12 +3788,12 @@ sub outer_main {
         # Bit of a cheat here, do two things at once...
         # This should probably me modified to work better on
         # non Quadrics systems.
-        my $res;
-        $stats_total = 1;
-        $group       = 1;
-        $res         = go_job( $full_report, "full-report" );
-        undef $stats_total;
-        undef $group;
+        #my $res;
+        #$stats_total = 1;
+        #$group       = 1;
+        #$res         = go_job( $full_report, "stats" );
+        #undef $stats_total;
+        #undef $group;
 
         # Don't exit on failure here.
         #if ( $res != 0 ) {
@@ -3970,8 +3802,6 @@ sub outer_main {
 
         printf("\n");
 
-        $line_formatted = 1;
-
         $compress = 1;
         go_job( $full_report, "queue" );
         undef $compress;
@@ -3979,7 +3809,6 @@ sub outer_main {
         printf("\n");
 
         $strip_above_wait = 0;
-        $countoutput      = 1;
         $tree             = 1;
         go_job( $full_report, "stack" );
         undef $tree;
@@ -4026,19 +3855,11 @@ sub outer_main {
         );
     }
 
-    $line_formatted = ( grep { $_ } ( $compress, $compress_C, $tree ) );
-    if ( $line_formatted > 1 ) {
+    my $style_count = ( grep { $_ } ( $compress, $compress_C, $tree ) );
+    if ( $style_count > 1 ) {
         cmdline_error(
 "$prog: Error: only specify one of --compress, --compress-long or --tree\n"
         );
-    }
-
-    if ( defined $mode && $mode eq "proc-summary" ) {
-        $line_formatted = 1;
-    }
-
-    if ( defined $mode && defined $allfns{$mode}{out_handler} ) {
-        $line_formatted = 1;
     }
 
     if ( not $input_file
@@ -4065,17 +3886,6 @@ sub outer_main {
     if ( $tree and !( ( defined $mode && $mode eq "stack" ) or $input_file ) ) {
         cmdline_error("$prog: Error: --tree only works with --stack-trace\n");
     }
-
-    if ( ( ( grep { $_ } ($stats_total) ) == 1 )
-        and $line_formatted )
-    {
-        cmdline_error(
-"$prog: Error: requested output not compatible with requested formatting\n"
-        );
-    }
-
-    $countoutput = 1
-      if ( ( defined $mode and $mode eq "stack" ) or $conf{"verbose"} );
 
     if ( defined($input_file) ) {
         my $m = "input";
@@ -4583,7 +4393,7 @@ sub gdb_string {
     my $offset = 0;
     my $str    = "";
     my @s      = gdb_read_raw( $gdb, $strp, 128 );
-    return undef if ( $s[0] eq undef );
+    return undef if ( not defined( $s[0] ) );
     foreach my $d (@s) {
         my $v = hex($d);
         return $str if ( $v == 0 );
@@ -4620,7 +4430,7 @@ sub handle_query {
         $stats->{symbol}++;
     } elsif ( $cmd eq "data" ) {
         my @r = gdb_read_raw( $gdb, $params[0], $params[1] );
-        if ( $r[0] ne undef ) {
+        if ( defined( $r[0] ) ) {
             $res = "@r";
             $stats->{datareads}++;
             $stats->{databytes} += $params[1];
@@ -4765,6 +4575,7 @@ sub show_mpi_queue_for_deadlock {
 sub show_mpi_queue_for_deadlock_all {
     my ( $carg, $list ) = @_;
 
+    my $ret;
     my @all;
 
     foreach my $proc ( @{$list} ) {
@@ -4793,7 +4604,9 @@ sub show_mpi_queue_for_deadlock_all {
         my $gdb = $proc->{gdb};
 
         my @mq = fetch_mpi_queue_gdb( $vp, $pid, $gdb );
-        output_dtype( $vp, \@mq );
+        $ret->{$vp} = \@mq;
+
+        #output_dtype( $vp, \@mq );
     }
 
     foreach my $proc (@all) {
@@ -4801,6 +4614,7 @@ sub show_mpi_queue_for_deadlock_all {
         gdb_detach($gdb);
         gdb_quit($gdb);
     }
+    return $ret;
 }
 
 sub go_deadlock_detect {
@@ -4845,10 +4659,10 @@ sub go_deadlock_detect {
         }
     }
 
-    #print Dumper \%ad;
     my $ret     = "";
     my $i_count = 0;    # Interesting groups.
-    foreach my $gid ( sort { $a <=> $b } keys %ad ) {
+                        #foreach my $gid ( sort { $a <=> $b } keys %ad ) {
+    foreach my $gid ( sort keys %ad ) {
 
         if ( $#target_groups != -1 ) {
             next unless defined $tg[$gid];
@@ -4946,8 +4760,8 @@ sub deadlock_detect {
     # code work with input files, the whole thing is due
     # a tidy-up on the full-duplex branch where this should
     # be solved properly.
-    if ( defined $lines->{raw} ) {
-        $data = $lines->{raw};
+    if ( defined $lines->{target_responce} ) {
+        $data = $lines->{target_responce};
     } else {
         $data = $lines->{lines};
     }
@@ -6044,19 +5858,10 @@ sub show_pid {
 
     debug( $vp, "Looking at $vp, pid: $pid" );
 
-    if ( $confInner{pre}
-        or not defined( $allfns{ $confInner{mode} }{handler} ) )
-    {
-        my %d;
-        $d{pid} = $pid;
-        $d{vp}  = $vp;
-        push( @{ $confInner{"all-pids"} }, \%d );
-    } else {
-        my $res = $allfns{ $confInner{mode} }{handler}( $vp, $pid );
-        if ( defined $allfns{ $confInner{mode} }{out_handler} ) {
-            output_dtype( $vp, $res );
-        }
-    }
+    my %d;
+    $d{pid} = $pid;
+    $d{vp}  = $vp;
+    push( @{ $confInner{"all-pids"} }, \%d );
 }
 
 sub maybe_show_pid {
@@ -6487,8 +6292,17 @@ sub inner_find_pids {
           $cmd->{jobconfig}{"orte-data"};
         $confInner{"orte-data"} = $cmd->{jobconfig}{"orte-data"};
     }
-    $confInner{pre} = 1;
 
+# Save the rank list if supplied, if there is no list then assume all, should probably
+# be sent over as part of the request rather than the header ready for when padb
+# can handle multiple commands over one run.
+# XXX: We also need to handle the case where modes don't accept partial input, for example
+# deadlock detect where this shouldn't be passed.
+    if ( exists( $cmd->{ranks} ) ) {
+        @ranks = @{ $cmd->{ranks} };
+    }
+
+# Query the resource manager to find the pids, they'll be added to the "all-pids" field.
     $rmgr{ $cmd->{jobconfig}{rmgr} }{find_pids}( $cmd->{jobconfig}{jobid} );
 
     foreach my $proc ( @{ $confInner{"all-pids"} } ) {
@@ -6500,6 +6314,7 @@ sub inner_find_pids {
         $netdata->{target_responce}{$vp}->{name}  = $name;
         $netdata->{target_responce}{$vp}->{state} = $state;
     }
+
 }
 
 # Receive a command (perl reference) from our parent.
@@ -6770,7 +6585,6 @@ sub inner_main {
 
     # Local vars to help with command line parsing
     my @config_options;
-    my $line_formatted;
     my $jobid;
     my $full_duplex;
     my $outerloc;
@@ -6778,7 +6592,6 @@ sub inner_main {
     my %optionhash = (
         "config-option|O=s" => \@config_options,
         "jobid=i"           => \$jobid,
-        "line-formatted"    => \$line_formatted,
         "rank=i"            => \@ranks,
         "stats-full"        => \$stats,
         "verbose|v+"        => \$confInner{"verbose"},
@@ -6806,47 +6619,14 @@ sub inner_main {
 
     GetOptions(%optionhash) or die("could not parse options\n");
 
+    $confInner{"myld"} = $ENV{"LD_LIBRARY_PATH"};
+
     # If this works then nothing below here is needed as all
     # requests can be sent over the socket.
-    if ($full_duplex) {
-        inner_loop_for_comms($outerloc);
-    }
+    inner_loop_for_comms($outerloc);
+    exit(0);
 
     my $mode;
-
-    foreach my $arg ( keys %config_hash ) {
-        next unless defined $config_hash{$arg};
-        $mode = $arg;
-    }
-
-    $confInner{"mode"} = $mode;
-
-    # Put the args in a hash so that they can be referenced by name.
-    if ( defined $allfns{$mode}{secondary} ) {
-        foreach my $sec ( @{ $allfns{$mode}{secondary} } ) {
-            $confInner{"args"}{ $sec->{arg_long} } = $sec->{value};
-        }
-    }
-
-    # Load all config options from the command line, unlike the outer
-    # code we don't check them to be valid here, any set on the outer
-    # command line are automatically passed on and they might not mean
-    # anything to us so silently ignore them.
-    foreach my $config_option (@config_options) {
-        my @pairs = split( ",", $config_option );
-        foreach my $pair (@pairs) {
-            my ( $name, $val ) = split( "=", $pair );
-            if ( not defined $confInner{$name} ) {
-                debug undef, "Unknown option $name";
-            }
-            $confInner{$name} = $val;
-        }
-    }
-
-    # Load some non user-modifiable data into conf now
-    $confInner{"lineformatted"} = $line_formatted;
-
-    $confInner{"myld"} = $ENV{"LD_LIBRARY_PATH"};
 
     # $rjobid is used for accessing the stats on slurm
     # systems, on rms it's just the jobId but on combined
