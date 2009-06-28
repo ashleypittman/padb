@@ -2990,12 +2990,16 @@ sub default_output_handler {
             }
         }
     } else {
+        my $nprocesses = keys( %{ $d->{target_output} } );
         foreach my $process ( sort( keys( %{ $d->{target_output} } ) ) ) {
             foreach my $line ( @{ $d->{target_output}{$process} } ) {
-                print "$process:$line\n";
+                if ( $nprocesses == 1 ) {
+                    print "$line\n";
+                } else {
+                    print "$process:$line\n";
+                }
             }
         }
-
     }
 }
 
