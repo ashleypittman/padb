@@ -2358,7 +2358,6 @@ sub open_is_installed {
 my %open_jobs;
 
 sub open_get_data {
-    my ($filename) = @_;
 
     # Simply return if called more than once.
     if ( keys(%open_jobs) != 0 ) {
@@ -2367,16 +2366,10 @@ sub open_get_data {
     }
     my $hostname = hostname();
     my $job;
-    my @out;
-    if ( defined $filename ) {
-        open( OPEN, $filename ) or return;
-        @out = <OPEN>;
-        close OPEN;
-    } else {
-        open( OPEN, "ompi-ps|" ) or return;
-        @out = <OPEN>;
-        close OPEN;
-    }
+
+    open( OPEN, "ompi-ps|" ) or return;
+    my @out = <OPEN>;
+    close OPEN;
 
     # Handle being called multiple times, zero the hash every
     # time we are called.  Of course we could just return the
@@ -2433,23 +2426,11 @@ sub open_get_jobs {
 }
 
 my $open_dfile;
-my $open_tfile;
 
 sub open_setup_pcmd {
     my $job = shift;
 
     open_get_data();
-
-    my ( $th, $tn ) = tempfile(".padb.XXXX");
-
-    open( my $oh, "ompi-ps|" );
-    while (<$oh>) {
-        print $th $_;
-    }
-    close $th;
-    $cinner{"open-ps"} = $tn;
-
-    $open_tfile = $tn;
 
     my @hosts = keys %{ $open_jobs{$job}{hosts} };
     my $i     = @hosts;
@@ -2472,7 +2453,6 @@ sub open_setup_pcmd {
 
 sub open_cleanup_pcmd {
     unlink($open_dfile) if ( defined($open_dfile) );
-    unlink($open_tfile) if ( defined($open_tfile) );
 }
 
 ###############################################################################
@@ -6097,7 +6077,7 @@ sub open_find_pids {
         %open_jobs = ();
         $open_jobs{$job} = $confInner{"orte-data"};
     } else {
-        open_get_data( $confInner{"open-ps"} );
+        open_get_data();
     }
     my $hostname = hostname();
 
@@ -6554,7 +6534,6 @@ sub inner_main {
     $confInner{"rmgr"}           = "auto";
     $confInner{"edb"}            = find_edb();
     $confInner{"minfo"}          = find_minfo();
-    $confInner{"open-ps"}        = "";
     $confInner{"hostname"}       = hostname();
 
     # The different options this script can perform.  One (and only one) of
