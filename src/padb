@@ -2751,7 +2751,6 @@ sub sort_proc_hashes {
 }
 
 sub pre_mpi_watch {
-    my ($cpus) = @_;
     my $header = <<EOF;
 u: unexpected messages U: unexpected and other messages
 s: sending messages r: receiving messages m: sending and receiving
@@ -2760,9 +2759,6 @@ a: alltoall A: alltoalls w: waiting
 .: consuming CPU cycles ,: using CPU but no queue data -: sleeping *: error
 EOF
     printf($header);
-    my %data;
-    $data{cpus} = $cpus;
-    return \%data;
 }
 
 sub show_mpi_watch {
@@ -3048,6 +3044,7 @@ sub rc_status {
 }
 
 sub maybe_clear_screen {
+    return unless $watch;
     if ( $conf{"watch-clears-screen"} ) {
         printf( "%s", " \033[1;1H" );
         printf( "%s", "\033[2J" );
@@ -3158,29 +3155,85 @@ sub issue_command_to_inner {
     $cdata->{socket}->print("$str\n");
 }
 
+sub first_command {
+    my $comm_data = shift;
+
+    my $req;
+    $req->{mode}            = "signon";
+    $req->{connection_tree} = $comm_data->{connection_tree};
+    $req->{remote}          = $comm_data->{remote};
+
+    # Also send over some of the per-run (as opposed to per-mode)
+    # configuration  options.
+    # XXX: Need to send over scripts and other stuff here as well.
+    $req->{jobconfig}{jobid} = $comm_data->{jobid};
+    $req->{jobconfig}{rmgr}  = $conf{rmgr};
+
+    if ( $#ranks != -1 ) {
+        @{ $req->{ranks} } = @ranks;
+    }
+
+    if ( $conf{rmgr} eq "orte" ) {
+        $req->{jobconfig}{"orte-data"} = $open_jobs{ $comm_data->{jobid} };
+    }
+
+    $req->{cinner} = \%cinner;
+
+    return $req;
+}
+
+my @commands;
+
+sub push_command {
+    my ( $mode, $args ) = @_;
+
+    my %cmd;
+    $cmd{mode} = $mode;
+    $cmd{args} = $args if defined($args);
+    push @commands, \%cmd;
+}
+
+sub next_command {
+    my $comm_data = shift;
+
+    if ( $#commands == -1 ) {
+        my $req;
+        $req->{mode} = "exit";
+        return $req;
+    }
+
+    my $cmd;
+
+    if ($watch) {
+        $cmd = $commands[0];
+    } else {
+        $cmd = shift(@commands);
+    }
+
+    my $req;
+    $req->{mode} = $cmd->{mode};
+
+    if ( defined $cmd->{args} ) {
+        $req->{cargs} = $cmd->{args};
+    }
+
+    # Send along the secondary args.
+    if ( defined $allfns{ $req->{mode} }{secondary} ) {
+        foreach my $sec ( @{ $allfns{ $req->{mode} }{secondary} } ) {
+            $req->{cargs}{ $sec->{arg_long} } = $sec->{value};
+        }
+    }
+
+    return $req;
+}
+
 sub command_from_inner {
     my ( $comm_data, $cdata, $line ) = @_;
 
+    # Initial signon from child.
     if ( $line eq "Welcome" ) {
-        my $req;
-        $req->{mode}            = "signon";
-        $req->{connection_tree} = $comm_data->{connection_tree};
-        $req->{remote}          = $comm_data->{remote};
-
-        # Also send over some of the per-run (as opposed to per-mode)
-        # configuration  options.
-        # XXX: Need to send over scripts and other stuff here as well.
-        $req->{jobconfig}{jobid} = $comm_data->{jobid};
-        $req->{jobconfig}{rmgr}  = $conf{rmgr};
-
-        if ( $#ranks != -1 ) {
-            @{ $req->{ranks} } = @ranks;
-        }
-
-        if ( $conf{rmgr} eq "orte" ) {
-            $req->{jobconfig}{"orte-data"} = $open_jobs{ $comm_data->{jobid} };
-        }
-
+        my $req = first_command($comm_data);
+        $comm_data->{current_req} = $req;
         issue_command_to_inner( $cdata, $req );
         return;
     }
@@ -3193,66 +3246,52 @@ sub command_from_inner {
         print( Dumper($d) );
     }
 
-    if (   ( $comm_data->{state} eq "connecting" )
-        or ( $comm_data->{state} eq "live" and $watch ) )
-    {
-
-        if ( $comm_data->{state} eq "connecting" ) {
-
-            #XXX: Check all target_processes are here.
-            # print Dumper $d;
-        }
-
-        # Watch mode, show the output and then loop.
-        if ( $comm_data->{state} eq "live" ) {
-            maybe_clear_screen();
-            if ( defined( $allfns{ $comm_data->{mode} }{out_handler} ) ) {
-                $allfns{ $comm_data->{mode} }{out_handler}( undef, $d );
-            } else {
-                default_output_handler( $comm_data->{mode}, $d );
-            }
-            sleep( $conf{interval} );
-        }
-
+    # The inner process has signed on.
+    if ( $comm_data->{current_req}->{mode} eq "signon" ) {
+        $comm_data->{current_req} = next_command($comm_data);
+        issue_command_to_inner( $cdata, $comm_data->{current_req} );
         $comm_data->{state} = "live";
-        my $req;
-        $req->{mode} = $comm_data->{mode};
 
-        # Send along the secondary args.
-        if ( defined $allfns{ $comm_data->{mode} }{secondary} ) {
-            foreach my $sec ( @{ $allfns{ $comm_data->{mode} }{secondary} } ) {
-                $req->{cargs}{ $sec->{arg_long} } = $sec->{value};
-            }
-        }
-
-        $req->{cinner} = \%cinner;
-        issue_command_to_inner( $cdata, $req );
+        #XXX: Check all target_processes are here.
+        # print Dumper $d;
         return;
     }
 
-    if ( $comm_data->{state} eq "live" ) {
+    # The inner process is about to exit.
+    if ( $comm_data->{current_req}->{mode} eq "exit" ) {
         $comm_data->{state} = "shutdown";
-        my $req;
-        $req->{mode} = "exit";
+        return;
+    }
+
+    # We have received a reply to a request, send the next
+    # request first and then display this reply.  If in
+    # watch mode display the reply, sleep and then send
+    # the next request.
+    my $req = next_command($comm_data);
+    if ( not $watch ) {
         issue_command_to_inner( $cdata, $req );
-
-        if ( defined( $allfns{ $comm_data->{mode} }{out_handler} ) ) {
-            $allfns{ $comm_data->{mode} }{out_handler}( undef, $d );
-        } else {
-            default_output_handler( $comm_data->{mode}, $d );
-        }
-        return;
     }
 
-    if ( $comm_data->{state} eq "shutdown" ) {
+    maybe_clear_screen();
 
-        # Nothing to do here.
-        return;
+    # Mode here is the mode for the reply we just got, this
+    # may not be the same thing as the request we are currently
+    # sending.
+    my $mode = $comm_data->{current_req}->{mode};
+    if ( defined( $allfns{$mode}{out_handler} ) ) {
+        $allfns{$mode}{out_handler}( undef, $d );
+    } else {
+        default_output_handler( $mode, $d );
     }
 
-    print("Hmm, unknown state! $comm_data->{state}\n");
+    $comm_data->{current_req} = $req;
+
+    if ($watch) {
+        sleep( $conf{interval} );
+        issue_command_to_inner( $cdata, $req );
+    }
+
     return;
-
 }
 
 sub handle_signon {
@@ -3300,9 +3339,6 @@ sub go_parallel {
     my $jobid = shift;
     my $cmd   = shift;
     my $ncpus = shift;
-    my $stats = shift;
-    my $mode  = shift;
-    my $h     = shift;
     my $hosts = shift;
 
     my $comm_data;
@@ -3338,7 +3374,6 @@ sub go_parallel {
 
     close $pcmd->{in};
 
-    $comm_data->{mode}    = $mode;
     $comm_data->{hosts}   = $hosts;
     $comm_data->{cmd}     = $cmd;
     $comm_data->{jobid}   = $jobid;
@@ -3490,8 +3525,6 @@ sub go_job {
     my $jobid = shift;
     my $mode  = shift;
 
-    my $stats;
-
     if ( defined $rmgr{ $conf{rmgr} }{require_inner_callback}
         and $rmgr{ $conf{rmgr} }{require_inner_callback} )
     {
@@ -3551,17 +3584,12 @@ sub go_job {
 
     ( $conf{"verbose"} > 1 or $conf{"showcmd"} ) && print "$cmd\n";
 
-    my $h;
-    if ( defined $allfns{$mode}{pre_out_handler} ) {
-        $h = $allfns{$mode}{pre_out_handler}($ncpus);
-    }
-
     if ( not defined $hosts ) {
         printf("Full duplex mode needs to know the host count\n");
         printf("Which is doesn't for this resource manager: $conf{rmgr}\n");
         return 1;
     }
-    my $errors = go_parallel( $jobid, $cmd, $ncpus, $stats, $mode, $h, $hosts );
+    my $errors = go_parallel( $jobid, $cmd, $ncpus, $hosts );
     cleanup_pcmd();
     return $errors;
 }
@@ -3780,17 +3808,26 @@ sub outer_main {
         #    exit 1;
         #}
 
+        push_command("queue");
+
+        my %c;
+        $c{"strip-above-wait"} = 0;
+        push_command( "stack", \%c );
+        go_job($full_report);
+        exit(0);
+
         printf("\n");
 
         $compress = 1;
-        go_job( $full_report, "queue" );
+
+        go_job($full_report);
         undef $compress;
 
         printf("\n");
 
         $strip_above_wait = 0;
         $tree             = 1;
-        go_job( $full_report, "stack" );
+        go_job($full_report);
         undef $tree;
 
         exit 0;
@@ -3915,7 +3952,12 @@ sub outer_main {
         printf "\nCollecting information for job '$jobid'\n\n"
           if ( $conf{"verbose"} or ( $#jobids > 0 ) );
 
-        go_job( $jobid, $mode );
+        if ( defined $allfns{$mode}{pre_out_handler} ) {
+            $allfns{$mode}{pre_out_handler}();
+        }
+
+        push_command($mode);
+        go_job($jobid);
     }
 }
 
@@ -6287,6 +6329,11 @@ sub command_from_parent {
     if ( $cmd->{mode} eq "signon" ) {
         $netdata->{signon_cmd} = my_encode($cmd);
 
+        # Setup the environment.
+        foreach my $key ( keys( %{ $cmd->{cinner} } ) ) {
+            $confInner{$key} = $cmd->{cinner}{$key};
+        }
+
         if (
             not
             exists $cmd->{connection_tree}{ $confInner{hostname} }{children} )
@@ -6332,11 +6379,6 @@ sub command_from_parent {
     if ( $cmd->{mode} eq "exit" ) {
         $netdata->{shutdown} = 1;
         return;
-    }
-
-    # Setup the environment.
-    foreach my $key ( keys( %{ $cmd->{cinner} } ) ) {
-        $confInner{$key} = $cmd->{cinner}{$key};
     }
 
     $confInner{mode} = $cmd->{mode};
