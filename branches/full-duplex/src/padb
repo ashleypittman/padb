@@ -5881,41 +5881,19 @@ sub maybe_show_pid {
     }
 }
 
-my %proc_data;
-
-sub load_all_proc_info {
-    my $cmd = "ps -eo pid,ppid,user,comm";
-    open( PS, "$cmd|" );
-    my @pids = (<PS>);
-    close(PS);
-    foreach my $pid (@pids) {
-        my ( $pid, $ppid, $user, $cmd ) = split( " ", $pid );
-        next if $pid eq "PID";
-        $proc_data{$pid}{PPid} = $ppid;
-
-        # $proc{$pid}{user} = $user;
-        $proc_data{$pid}{Name} = $cmd;
-    }
-}
-
 sub find_from_status {
     my $pid = shift;
     my $key = shift;
 
-    if ( -f "/proc/version" ) {
-        open( PCMD, "/proc/$pid/status" ) or return;
-        while (<PCMD>) {
-            my $l = $_;
-            if ( $l =~ /$key:\t+(\w+)/ ) {
-                close PCMD;
-                return $1;
-            }
+    open( PCMD, "/proc/$pid/status" ) or return;
+    while (<PCMD>) {
+        my $l = $_;
+        if ( $l =~ /$key:\t+(\w+)/ ) {
+            close PCMD;
+            return $1;
         }
-        close PCMD;
-    } else {
-        load_all_proc_info() if ( keys(%proc_data) eq 0 );
-        return $proc_data{$pid}{$key} if ( defined $proc_data{$pid}{$key} );
     }
+    close PCMD;
     return;
 }
 
