@@ -4604,6 +4604,46 @@ sub show_mpi_queue {
     }
 }
 
+sub show_mpi_queue_all {
+    my ( $carg, $list ) = @_;
+
+    my @all;
+
+    foreach my $proc ( @{$list} ) {
+        my $vp  = $proc->{vp};
+        my $pid = $proc->{pid};
+
+        debug $vp, "Attaching to $pid";
+        my $gdb = gdb_start();
+        kill( "CONT", $pid );
+        if ( gdb_attach( $gdb, $pid ) ) {
+            $proc->{gdb} = $gdb;
+            push( @all, $proc );
+        } else {
+            output $vp, "Failed to attach to to process";
+        }
+
+    }
+
+    foreach my $proc (@all) {
+
+        my $vp  = $proc->{vp};
+        my $pid = $proc->{pid};
+        my $gdb = $proc->{gdb};
+
+        my @mq = fetch_mpi_queue_gdb( $carg, $vp, $pid, $gdb );
+        foreach my $o (@mq) {
+            output( $vp, $o );
+        }
+    }
+
+    foreach my $proc (@all) {
+        my $gdb = $proc->{gdb};
+        gdb_detach($gdb);
+        gdb_quit($gdb);
+    }
+}
+
 # Ideally handle all this at a higher level...
 sub show_mpi_queue_for_deadlock_all {
     my ( $carg, $list ) = @_;
@@ -6687,11 +6727,11 @@ sub common_main {
     };
 
     $allfns{mqueue} = {
-        'handler'   => \&show_mpi_queue,
-        'arg_long'  => 'mpi-queue',
-        'arg_short' => 'Q',
-        'help'      => "Show MPI message queues",
-        'options_i' => { "mpi-dll" => undef, }
+        'handler_all' => \&show_mpi_queue_all,
+        'arg_long'    => 'mpi-queue',
+        'arg_short'   => 'Q',
+        'help'        => "Show MPI message queues",
+        'options_i'   => { "mpi-dll" => undef, }
     };
 
     $allfns{deadlock} = {
