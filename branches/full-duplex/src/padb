@@ -5862,28 +5862,71 @@ sub mpi_watch_load {
 #
 # * - error.
 
-sub mpi_watch {
-    my ( $carg, $vp, $pid ) = @_;
+sub mpi_watch_all {
 
-    my @mq   = fetch_mpi_queue( $carg, $vp, $pid );
-    my $sm   = 0;
-    my $rm   = 0;
-    my $um   = 0;
-    my $good = ".";
-
+    my ( $carg, $list ) = @_;
     my %res;
-
     my $fns = mpi_watch_load($carg);
 
-    my $fnmode;
-    my $fnreal;
-    my $gdb = gdb_start();
-    kill( "CONT", $pid );
-    if ( gdb_attach( $gdb, $pid ) ) {
-        my @threads = gdb_dump_frames_per_thread($gdb);
-        gdb_detach($gdb);
-        gdb_quit($gdb);
+    foreach my $proc ( @{$list} ) {
+        my $vp  = $proc->{vp};
+        my $pid = $proc->{pid};
+        my $gdb = gdb_start();
         kill( "CONT", $pid );
+        if ( gdb_attach( $gdb, $pid ) ) {
+            $proc->{gdb} = $gdb;
+        } else {
+            output $vp, "Failed to attach to to process";
+        }
+    }
+
+    foreach my $proc ( @{$list} ) {
+        my $vp  = $proc->{vp};
+        my $pid = $proc->{pid};
+        my $gdb = $proc->{gdb};
+
+        my @mq;
+        my $sm   = 0;
+        my $rm   = 0;
+        my $um   = 0;
+        my $good = ".";
+        my $fnmode;
+
+        @mq = fetch_mpi_queue_gdb( $carg, $vp, $pid, $gdb );
+
+        if ( $#mq == 0 ) {
+            $good = ",";
+        } else {
+            foreach my $o (@mq) {
+                if ( $o =~ /Operation (\d)/ ) {
+                    my $type = $1;
+                    $sm++ if ( $type == 0 );
+                    $rm++ if ( $type == 1 );
+                    $um++ if ( $type == 2 );
+                }
+            }
+        }
+
+        my $mt = ( grep { $_ } ( $sm, $rm, $um ) );
+        if ( $mt != 0 ) {
+            my $mode = "*";
+
+            if ($um) {
+                $mode = "u";
+                $mode = "U" if ( $mt != 1 );
+            } else {
+                if ( $mt == 1 ) {
+                    $mode = "s" if ($sm);
+                    $mode = "r" if ($rm);
+                } else {
+                    $mode = "m";
+                }
+            }
+            $res{$vp}{state} = $mode;
+            next;
+        }
+
+        my @threads = gdb_dump_frames_per_thread($gdb);
 
         foreach my $thread ( sort { $a->{id} <=> $b->{id} } @threads ) {
             my @frames = @{ $thread->{frames} };
@@ -5891,74 +5934,35 @@ sub mpi_watch {
                 my $frame = $frames[$i];
                 if ( defined $fns->{fns}{ $frame->{func} } ) {
                     $fnmode = $fns->{fns}{ $frame->{func} };
-                    $fnreal = $frame->{func};
                     last;
                 }
             }
         }
-    }
 
-    # $res{mq} = \@mq;
-    if ( $#mq == 0 ) {
-        $good = ",";
-    } else {
-        foreach my $o (@mq) {
-            if ( $o =~ /Operation (\d)/ ) {
-                my $type = $1;
-                $sm++ if ( $type == 0 );
-                $rm++ if ( $type == 1 );
-                $um++ if ( $type == 2 );
-            }
+        if ( defined $fnmode ) {
+            $res{$vp}{state} = $fns->{names}{$fnmode};
+            next;
+
         }
-    }
 
-    my $mt = ( grep { $_ } ( $sm, $rm, $um ) );
-    if ( $mt != 0 ) {
-        my $mode = "*";
-
-        if ($um) {
-            $mode = "u";
-            $mode = "U" if ( $mt != 1 );
+        my $m = find_from_status( $pid, "State" );
+        if ( $m eq "R" ) {
+            $m = $good;
+        } elsif ( $m eq "S" ) {
+            $m = "-";
         } else {
-            if ( $mt == 1 ) {
-                $mode = "s" if ($sm);
-                $mode = "r" if ($rm);
-            } else {
-                $mode = "m";
-            }
+            $m = "*";
         }
-        $res{state} = $mode;
-        output( $vp, $mode );
-        return \%res;
+
+        $res{$vp}{state} = $m;
     }
 
-    if ( defined $fnmode ) {
-        $res{state} = "$fns->{names}{$fnmode} $fnreal  ";
-        $res{state} = $fns->{names}{$fnmode};
-        return \%res;
-    }
-
-    my $m = find_from_status( $pid, "State" );
-    if ( $m eq "R" ) {
-        $m = $good;
-    } elsif ( $m eq "S" ) {
-        $m = "-";
-    } else {
-        $m = "*";
-    }
-    output $vp, $m;
-    $res{state} = $m;
-    return \%res;
-}
-
-sub mpi_watch_all {
-    my ( $carg, $list ) = @_;
-    my %res;
     foreach my $proc ( @{$list} ) {
-        my $vp  = $proc->{vp};
-        my $pid = $proc->{pid};
-        $res{$vp} = mpi_watch( $carg, $vp, $pid );
+        my $gdb = $proc->{gdb};
+        gdb_detach($gdb);
+        gdb_quit($gdb);
     }
+
     return \%res;
 }
 
