@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# padb. a simple parallel debugging aid from Quadrics.
+# padb. a simple parallel debugging aid.
 
 # For help and support visit http://padb.pittman.org.uk
 # or email padb-users@pittman.org.uk
@@ -23,8 +23,21 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
 # Revision history
+# Version 3.0
+#  * Full-duplex communication between inner and outer processes, padb
+#    no longer simply sends request on the command line and processes
+#    the response but is truly interactive between the inner and outer
+#    processes.  This avails greater flexibility in what can be achieved
+#    and hopefully helps with scalability as well.
+#  * Enabled warnings (-w) by default.  Fixed lots of warnings, mostly
+#    about comparing with undef
+#  * Much more complete separation into "modes" of operation, most options
+#    are now mode specific rather than simply using global variables or
+#    global conf options.
+#  * Overhaul of the allfns (mode) callbacks and in particular their parameters
+#  * Performance improvements.
 #
-# Version 2.5 (Beta)
+# Version 2.5
 #  * First Non-Quadrics version
 #  * Various stability/bug fixes.
 #  * Deadlock detect at the MPI Layer rather than the Elan layer
@@ -239,7 +252,7 @@ use IO::Select;
 # Main.
 
 my $prog    = basename $0;
-my $version = "2.5-beta";
+my $version = "3.0-beta";
 
 my %conf;
 
@@ -413,8 +426,7 @@ sub find_minfo {
 sub show_version {
     printf("$prog version $version\n\n");
     printf("Written by Ashley Pittman\n");
-
-    #ashley@quadrics.com
+    printf("http://padb.pittman.org.uk\n");
     exit 0;
 }
 
