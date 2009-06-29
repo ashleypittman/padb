@@ -362,8 +362,6 @@ $conf{slurm_job_step} = "0";
 
 # Output options.
 $conf{"stats-sort-key"}      = "vp";
-$conf{"proc-sort-key"}       = "vp";
-$conf{"proc-show-header"}    = 1;
 $conf{"stats-reverse"}       = 0;
 $conf{"stats-short"}         = 0;
 $conf{"show-group-members"}  = 0;
@@ -2823,9 +2821,9 @@ sub show_proc_format {
         push @all, \%hash;
     }
 
-    @all = sort_proc_hashes( $conf{"proc-sort-key"}, @all );
+    @all = sort_proc_hashes( $carg->{"proc-sort-key"}, @all );
 
-    if ( $conf{"proc-show-header"} ) {
+    if ( $carg->{"proc-show-header"} ) {
         my @res;
         foreach my $key (@proc_format_array) {
             my $l .= sprintf( "%-$proc_format_lengths{$key}s",
@@ -3694,10 +3692,15 @@ sub config_help {
     foreach my $mode ( sort( keys( %{ $conf{mode_options} } ) ) ) {
         printf("Options for mode '$mode'\n");
         foreach my $key ( sort( keys( %{ $conf{mode_options}{$mode} } ) ) ) {
-            printf(
-                " %$max_len" . "s = '$conf{mode_options}{$mode}{$key}'\n",
-                $key
-            );
+            if ( defined $conf{mode_options}{$mode}{$key} ) {
+                printf(
+                    " %$max_len" . "s = '$conf{mode_options}{$mode}{$key}'\n",
+                    $key
+                );
+            } else {
+                printf( " %$max_len" . "s = undef\n", $key );
+
+            }
         }
     }
 }
@@ -5729,8 +5732,7 @@ sub show_full_stacks {
 sub set_debug {
     my ( $carg, $vp, $pid ) = @_;
     run_command( $vp,
-"edb --key $confInner{key} --debug=$confInner{args}{dflag} --target-vp=$vp"
-    );
+        "edb --key $confInner{key} --debug=$carg->{dflag} --target-vp=$vp" );
 }
 
 my $mpi_watch_data = <<EOF;
@@ -6727,7 +6729,9 @@ sub common_main {
             "proc-shows-proc"  => 1,
             "proc-shows-fds"   => 0,
             "proc-shows-maps"  => 0,
-            "proc-shows-stat"  => 1
+            "proc-shows-stat"  => 1,
+            "proc-sort-key"    => "vp",
+            "proc-show-header" => 1,
         },
         'secondary' => [
             {
