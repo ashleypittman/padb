@@ -364,9 +364,7 @@ $conf{slurm_job_step} = "0";
 $conf{"stats-sort-key"}      = "vp";
 $conf{"stats-reverse"}       = 0;
 $conf{"stats-short"}         = 0;
-$conf{"show-group-members"}  = 0;
 $conf{"show-all-stats"}      = 0;
-$conf{"show-all-groups"}     = 0;
 $conf{"interval"}            = 10;
 $conf{"watch-clears-screen"} = 1;
 $conf{"stats-name"}          = undef;
@@ -376,6 +374,12 @@ $conf{"lsf-job-offset"}      = 1;
 $conf{"local-fd-name"}       = "/dev/null";
 $conf{"full-duplex"}         = 1;
 $conf{"inner-callback"}      = 0;
+
+# These two are used by deadlock and QsNet group
+# code, they need migrating in the group code
+# when I have access to a test system again.
+#$conf{"show-group-members"}  = 0;
+#$conf{"show-all-groups"}     = 0;
 
 # Tuning options.
 $conf{"prun-timeout"}     = 120;
@@ -4569,7 +4573,7 @@ sub fetch_mpi_queue {
         return;
     }
 
-    if ( $carg->{"mpi-dll"} ne "auto" ) {
+    if ( defined $carg->{"mpi-dll"} ) {
         $ENV{MPINFO_DLL} = $carg->{"mpi-dll"};
     } else {
         my $base = gdb_var_addr( $g, "MPIR_dll_name" );
@@ -4590,7 +4594,7 @@ sub fetch_mpi_queue {
 sub fetch_mpi_queue_gdb {
     my ( $carg, $vp, $pid, $g ) = @_;
 
-    if ( $carg->{"mpi-dll"} ne "auto" ) {
+    if ( defined $carg->{"mpi-dll"} ) {
         $ENV{MPINFO_DLL} = $carg->{"mpi-dll"};
     } else {
         my $base = gdb_var_addr( $g, "MPIR_dll_name" );
@@ -4659,9 +4663,8 @@ sub show_mpi_queue_for_deadlock_all {
 }
 
 sub go_deadlock_detect {
-    my ($cd) = @_;
+    my ( $carg, $cd ) = @_;
 
-    # print Dumper $cd;
     my %ad;
 
     my @tg;
@@ -4678,11 +4681,18 @@ sub go_deadlock_detect {
             my $gd  = $rd->{$g};
             my $gid = $gd->{id};
 
+            if ( $gd->{size} == 1 ) {
+                $gid = "$gd->{id}($process)";
+            }
+            if ( defined $gd->{ranks}{0} ) {
+                $gid = "$gd->{id}($gd->{ranks}{0})";
+            }
+
             if ( $#target_groups != -1 ) {
                 next unless defined $tg[$gid];
             }
 
-            if ( $gd->{size} > 1 ) {
+            if ( $gd->{size} > 0 ) {
                 $ad{$gid}{map}[ $gd->{rank} ] = $process;
             }
             $ad{$gid}{size} = $gd->{size};
@@ -4703,6 +4713,7 @@ sub go_deadlock_detect {
     my $ret     = "";
     my $i_count = 0;    # Interesting groups.
                         #foreach my $gid ( sort { $a <=> $b } keys %ad ) {
+
     foreach my $gid ( sort keys %ad ) {
 
         if ( $#target_groups != -1 ) {
@@ -4713,12 +4724,12 @@ sub go_deadlock_detect {
 
         # Maybe show the group members, hope that the user doesn't turn
         # this on unless also setting target_groups!
-        if ( $conf{"show-group-members"} ) {
+        if ( $carg->{"show-group-members"} ) {
             $gstr .= "group has $ad{$gid}{size} members\n";
-            if ( defined $ad{$gid}{size} and $gid != 1 ) {
+            if ( defined $ad{$gid}{size} ) {
                 for ( my $ident = 0 ; $ident < $ad{$gid}{size} ; $ident++ ) {
                     $gstr .=
-                      "group member[$ident] => vp[$ad{$gid}{map}[$ident]]\n";
+                      "group member[$ident] => grank[$ad{$gid}{map}[$ident]]\n";
                 }
             }
         }
@@ -4756,15 +4767,14 @@ sub go_deadlock_detect {
                 }
             }
         } else {
-            next unless ( $conf{"show-all-groups"} );
+            next unless ( $carg->{"show-all-groups"} );
+            $ret .= $gstr;
+            $gstr = "";
         }
 
         {
             my @inactive;
             foreach my $ident ( sort keys %{ $ad{$gid}{'idents'} } ) {
-
-    #                if ( $ad{$gid}{'idents'}{$ident}{'statistics'}
-    #                    and not defined $ad{$gid}{'idents'}{$ident}{'active'} )
                 if ( not defined $ad{$gid}{'idents'}{$ident}{'active'} ) {
                     push( @inactive, $ident );
                 }
@@ -4794,7 +4804,7 @@ sub go_deadlock_detect {
 }
 
 sub deadlock_detect {
-    my ( $handle, $lines ) = @_;
+    my ( $carg, $lines ) = @_;
     my $data;
 
     # XXX This is a bit of a hack to make the deadlock
@@ -4836,7 +4846,7 @@ sub deadlock_detect {
 
     # print Dumper \%coll_data;
 
-    my $r = go_deadlock_detect \%coll_data;
+    my $r = go_deadlock_detect( $carg, \%coll_data );
     print $r;
 }
 
@@ -6671,7 +6681,7 @@ sub common_main {
         'arg_short' => "q",
         'handler'   => \&show_queue,
         'help'      => "Show the message queues",
-        'options_i' => { "mpi-dll" => "auto", }
+        'options_i' => { "mpi-dll" => undef, }
 
     };
 
@@ -6693,7 +6703,7 @@ sub common_main {
         'arg_long'  => 'mpi-queue',
         'arg_short' => 'Q',
         'help'      => "Show MPI message queues",
-        'options_i' => { "mpi-dll" => "auto", }
+        'options_i' => { "mpi-dll" => undef, }
     };
 
     $allfns{deadlock} = {
@@ -6702,7 +6712,11 @@ sub common_main {
         'arg_short'   => 'j',
         'help'        => "Run deadlock detection algorithm",
         'out_handler' => \&deadlock_detect,
-        'options_i'   => { "mpi-dll" => "auto", }
+        'options_i'   => {
+            "mpi-dll"            => undef,
+            "show-group-members" => 0,
+            "show-all-groups"    => 0,
+          }
 
     };
 
@@ -6773,7 +6787,7 @@ sub common_main {
         'pre_out_handler' => \&pre_mpi_watch,
         'out_handler'     => \&show_mpi_watch,
         'options_i'       => {
-            "mpi-dll"        => "auto",
+            "mpi-dll"        => undef,
             "mpi-watch-file" => undef
         }
     };
