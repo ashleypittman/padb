@@ -2931,11 +2931,15 @@ sub post_process_lines {
 }
 
 sub default_output_handler {
-    my ( $mode, $d ) = @_;
+    my ( $req, $d ) = @_;
 
     # Could warn on missing output here...
 
-    my $lines = $d->{target_output};
+    my $lines  = $d->{target_output};
+    my $mode   = $req->{mode};
+    my $output = "raw";
+
+    $output = $req->{out_format} if defined $req->{out_format};
 
     if ( $mode eq "stack" or $input_file ) {
         if ( $strip_below_main or $strip_above_wait ) {
@@ -2943,11 +2947,11 @@ sub default_output_handler {
         }
     }
 
-    if ($tree) {
+    if ( $output eq "tree" ) {
         print show_tree go_p( 0, $lines,
             ( sort { $a <=> $b } ( keys %$lines ) ) );
 
-    } elsif ($compress) {
+    } elsif ( $output eq "compress" ) {
 
         foreach my $tag ( sort { $a <=> $b } ( keys %$lines ) ) {
             next if ( !defined( $lines->{$tag} ) );
@@ -2966,7 +2970,7 @@ sub default_output_handler {
                 print("$data\n");
             }
         }
-    } elsif ($compress_C) {
+    } elsif ( $output eq "compress_c" ) {
         foreach my $tag ( sort { $a <=> $b } ( keys %$lines ) ) {
             print("----------------\n");
             print("$tag\n");
@@ -3173,13 +3177,14 @@ my @commands;
 
 # Push a command onto the list of commands to be executed.
 sub push_command {
-    my ( $mode, $args ) = @_;
+    my ( $mode, $out_format, $args ) = @_;
 
     # $args = $conf{mode_options}{$mode};
 
     my %cmd;
-    $cmd{mode} = $mode;
-    $cmd{args} = $args if defined($args);
+    $cmd{mode}       = $mode;
+    $cmd{out_format} = $out_format if defined($out_format);
+    $cmd{args}       = $args if defined($args);
     push @commands, \%cmd;
 }
 
@@ -3205,6 +3210,10 @@ sub next_command {
 
     if ( defined $cmd->{args} ) {
         $req->{cargs} = $cmd->{args};
+    }
+
+    if ( defined $cmd->{out_format} ) {
+        $req->{out_format} = $cmd->{out_format};
     }
 
     # Send along the secondary args.
@@ -3271,7 +3280,7 @@ sub command_from_inner {
     if ( defined( $allfns{$mode}{out_handler} ) ) {
         $allfns{$mode}{out_handler}( $conf{mode_options}{$mode}, $d );
     } else {
-        default_output_handler( $mode, $d );
+        default_output_handler( $comm_data->{current_req}, $d );
     }
 
     $comm_data->{current_req} = $req;
@@ -3831,29 +3840,17 @@ sub outer_main {
         #    exit 1;
         #}
 
-        push_command("queue");
+        push_command( "queue", "compress" );
 
         my %c;
         $c{"strip-above-wait"} = 0;
-        push_command( "stack", \%c );
+        push_command( "stack", "tree", \%c );
+
+        # This option is still a global rather than being just a mode option.
+        $strip_above_wait = 0;
+
         go_job($full_report);
         exit(0);
-
-        printf("\n");
-
-        $compress = 1;
-
-        go_job($full_report);
-        undef $compress;
-
-        printf("\n");
-
-        $strip_above_wait = 0;
-        $tree             = 1;
-        go_job($full_report);
-        undef $tree;
-
-        exit 0;
     }
 
     if ($show_jobs) {
@@ -3977,7 +3974,11 @@ sub outer_main {
             $allfns{$mode}{pre_out_handler}();
         }
 
-        push_command( $mode, $conf{mode_options}{$mode} );
+        my $of;
+        $of = "tree"       if $tree;
+        $of = "compress"   if $compress;
+        $of = "compress_c" if $compress_C;
+        push_command( $mode, $of, $conf{mode_options}{$mode} );
         go_job($jobid);
     }
 }
