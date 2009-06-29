@@ -437,15 +437,13 @@ Usage: padb [-hv] [-c|-C|-t] -g|-q|-s|-x|-X [-O <opt>=<val>
 
 -a --all               report on all running jobs for user.
 -A --any               report on a running job for user.
--u --user=USER         report on jobs for username=<user>.
+-u --user=<USER>       report on jobs for username=<user>.
 
--r --rank=RANK         report only on processes <RANK>.
-   --group-id=ID       report only on group <ID>.
+-r --rank=<RANK>       report only on processes <RANK>.
+   --group-id=<ID>     report only on group <ID>.
 
--s --statistics        Show the job-wide statistics.
--g --group             Show the state of collective operations (groups).
 XXXX
-   --full-report=JOBID All of the above.
+   --full-report=<JOBID> Generate a full report of job state.
 
    --nostrip-below-main Don\'t strip stack traces below main.
    --nostrip-above-wait Don\'t strip stack traces about elan_waitWord.
@@ -501,8 +499,24 @@ sub usage {
     chomp $usage;
 
     my $extra = "";
+    $extra .= "Modes of operation\n";
     foreach my $arg ( sort( keys %allfns ) ) {
         next unless ( defined $allfns{$arg}{help} );
+        next if ( defined $allfns{$arg}{qsnet} );
+        if ( defined $allfns{$arg}{arg_short} ) {
+            $extra .= "-$allfns{$arg}{arg_short}";
+        } else {
+            $extra .= "  ";
+        }
+        $extra .= sprintf( " --%-18s%s.\n",
+            $allfns{$arg}{arg_long},
+            $allfns{$arg}{help} );
+    }
+
+    $extra .= "\nQsNet specific modes\n";
+    foreach my $arg ( sort( keys %allfns ) ) {
+        next unless ( defined $allfns{$arg}{help} );
+        next unless ( defined $allfns{$arg}{qsnet} );
         if ( defined $allfns{$arg}{arg_short} ) {
             $extra .= "-$allfns{$arg}{arg_short}";
         } else {
@@ -3852,7 +3866,9 @@ sub outer_main {
         #    exit 1;
         #}
 
-        push_command( "queue", "compress" );
+        push_command( "mqueue", "compress" );
+
+        push_command("deadlock");
 
         my %c;
         $c{"strip-above-wait"} = 0;
@@ -6718,6 +6734,7 @@ sub common_main {
 
     $allfns{queue} = {
         'arg_long'  => "message-queue",
+        'qsnet'     => 1,
         'arg_short' => "q",
         'handler'   => \&show_queue,
         'help'      => "Show the message queues",
@@ -6834,6 +6851,7 @@ sub common_main {
 
     $allfns{set_debug} = {
         'handler'   => \&set_debug,
+        'qsnet'     => 1,
         'arg_long'  => 'set-debug',
         'arg_short' => 'D',
         'help'      => "Set debug flags (use --dflag=value)",
@@ -6856,6 +6874,7 @@ sub common_main {
     $allfns{qsnet_stats} = {
         'handler_all' => \&inner_show_stats,
         'out_handler' => \&show_stats,
+        'qsnet'       => 1,
         'arg_long'    => 'statistics-total',
         'arg_short'   => 's',
         'help'        => "Show the job-wide statistics.",
@@ -6870,6 +6889,7 @@ sub common_main {
     $allfns{qsnet_groups} = {
         'handler_all' => \&inner_show_stats,
         'out_handler' => \&group_status,
+        'qsnet'       => 1,
         'arg_long'    => 'group',
         'arg_short'   => 'g',
         'help'        => "Show the state of collective operations (groups).",
