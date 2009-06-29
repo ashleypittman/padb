@@ -361,14 +361,8 @@ $conf{"showcmd"}      = 0;
 $conf{slurm_job_step} = "0";
 
 # Output options.
-$conf{"stats-sort-key"}      = "vp";
-$conf{"stats-reverse"}       = 0;
-$conf{"stats-short"}         = 0;
-$conf{"show-all-stats"}      = 0;
 $conf{"interval"}            = 10;
 $conf{"watch-clears-screen"} = 1;
-$conf{"stats-name"}          = undef;
-$conf{"stats-raw"}           = 0;
 $conf{"scripts"}             = "bash,sh,dash,ash,perl,xterm";
 $conf{"lsf-job-offset"}      = 1;
 $conf{"local-fd-name"}       = "/dev/null";
@@ -530,9 +524,6 @@ my $any;
 # Number of functions provided on the command line from the allfns hash.
 my $have_allfns_option = 0;
 
-my $stats_total;
-my $group;
-
 my $full_report;
 my $core_stack;
 my $list_rmgrs;
@@ -564,33 +555,31 @@ sub parse_args_outer {
     my $mode;
 
     my %optionhash = (
-        "verbose|v+"                     => \$conf{verbose},
-        "user|u=s"                       => \$user,
-        "rank|r=i"                       => \@ranks,
-        "group-id=i"                     => \@target_groups,
-        "help|h"                         => \&usage,
-        "all|a"                          => \$all,
-        "any|A"                          => \$any,
-        "statistics-total|stat|sta|st|s" => \$stats_total,
-        "version|V"                      => \&show_version,
-        "compress|c"                     => \$compress,
-        "compress-long|C"                => \$compress_C,
-        "group|g"                        => \$group,
-        "tree|t"                         => \$tree,
-        "input-file|file|i=s"            => \$input_file,
-        "config-option|O=s"              => \@config_options,
-        "full-report=s"                  => \$full_report,
-        "core-stack"                     => \$core_stack,
-        "core=s"                         => \$core_name,
-        "exe=s"                          => \$exe_name,
-        "list-rmgrs"                     => \$list_rmgrs,
-        "strip-below-main!"              => \$strip_below_main,
-        "strip-above-wait!"              => \$strip_above_wait,
-        "watch!"                         => \$watch,
-        "local-stats"                    => \$local_stats,
-        "show-jobs"                      => \$show_jobs,
-        "norc"                           => \$norc,
-        "config-file=s"                  => \$configfile
+        "verbose|v+"          => \$conf{verbose},
+        "user|u=s"            => \$user,
+        "rank|r=i"            => \@ranks,
+        "group-id=i"          => \@target_groups,
+        "help|h"              => \&usage,
+        "all|a"               => \$all,
+        "any|A"               => \$any,
+        "version|V"           => \&show_version,
+        "compress|c"          => \$compress,
+        "compress-long|C"     => \$compress_C,
+        "tree|t"              => \$tree,
+        "input-file|file|i=s" => \$input_file,
+        "config-option|O=s"   => \@config_options,
+        "full-report=s"       => \$full_report,
+        "core-stack"          => \$core_stack,
+        "core=s"              => \$core_name,
+        "exe=s"               => \$exe_name,
+        "list-rmgrs"          => \$list_rmgrs,
+        "strip-below-main!"   => \$strip_below_main,
+        "strip-above-wait!"   => \$strip_above_wait,
+        "watch!"              => \$watch,
+        "local-stats"         => \$local_stats,
+        "show-jobs"           => \$show_jobs,
+        "norc"                => \$norc,
+        "config-file=s"       => \$configfile
     );
 
     my %config_hash;
@@ -1414,6 +1403,9 @@ sub show_stats {
         return;
     }
 
+    my $stats_total = 0;
+    my $group       = 0;
+
     if ($stats_total) {
 
         if ( $conf{"stats-short"} ) {
@@ -1730,7 +1722,7 @@ sub local_stats_from_job {
 
     my $s = read_stats(@data);
 
-    $stats_total = 1;
+    # $stats_total = 1;
 
     show_stats($s);
 }
@@ -3001,21 +2993,18 @@ sub go_file {
     my $file = shift;
     my $mode = shift;
 
-    if ( $stats_total or $group ) {
-        my @data;
-
-        open( PCMD, "$file" ) or die "$prog: cant open file $file: $!\n";
-        local $/ = "\n\n";
-        while (<PCMD>) {
-            s/\n//g;
-            push @data, $_;
-        }
-        my $s = read_stats(@data);
-
-        show_stats($s);
-
-        return;
-    }
+    #if ( $stats_total or $group ) {
+    #    my @data;
+    #    open( PCMD, "$file" ) or die "$prog: cant open file $file: $!\n";
+    #    local $/ = "\n\n";
+    #    while (<PCMD>) {
+    #        s/\n//g;
+    #        push @data, $_;
+    #    }
+    #    my $s = read_stats(@data);
+    #    show_stats($s);
+    #    return;
+    #}
 
     open( PCMD, "$file" ) or die "$prog: cant open file $file: $!\n";
     my @data = <PCMD>;
@@ -3914,9 +3903,7 @@ sub outer_main {
     }
 
     if ( not $input_file
-        and
-        ( ( grep { $_ } ( $stats_total, $group, $have_allfns_option ) ) != 1 )
-        or ( $have_allfns_option > 1 ) )
+        and ( $have_allfns_option > 1 ) )
     {
         cmdline_error(
 "$prog: Error: you must specify only one of -x, -S, -s, -g, -q, -X or --kill\n"
@@ -6804,6 +6791,39 @@ sub common_main {
                 'default'  => '0'
             }
         ]
+    };
+
+    # These next two don't work currently pending access to a QsNet system
+    # for testing.  In the new full-duplex world startup is a little different
+    # and these functions need updating.
+    # In particular the following need to be addressed.
+    # the callback paramaters are probably wrong.
+    # The shared memory key needs to be calculated.
+    # Config options need to be read locally rather than globally
+    $allfns{qsnet_stats} = {
+        'handler_all' => \&inner_show_stats,
+        'out_handler' => \&show_stats,
+        'arg_long'    => 'statistics-total',
+        'arg_short'   => 's',
+        'help'        => "Show the job-wide statistics.",
+        'options_i'   => {
+            "stats-name"     => undef,
+            "stats-sort-key" => "vp",
+            "stats-reverse"  => 0,
+            "stats-short"    => 0,
+            "show-all-stats" => 0,
+        }
+    };
+    $allfns{qsnet_groups} = {
+        'handler_all' => \&inner_show_stats,
+        'out_handler' => \&group_status,
+        'arg_long'    => 'group',
+        'arg_short'   => 'g',
+        'help'        => "Show the state of collective operations (groups).",
+        'options_i'   => {
+            "show-group-members" => 0,
+            "show-all-groups"    => 0,
+        }
     };
 
     # Make a getopt string out of each of the optional options.
