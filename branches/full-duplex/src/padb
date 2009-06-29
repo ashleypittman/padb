@@ -6808,7 +6808,7 @@ sub common_main {
 
 common_main();
 
-if ( $ARGV[0] eq "--inner" ) {
+if ( $#ARGV >= 0 and $ARGV[0] eq "--inner" ) {
     shift @ARGV;
     inner_main();
 } else {
