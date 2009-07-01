@@ -5450,6 +5450,7 @@ sub show_proc_all {
     my @all;
 
     my $jiffies_start;
+    my $load_avg;
     if ( $carg->{"proc-shows-proc"} ) {
         foreach my $proc ( @{$list} ) {
             my $pid = $proc->{pid};
@@ -5474,6 +5475,9 @@ sub show_proc_all {
         # End critical path.
 
         $jiffies_start = add_and_divide_jiffies( $stat, $stat2 );
+        open( LFD, "/proc/loadavg" );
+        $load_avg = <LFD>;
+        close LFD;
     }
 
     foreach my $proc ( @{$list} ) {
@@ -5514,6 +5518,8 @@ sub show_proc_all {
 
         my $elapsed = $jiffies_end - $jiffies_start;
 
+        my ( $l1, $l5, $l15 ) = split( " ", $load_avg );
+
         foreach my $proc ( @{$list} ) {
             my $vp       = $proc->{vp};
             my $jpre     = stat_to_jiffies( $proc->{stat_start} );
@@ -5522,7 +5528,10 @@ sub show_proc_all {
             my $used     = ( $jused / $elapsed ) * $cpucount * 100;
             my $used_str = sprintf( "%d", $used );
 
-            proc_output( $vp, "pcpu", $used_str );
+            proc_output( $vp, "pcpu",   $used_str );
+            proc_output( $vp, "load1",  $l1 );
+            proc_output( $vp, "load5",  $l15 );
+            proc_output( $vp, "load15", $l15 );
         }
     }
 
