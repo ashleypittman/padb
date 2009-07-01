@@ -2753,11 +2753,15 @@ sub strip_stack_traces {
 }
 
 sub sort_proc_hashes {
-    my $key = shift;
-    my @all = @_;
+    my $carg = shift;
+    my $key  = shift;
+    my @all  = @_;
 
-    #print Dumper $all;
-    return ( reverse( sort { $a->{$key} <=> $b->{$key} } @all ) );
+    if ( $carg->{"reverse-sort-order"} ) {
+        return ( sort { $a->{$key} <=> $b->{$key} } @all );
+    } else {
+        return ( reverse( sort { $a->{$key} <=> $b->{$key} } @all ) );
+    }
 }
 
 sub pre_mpi_watch {
@@ -2796,6 +2800,7 @@ sub show_proc_format {
     my $show_fields = 0;
 
     my %proc_format_lengths;
+    my %proc_header_reverse;
 
     my $separator = $carg->{"column-seperator"};
 
@@ -2809,6 +2814,7 @@ sub show_proc_format {
             push @proc_format_array, lc($name);
             $proc_format_header{ lc($name) }  = $desc;
             $proc_format_lengths{ lc($name) } = length($desc);
+            $proc_header_reverse{ lc($desc) } = lc($name);
         } else {
             push @proc_format_array, lc($column);
             $proc_format_header{ lc($column) }  = $column;
@@ -2841,7 +2847,12 @@ sub show_proc_format {
         push @all, \%hash;
     }
 
-    @all = sort_proc_hashes( $carg->{"proc-sort-key"}, @all );
+    # Allow sort keys to be based on column names as well as real keys.
+    my $key = lc( $carg->{"proc-sort-key"} );
+    if ( defined $proc_header_reverse{$key} ) {
+        $key = $proc_header_reverse{$key};
+    }
+    @all = sort_proc_hashes( $carg, $key, @all );
 
     if ( $carg->{"proc-show-header"} ) {
         my @res;
@@ -2853,6 +2864,7 @@ sub show_proc_format {
         my $line = join( $separator, @res );
         print "$line\n";
     }
+    my $count = $carg->{"nprocs-output"};
     foreach my $hash (@all) {
         my @res;
         foreach my $key (@proc_format_array) {
@@ -2864,6 +2876,9 @@ sub show_proc_format {
         }
         my $line = join( $separator, @res );
         print "$line\n";
+        if ( $count and ( --$count == 0 ) ) {
+            return;
+        }
     }
 }
 
@@ -6798,13 +6813,15 @@ sub common_main {
         'arg_long'    => 'proc-summary',
         'help'        => "Show process information in top format",
         'options_i'   => {
-            "column-seperator" => "  ",
-            "proc-shows-proc"  => 1,
-            "proc-shows-fds"   => 0,
-            "proc-shows-maps"  => 0,
-            "proc-shows-stat"  => 1,
-            "proc-sort-key"    => "vp",
-            "proc-show-header" => 1,
+            "column-seperator"   => "  ",
+            "proc-shows-proc"    => 1,
+            "proc-shows-fds"     => 0,
+            "proc-shows-maps"    => 0,
+            "proc-shows-stat"    => 1,
+            "proc-sort-key"      => "vp",
+            "proc-show-header"   => 1,
+            "reverse-sort-order" => 0,
+            "nprocs-output"      => 0,
         },
         'secondary' => [
             {
