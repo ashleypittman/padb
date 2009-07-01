@@ -2021,7 +2021,7 @@ sub find_exe {
 }
 
 sub rms_is_installed {
-    return find_exe("prun");
+    return ( find_exe("prun") and find_exe("rmsquery") );
 }
 
 sub rms_get_jobs {
@@ -2128,7 +2128,7 @@ sub rms_res_to_partition {
 ###############################################################################
 
 sub slurm_is_installed {
-    return find_exe("srun");
+    return ( find_exe("srun") and find_exe("squeue") and find_exe("scontrol") );
 }
 
 sub slurm_get_jobs {
@@ -2266,7 +2266,7 @@ sub local_setup_pcmd {
 ###############################################################################
 
 sub mpd_is_installed {
-    return find_exe("mpdlistjobs");
+    return ( find_exe("mpdlistjobs") and find_exe("mpdrun") );
 }
 
 sub mpd_get_data {
@@ -2362,7 +2362,7 @@ sub find_ompi_prefix {
 }
 
 sub open_is_installed {
-    return find_exe("ompi-ps");
+    return ( find_exe("ompi-ps") and find_exe("orterun") );
 }
 
 my %open_jobs;
@@ -2475,9 +2475,7 @@ sub lsf_is_installed {
 
     # Check for both LSF and RMS, I know LSF works in other ways but I don't
     # know how to launch jobs then...
-    my $rms = find_exe("rinfo");
-    return 0 unless $rms;
-    return find_exe("bjobs");
+    return ( find_exe("bjobs") and rms_is_installed() );
 }
 
 sub lsf_get_jobs {
