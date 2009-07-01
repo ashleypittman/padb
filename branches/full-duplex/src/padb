@@ -3262,6 +3262,17 @@ sub next_command {
         }
     }
 
+    if ( $conf{verbose} and defined $req->{cargs} ) {
+        printf("Mode '$req->{mode}' mode specific flags:\n");
+        foreach my $arg ( sort( keys( %{ $req->{cargs} } ) ) ) {
+            if ( defined $req->{cargs}{$arg} ) {
+                printf( "%20s : '%s'\n", $arg, $req->{cargs}{$arg} );
+            } else {
+                printf( "%20s : undef\n", $arg );
+            }
+        }
+    }
+
     return $req;
 }
 
@@ -3572,7 +3583,7 @@ sub go_job {
         $secret = find_padb_secret();
 
         if ( not defined $secret ) {
-            printf("Error: No secret\n");
+            printf("Error: Could not load secret file on this node\n");
             exit(1);
         }
 
@@ -3594,8 +3605,8 @@ sub go_job {
     my $ncpus = $res[1];
     my $hosts = $res[2];
 
-    $conf{"verbose"} && defined $ncpus && print "Job has $ncpus cpus\n";
-    $conf{"verbose"} && defined $hosts && print "Job has $hosts hosts\n";
+    $conf{"verbose"} && defined $ncpus && print "Job has $ncpus processe(s)\n";
+    $conf{"verbose"} && defined $hosts && print "Job spans $hosts host(s)\n";
 
   # Maybe do it this way, edb works best when run with the same LD_LIBRARY_PATH
   # as the application.  It's very important when running the message queue
@@ -3775,34 +3786,31 @@ sub outer_main {
     # -Oedbopt="--pagesize=8192 --pagesize-header=4096"
     # -Oedbopt="--pagesize 8192 --pagesize-header 4096"
     foreach my $config_option (@config_options) {
-        my @pairs = split( ",", $config_option );
 
-        foreach my $pair (@pairs) {
-            my ( $name, $val ) = split( "=", $pair );
+        my ( $name, $val ) = split( "=", $config_option );
 
-            # $name =~ s/\-/\_/g;
+        # $name =~ s/\-/\_/g;
 
-            if ( $name eq "scriptDir" ) {
-                printf(
+        if ( $name eq "scriptDir" ) {
+            printf(
 "$prog: -OscriptDir deprecated, use -Oedb=/path/to/edb instead\n"
-                );
-                exit(1);
-            }
-
-            if (    !exists $conf{$name}
-                and !exists $conf{mode_options_reverse}{$name} )
-            {
-                printf("Error, unknown config option '$name'\n");
-                config_help();
-                exit(1);
-            }
-            if ( !defined $val ) {
-                printf("Error, config option '$name' requires value\n");
-                config_help();
-                exit(1);
-            }
-            config_set( $name, $val );
+            );
+            exit(1);
         }
+
+        if (    !exists $conf{$name}
+            and !exists $conf{mode_options_reverse}{$name} )
+        {
+            printf("Error, unknown config option '$name'\n");
+            config_help();
+            exit(1);
+        }
+        if ( !defined $val ) {
+            printf("Error, config option '$name' requires value\n");
+            config_help();
+            exit(1);
+        }
+        config_set( $name, $val );
     }
 
     if ($list_rmgrs) {
