@@ -2374,7 +2374,7 @@ sub open_get_data {
         return;
 
     }
-    my $hostname = hostname();
+
     my $job;
 
     open( OPEN, "ompi-ps|" ) or return;
@@ -2408,16 +2408,14 @@ sub open_get_data {
                 next if $host eq "Node";
                 $open_jobs{$job}{hosts}{$host}++;
 
-                if ( $host eq $hostname ) {
-                    my $name = $elems[1];
-                    $name =~ /\[\[(\d+)\,(\d+)\]\,(\d+)\]/;
-                    my $rank = $3;
+                my $name = $elems[1];
+                $name =~ /\[\[(\d+)\,(\d+)\]\,(\d+)\]/;
+                my $rank = $3;
 
-                    my $pid = $elems[3];
-                    $rank =~ s/ //g;
-                    $pid  =~ s/ //g;
-                    $open_jobs{$job}{ranks}{$host}{$rank} = $pid;
-                }
+                my $pid = $elems[3];
+                $rank =~ s/ //g;
+                $pid  =~ s/ //g;
+                $open_jobs{$job}{ranks}{$host}{$rank} = $pid;
             }
         }
 
