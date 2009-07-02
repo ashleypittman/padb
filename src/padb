@@ -3440,6 +3440,8 @@ sub eof_from_fd {
     if ( $comm_data->{state} ne "shutdown" ) {
         printf("Unexpected EOF from $cdata->{fd_desc} ($comm_data->{state})\n");
     }
+
+    #printf("Expected EOF from $cdata->{fd_desc} ($comm_data->{state})\n");
 }
 
 sub handle_event_from_socket {
@@ -5490,11 +5492,14 @@ sub stat_to_jiffies {
 }
 
 my $proc_info;
+my %proc_keys;
 
 sub proc_output {
     my ( $vp, $key, $value ) = @_;
     if ( $confInner{mode} eq "proc-summary" ) {
-        $proc_info->{$vp}{ lc($key) } = $value;
+        if ( defined $proc_keys{ lc($key) } ) {
+            $proc_info->{$vp}{ lc($key) } = $value;
+        }
     } else {
         output( $vp, "$key: $value" );
     }
@@ -5502,6 +5507,16 @@ sub proc_output {
 
 sub show_proc_all {
     my ( $carg, $list ) = @_;
+
+    %proc_keys = ();
+
+    if ( defined $carg->{"proc-format"} ) {
+        my @columns = split( ",", $carg->{"proc-format"} );
+        foreach my $column (@columns) {
+            my ( $name, $desc ) = split( "=", $column );
+            $proc_keys{ lc($name) } = 1;
+        }
+    }
 
     $proc_info = undef;
 
