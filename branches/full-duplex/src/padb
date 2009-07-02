@@ -2756,9 +2756,9 @@ sub sort_proc_hashes {
     my @all  = @_;
 
     if ( $carg->{"reverse-sort-order"} ) {
-        return ( sort { $a->{$key} <=> $b->{$key} } @all );
-    } else {
         return ( reverse( sort { $a->{$key} <=> $b->{$key} } @all ) );
+    } else {
+        return ( sort { $a->{$key} <=> $b->{$key} } @all );
     }
 }
 
@@ -2874,7 +2874,7 @@ sub show_proc_format {
         }
         my $line = join( $separator, @res );
         print "$line\n";
-        if ( $count and ( --$count == 0 ) ) {
+        if ( defined($count) and ( --$count == 0 ) ) {
             return;
         }
     }
@@ -3380,12 +3380,12 @@ sub inner_stdout_cb {
         print("There are $count sockets\n");
         return;
     }
-    print("inner: $line");
+    print("inner: $line\n");
 }
 
 sub inner_sterr_cb {
     my ( $comm_data, $cdata, $line ) = @_;
-    print("einner: $line");
+    print("einner: $line\n");
 }
 
 sub eof_from_fd {
@@ -6841,14 +6841,14 @@ sub common_main {
             "proc-sort-key"      => "vp",
             "proc-show-header"   => 1,
             "reverse-sort-order" => 0,
-            "nprocs-output"      => 0,
+            "nprocs-output"      => undef,
         },
         'secondary' => [
             {
                 'arg_long' => 'proc-format',
                 'type'     => 's',
                 'default' =>
-'vp=vpid,hostname,pid,vmsize,vmrss,stat.state=S,pcpu=%cpu,name=command'
+'vp=vpid,hostname,pid,vmsize,vmrss,stat.state=S,load1=uptime,pcpu=%cpu,name=command'
             }
           ]
 
