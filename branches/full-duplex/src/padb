@@ -3195,10 +3195,6 @@ sub first_command {
     $req->{jobconfig}{jobid} = $comm_data->{jobid};
     $req->{jobconfig}{rmgr}  = $conf{rmgr};
 
-    if ( $#ranks != -1 ) {
-        @{ $req->{ranks} } = @ranks;
-    }
-
     if ( $conf{rmgr} eq "orte" ) {
         $req->{jobconfig}{"orte-data"} = $open_jobs{ $comm_data->{jobid} };
     }
@@ -3245,6 +3241,12 @@ sub next_command {
 
     if ( defined $cmd->{args} ) {
         $req->{cargs} = $cmd->{args};
+    }
+
+    # XXX: Should only send this list over if it makes sense, for example
+    # the deadlock code only works when targetting all ranks.
+    if ( $#ranks != -1 ) {
+        @{ $req->{ranks} } = @ranks;
     }
 
     if ( defined $cmd->{out_format} ) {
@@ -3301,7 +3303,7 @@ sub check_signon {
         $target_state{ $data->{target_responce}{$proc}{state} }++;
     }
     if ( $#missing != -1 ) {
-        printf( "Warning, failed to locates ranks %s\n", compress(@missing) );
+        printf( "Warning, failed to locate ranks %s\n", compress(@missing) );
     }
     return if ( $conf{"check-signon"} eq "missing" );
     my $exe_count = keys(%target_exe);
@@ -6061,32 +6063,16 @@ sub mpi_watch_all {
     return \%res;
 }
 
-sub show_pid {
-    my ( $vp, $pid ) = @_;
-
-    debug( $vp, "Looking at $vp, pid: $pid" );
-
-    my %d;
-    $d{pid} = $pid;
-    $d{vp}  = $vp;
-    push( @{ $confInner{"all-pids"} }, \%d );
-}
-
 sub maybe_show_pid {
     my ( $vp, $pid ) = @_;
 
     debug( $vp, "maybe_show_pid vp $vp, pid: $pid" );
 
-    if ( $#ranks == -1 ) {
-        show_pid( $vp, $pid );
-    }
+    my %d;
+    $d{vp}  = $vp;
+    $d{pid} = $pid;
+    push( @{ $confInner{"all-pids"} }, \%d );
 
-    foreach my $rank (@ranks) {
-        if ( $rank eq $vp ) {
-            show_pid( $vp, $pid );
-            return;
-        }
-    }
 }
 
 sub find_from_status {
@@ -6477,15 +6463,6 @@ sub inner_find_pids {
         $confInner{"orte-data"} = $cmd->{jobconfig}{"orte-data"};
     }
 
-# Save the rank list if supplied, if there is no list then assume all, should probably
-# be sent over as part of the request rather than the header ready for when padb
-# can handle multiple commands over one run.
-# XXX: We also need to handle the case where modes don't accept partial input, for example
-# deadlock detect where this shouldn't be passed.
-    if ( exists( $cmd->{ranks} ) ) {
-        @ranks = @{ $cmd->{ranks} };
-    }
-
 # Query the resource manager to find the pids, they'll be added to the "all-pids" field.
     $rmgr{ $cmd->{jobconfig}{rmgr} }{find_pids}( $cmd->{jobconfig}{jobid} );
 
@@ -6565,14 +6542,31 @@ sub command_from_parent {
 
     $confInner{mode} = $cmd->{mode};
 
+    my $pid_list;
+
+    # If supplied with a rank list then use it now to generate a list of
+    # processes to inspect.
+    if ( exists( $cmd->{ranks} ) ) {
+        my @ranks = @{ $cmd->{ranks} };
+        foreach my $proc ( @{ $confInner{"all-pids"} } ) {
+            my $vp  = $proc->{vp};
+            my $pid = $proc->{pid};
+            foreach my $rank (@ranks) {
+                if ( $vp == $rank ) {
+                    push @{$pid_list}, $proc;
+                }
+            }
+        }
+    } else {
+        $pid_list = $confInner{"all-pids"};
+    }
+
     # Now do the work.
     my $res;
     if ( defined $allfns{ $cmd->{mode} }{handler_all} ) {
-        $res =
-          $allfns{ $cmd->{mode} }{handler_all}( $cmd->{cargs},
-            $confInner{"all-pids"} );
+        $res = $allfns{ $cmd->{mode} }{handler_all}( $cmd->{cargs}, $pid_list );
     } else {
-        $res = default_handler_all( $cmd, $confInner{"all-pids"} );
+        $res = default_handler_all( $cmd, $pid_list );
     }
     $netdata->{target_responce} = $res;
     $netdata->{all_replys}{target_responce} = $res;
