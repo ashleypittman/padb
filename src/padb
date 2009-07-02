@@ -371,6 +371,10 @@ $conf{"tree-verbose"} = 0;
 $conf{"dump-raw"}     = 0;
 $conf{"showcmd"}      = 0;
 
+# Valid values are "none" "missing" or "all".  Anything not recognised
+# is treated as "all".
+$conf{"check-signon"} = "all";
+
 $conf{slurm_job_step} = "0";
 
 # Output options.
@@ -3268,6 +3272,50 @@ sub next_command {
     return $req;
 }
 
+sub report_failed_signon {
+    my ( $key, $data ) = @_;
+    my %values;
+    foreach my $proc ( keys( %{$data} ) ) {
+        push( @{ $values{ $data->{$proc}{$key} } }, $proc );
+    }
+    my %c;
+    $c{i} = length($key);
+    printf("$key : ranks\n");
+    foreach my $value ( sort( keys(%values) ) ) {
+        printf( "%$c{i}s : %s\n", $value, compress( @{ $values{$value} } ) );
+    }
+}
+
+sub check_signon {
+    my ( $comm_data, $data ) = @_;
+    return if ( $conf{"check-signon"} eq "none" );
+    my @missing;
+    my %target_state;
+    my %target_exe;
+    for ( my $proc = 0 ; $proc < $comm_data->{nprocesses} ; $proc++ ) {
+        if ( not defined $data->{target_responce}{$proc} ) {
+            push( @missing, $proc );
+            next;
+        }
+        $target_exe{ $data->{target_responce}{$proc}{name} }++;
+        $target_state{ $data->{target_responce}{$proc}{state} }++;
+    }
+    if ( $#missing != -1 ) {
+        printf( "Warning, failed to locates ranks %s\n", compress(@missing) );
+    }
+    return if ( $conf{"check-signon"} eq "missing" );
+    my $exe_count = keys(%target_exe);
+    if ( $exe_count != 1 ) {
+        printf("Warning, remote process name differs across ranks\n");
+        report_failed_signon( "name", $data->{target_responce} );
+    }
+    my $state_count = keys(%target_state);
+    if ( $state_count != 1 ) {
+        printf("Warning, remote process state differs across ranks\n");
+        report_failed_signon( "state", $data->{target_responce} );
+    }
+}
+
 sub command_from_inner {
     my ( $comm_data, $cdata, $line ) = @_;
 
@@ -3292,9 +3340,7 @@ sub command_from_inner {
         $comm_data->{current_req} = next_command($comm_data);
         issue_command_to_inner( $cdata, $comm_data->{current_req} );
         $comm_data->{state} = "live";
-
-        #XXX: Check all target_processes are here.
-        # print Dumper $d;
+        check_signon( $comm_data, $d );
         return;
     }
 
@@ -3342,7 +3388,7 @@ sub handle_signon {
     $comm_data->{remote}{$host}{key}  = $key;
     $comm_data->{signons}++;
 
-    if ( $comm_data->{signons} == $comm_data->{hosts} ) {
+    if ( $comm_data->{signons} == $comm_data->{nhosts} ) {
         connect_to_children($comm_data);
     }
 }
@@ -3359,7 +3405,7 @@ sub hello_from_inner {
 
     handle_signon( $comm_data, $words[2], $words[3], $words[4] );
 
-    if ( $comm_data->{signons} == $comm_data->{hosts} ) {
+    if ( $comm_data->{signons} == $comm_data->{nhosts} ) {
 
         # Don't listen on this port any more;
         $comm_data->{sel}->remove( $comm_data->{listen} );
@@ -3383,7 +3429,7 @@ sub inner_stdout_cb {
     print("inner: $line\n");
 }
 
-sub inner_sterr_cb {
+sub inner_stderr_cb {
     my ( $comm_data, $cdata, $line ) = @_;
     print("einner: $line\n");
 }
@@ -3428,10 +3474,10 @@ sub handle_event_from_port {
 }
 
 sub go_parallel {
-    my $jobid = shift;
-    my $cmd   = shift;
-    my $ncpus = shift;
-    my $hosts = shift;
+    my $jobid      = shift;
+    my $cmd        = shift;
+    my $nprocesses = shift;
+    my $nhosts     = shift;
 
     my $comm_data;
 
@@ -3470,10 +3516,11 @@ sub go_parallel {
 
     close $pcmd->{in};
 
-    $comm_data->{hosts}   = $hosts;
-    $comm_data->{cmd}     = $cmd;
-    $comm_data->{jobid}   = $jobid;
-    $comm_data->{signons} = 0;
+    $comm_data->{nhosts}     = $nhosts;
+    $comm_data->{nprocesses} = $nprocesses;
+    $comm_data->{cmd}        = $cmd;
+    $comm_data->{jobid}      = $jobid;
+    $comm_data->{signons}    = 0;
 
     # State, one of "connecting" "live" and "shutdown";
     $comm_data->{state} = "connecting";
@@ -3517,8 +3564,8 @@ sub go_parallel {
         if ( $count > 0 ) {
 
             #printf("Still here, time:$t2 comm_count:$count\n");
-            if ( $comm_data->{signons} != $comm_data->{hosts} ) {
-                my $missing = $comm_data->{hosts} - $comm_data->{signons};
+            if ( $comm_data->{signons} != $comm_data->{nhosts} ) {
+                my $missing = $comm_data->{nhosts} - $comm_data->{signons};
                 print("Waiting for signon from $missing hosts.\n");
             }
         }
@@ -6435,7 +6482,6 @@ sub inner_find_pids {
         $netdata->{target_responce}{$vp}->{name}  = $name;
         $netdata->{target_responce}{$vp}->{state} = $state;
     }
-
 }
 
 # Receive a command (perl reference) from our parent.
