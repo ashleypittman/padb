@@ -588,7 +588,7 @@ sub parse_args_outer {
         "verbose|v+"          => \$conf{verbose},
         "user|u=s"            => \$user,
         "rank|r=i"            => \@ranks,
-        "group-id=i"          => \@target_groups,
+        "group-id=s"          => \@target_groups,
         "help|h"              => \&usage,
         "all|a"               => \$all,
         "any|A"               => \$any,
@@ -1518,11 +1518,11 @@ sub group_status {
 
     my %ad;
 
-    my @tg;
+    my %tg;
 
     if ( $#target_groups != -1 ) {
         foreach my $gid (@target_groups) {
-            $tg[$gid]++;
+            $tg{$gid}++;
         }
     }
 
@@ -1533,7 +1533,7 @@ sub group_status {
         foreach my $gid ( keys %{ $dataset->{'subsystems'}{'Group'} } ) {
 
             if ( $#target_groups != -1 ) {
-                next unless defined $tg[$gid];
+                next unless defined $tg{$gid};
             }
 
             my $str;
@@ -1584,7 +1584,7 @@ sub group_status {
     foreach my $gid ( sort { $a <=> $b } keys %ad ) {
 
         if ( $#target_groups != -1 ) {
-            next unless defined $tg[$gid];
+            next unless defined $tg{$gid};
         }
 
         my $gstr = "Information for group '$gid'\n";
@@ -4815,11 +4815,11 @@ sub go_deadlock_detect {
 
     my %ad;
 
-    my @tg;
+    my %tg;
 
     if ( $#target_groups != -1 ) {
         foreach my $gid (@target_groups) {
-            $tg[$gid]++;
+            $tg{$gid}++;
         }
     }
 
@@ -4837,7 +4837,7 @@ sub go_deadlock_detect {
             }
 
             if ( $#target_groups != -1 ) {
-                next unless defined $tg[$gid];
+                next unless defined $tg{$gid};
             }
 
             if ( $gd->{size} > 0 ) {
@@ -4865,7 +4865,7 @@ sub go_deadlock_detect {
     foreach my $gid ( sort keys %ad ) {
 
         if ( $#target_groups != -1 ) {
-            next unless defined $tg[$gid];
+            next unless defined $tg{$gid};
         }
 
         my $gstr = "Information for group '$gid' ($ad{$gid}{name})\n";
