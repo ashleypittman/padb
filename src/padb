@@ -3126,10 +3126,17 @@ sub extract_line {
     $str =~ s/\r//g;
 
     # Allow multi-line output here, making sure we process each line.
-    while ( $str =~ /^([^\n]+)\n(.*)$/ ) {
+    while ( $str =~ /^([^\n]+)\n/ ) {
         $sd->{line_cb}( $handle, $sd, $1 );
-        $sd->{str} = $2;
-        $str = $2;
+        my $len  = length($1);
+        my $flen = length($str);
+        if ( ( $len + 1 ) != $flen ) {
+            $str = substr( $str, $len + 1, $flen - $len );
+        } else {
+            $str = "";
+
+        }
+        $sd->{str} = $str;
     }
 
     return;
