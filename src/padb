@@ -2557,6 +2557,11 @@ sub find_rmgr {
 # Don't do any sanity checks here to cope with non-default installs.
 
     if ( defined $rmgr{ $conf{"rmgr"} } ) {
+        if ( not $rmgr{ $conf{"rmgr"} }{is_installed}() ) {
+            printf(
+"Warning: Selected resource manager $conf{rmgr} does not appear to be installed\n"
+            );
+        }
         setup_rmgr( $conf{"rmgr"} );
         return;
     }
@@ -2597,6 +2602,11 @@ sub find_any_rmgr {
 # Don't do any sanity checks here to cope with non-default installs.
 
     if ( defined $rmgr{ $conf{"rmgr"} } ) {
+        if ( not $rmgr{ $conf{"rmgr"} }{is_installed}() ) {
+            printf(
+"Warning: Selected resource manager $conf{rmgr} does not appear to be installed\n"
+            );
+        }
         setup_rmgr( $conf{"rmgr"} );
         return;
     }
