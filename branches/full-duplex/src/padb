@@ -3468,7 +3468,7 @@ sub handle_event_from_socket {
     my $cdata = $comm_data->{sockets}{$h};
 
     my $data;
-    my $nb = sysread( $h, $data, 1024 );
+    my $nb = sysread( $h, $data, 65536 );
 
     if ( $nb == 0 ) {
         if ( defined( $cdata->{eof_cb} ) ) {
@@ -6735,7 +6735,7 @@ sub inner_loop_for_comms {
 
             my $sinfo = $netdata->{connections}{$s};
             my $d;
-            my $count = sysread( $s, $d, 1024 );
+            my $count = sysread( $s, $d, 65536 );
 
             # Dead connection.
             if ( not defined $d or $count eq 0 ) {
