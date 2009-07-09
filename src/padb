@@ -5500,14 +5500,31 @@ sub add_and_divide_jiffies {
     return ( ( string_to_jiffies($pre) + string_to_jiffies($post) ) / 2 );
 }
 
-# Convert /proc/self/stat into used jiffies.
-sub stat_to_jiffies {
-    my $stat    = shift;
-    my @values  = split( " ", $stat );
-    my $jiffies = 0;
-    $jiffies += $values[13];    # utime
-    $jiffies += $values[14];    # stime
-    return $jiffies;
+sub pcpu_user {
+    my ( $cpucount, $elapsed, $start, $end ) = @_;
+    my @pre  = split( " ", $start );
+    my @post = split( " ", $end );
+    my $jused = $post[13] - $pre[13];
+    my $used  = ( $jused / $elapsed ) * $cpucount * 100;
+    return sprintf( "%d", $used );
+}
+
+sub pcpu_sys {
+    my ( $cpucount, $elapsed, $start, $end ) = @_;
+    my @pre  = split( " ", $start );
+    my @post = split( " ", $end );
+    my $jused = $post[14] - $pre[14];
+    my $used  = ( $jused / $elapsed ) * $cpucount * 100;
+    return sprintf( "%d", $used );
+}
+
+sub pcpu_total {
+    my ( $cpucount, $elapsed, $start, $end ) = @_;
+    my @pre  = split( " ", $start );
+    my @post = split( " ", $end );
+    my $jused = $post[13] - $pre[13] + $post[14] - $pre[14];
+    my $used  = ( $jused / $elapsed ) * $cpucount * 100;
+    return sprintf( "%d", $used );
 }
 
 my $proc_info;
@@ -5613,14 +5630,29 @@ sub show_proc_all {
         my ( $l1, $l5, $l15 ) = split( " ", $load_avg );
 
         foreach my $proc ( @{$list} ) {
-            my $vp       = $proc->{vp};
-            my $jpre     = stat_to_jiffies( $proc->{stat_start} );
-            my $jpost    = stat_to_jiffies( $proc->{stat_end} );
-            my $jused    = $jpost - $jpre;
-            my $used     = ( $jused / $elapsed ) * $cpucount * 100;
-            my $used_str = sprintf( "%d", $used );
+            my $vp = $proc->{vp};
 
-            proc_output( $vp, "pcpu",   $used_str );
+            proc_output(
+                $vp, "pcpu",
+                pcpu_total(
+                    $cpucount,           $elapsed,
+                    $proc->{stat_start}, $proc->{stat_end}
+                )
+            );
+            proc_output(
+                $vp, "pucpu",
+                pcpu_user(
+                    $cpucount,           $elapsed,
+                    $proc->{stat_start}, $proc->{stat_end}
+                )
+            );
+            proc_output(
+                $vp, "pscpu",
+                pcpu_sys(
+                    $cpucount,           $elapsed,
+                    $proc->{stat_start}, $proc->{stat_end}
+                )
+            );
             proc_output( $vp, "load1",  $l1 );
             proc_output( $vp, "load5",  $l15 );
             proc_output( $vp, "load15", $l15 );
