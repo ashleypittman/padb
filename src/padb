@@ -2992,7 +2992,6 @@ sub default_output_handler {
 
     if ( $mode eq "stack" or $input_file ) {
         if ( $cargs->{"strip-below-main"} or $cargs->{"strip-above-wait"} ) {
-            printf("Striping stack traces\n");
             strip_stack_traces( $cargs, $lines );
         }
     }
