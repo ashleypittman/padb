@@ -569,9 +569,6 @@ my $compress;
 my $compress_C;
 my $tree;
 
-my $strip_below_main = 1;
-my $strip_above_wait = 1;
-
 my @config_options;
 my %ic_names;
 
@@ -603,9 +600,7 @@ sub parse_args_outer {
         "core=s"              => \$core_name,
         "exe=s"               => \$exe_name,
         "list-rmgrs"          => \$list_rmgrs,
-        "strip-below-main!"   => \$strip_below_main,
-        "strip-above-wait!"   => \$strip_above_wait,
-        "watch!"              => \$watch,
+        "watch"               => \$watch,
         "local-stats"         => \$local_stats,
         "show-jobs"           => \$show_jobs,
         "norc"                => \$norc,
@@ -2714,7 +2709,7 @@ sub cleanup_pcmd {
 ###############################################################################
 
 sub strip_stack_traces {
-    my $lines = shift;
+    my ( $cargs, $lines ) = @_;
 
     my %above;
     my %below;
@@ -2747,10 +2742,11 @@ sub strip_stack_traces {
         $main_idx = 0 if not defined $main_idx;
         if ( $main_idx != 0 or $wait_idx != 0 ) {
             my $end =
-              ( $strip_above_wait and $wait_idx )
+              ( $cargs->{"strip-above-wait"} and $wait_idx )
               ? $wait_idx
               : $#{ $lines->{$tag} };
-            my $start = ( $strip_below_main and $main_idx ) ? $main_idx : 0;
+            my $start =
+              ( $cargs->{"strip-below-main"} and $main_idx ) ? $main_idx : 0;
 
             printf( "Stripping 0.."
                   . $#{ $lines->{$tag} }
@@ -2907,11 +2903,11 @@ sub show_results {
         return;
     }
 
-    if ( $mode eq "stack" or $input_file ) {
-        if ( $strip_below_main or $strip_above_wait ) {
-            strip_stack_traces($lines);
-        }
-    }
+    #if ( $mode eq "stack" or $input_file ) {
+    #    if ( $strip_below_main or $strip_above_wait ) {
+    #        strip_stack_traces(undef,$lines);
+    #    }
+    #}
 
     if ($tree) {
         print show_tree go_p( 0, $lines,
@@ -2984,6 +2980,8 @@ sub post_process_lines {
 sub default_output_handler {
     my ( $req, $d ) = @_;
 
+    my $cargs = $req->{cargs};
+
     # Could warn on missing output here...
 
     my $lines  = $d->{target_output};
@@ -2993,8 +2991,9 @@ sub default_output_handler {
     $output = $req->{out_format} if defined $req->{out_format};
 
     if ( $mode eq "stack" or $input_file ) {
-        if ( $strip_below_main or $strip_above_wait ) {
-            strip_stack_traces($lines);
+        if ( $cargs->{"strip-below-main"} or $cargs->{"strip-above-wait"} ) {
+            printf("Striping stack traces\n");
+            strip_stack_traces( $cargs, $lines );
         }
     }
 
@@ -3270,10 +3269,13 @@ sub next_command {
         $req->{out_format} = $cmd->{out_format};
     }
 
-    # Send along the secondary args.
+    # Send along the secondary args, taking care not to override any that
+    # are already defined.
     if ( defined $allfns{ $req->{mode} }{secondary} ) {
         foreach my $sec ( @{ $allfns{ $req->{mode} }{secondary} } ) {
-            $req->{cargs}{ $sec->{arg_long} } = $sec->{value};
+            if ( not defined( $req->{cargs}{ $sec->{arg_long} } ) ) {
+                $req->{cargs}{ $sec->{arg_long} } = $sec->{value};
+            }
         }
     }
 
@@ -3965,9 +3967,6 @@ sub outer_main {
         my %c;
         $c{"strip-above-wait"} = 0;
         push_command( "stack", "tree", \%c );
-
-        # This option is still a global rather than being just a mode option.
-        $strip_above_wait = 0;
 
         go_job($full_report);
         exit(0);
@@ -6846,7 +6845,7 @@ sub to_arg {
         $res .= "|$arg->{arg_short}";
     }
     if ( defined $arg->{type} ) {
-        $res .= "=$arg->{type}";
+        $res .= $arg->{type};
     }
     return $res;
 }
@@ -6890,7 +6889,7 @@ sub common_main {
         'secondary' => [
             {
                 'arg_long' => 'signal',
-                'type'     => 's',
+                'type'     => '=s',
                 'default'  => 'TERM'
             }
         ]
@@ -6950,7 +6949,7 @@ sub common_main {
         'secondary' => [
             {
                 'arg_long' => 'proc-format',
-                'type'     => 's',
+                'type'     => '=s',
                 'default' =>
 'vp=vpid,hostname,pid,vmsize,vmrss,stat.state=S,load1=uptime,pcpu=%cpu,name=command'
             }
@@ -6970,7 +6969,20 @@ sub common_main {
             "stack-strip-above" =>
 "elan_waitWord,elan_pollWord,elan_deviceCheck,opal_condition_wait",
             "stack-strip-below" => "main",
-        }
+        },
+        'secondary' => [
+            {
+                'arg_long' => 'strip-below-main',
+                'type'     => '!',
+                'default'  => 1,
+            },
+            {
+                'arg_long' => 'strip-above-wait',
+                'type'     => '!',
+                'default'  => 1,
+            },
+          ]
+
     };
 
     $allfns{stack_long} = {
@@ -7001,7 +7013,7 @@ sub common_main {
         'secondary' => [
             {
                 'arg_long' => 'dflag',
-                'type'     => 's',
+                'type'     => '=s',
                 'default'  => '0'
             }
         ]
