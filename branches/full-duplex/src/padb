@@ -6973,7 +6973,7 @@ sub common_main {
                 'arg_long' => 'proc-format',
                 'type'     => '=s',
                 'default' =>
-'vp=vpid,hostname,pid,vmsize,vmrss,stat.state=S,load1=uptime,pcpu=%cpu,name=command'
+'vp=vpid,hostname,pid,vmsize,vmrss,stat.state=S,load1=uptime,pcpu=%cpu,stat.processor=lcorename=command'
             }
           ]
 
