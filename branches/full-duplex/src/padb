@@ -6434,9 +6434,11 @@ sub default_handler_all {
     foreach my $proc ( @{$list} ) {
         my $vp  = $proc->{vp};
         my $pid = $proc->{pid};
-        $gres{$vp} =
+        my $res =
           $allfns{ $cmd->{mode} }{handler}( $cmd->{cargs}, $vp, $pid );
+	$gres{$vp} = $res if ( defined $res );
     }
+    return if not %gres;
     return \%gres;
 }
 
@@ -6634,9 +6636,11 @@ sub command_from_parent {
     } else {
         $res = default_handler_all( $cmd, $pid_list );
     }
-    $netdata->{target_responce} = $res;
-    $netdata->{all_replys}{target_responce} = $res;
-
+    if ( $res ) {
+	$netdata->{target_responce} = $res;
+	$netdata->{all_replys}{target_responce} = $res;
+    }
+    
     return;
 }
 
