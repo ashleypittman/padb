@@ -4760,6 +4760,7 @@ sub show_mpi_queue_all {
         gdb_detach($gdb);
         gdb_quit($gdb);
     }
+    return;
 }
 
 # Ideally handle all this at a higher level...
@@ -5660,6 +5661,7 @@ sub show_proc_all {
     if ( $confInner{mode} eq "proc-summary" ) {
         return $proc_info;
     }
+    return;
 }
 
 sub show_proc {
@@ -5839,6 +5841,7 @@ sub stack_trace_from_pids {
             }
         }
     }
+    return;
 }
 
 sub kill_proc {
@@ -5938,6 +5941,7 @@ sub show_full_stacks {
     }
 
     unlink($file);
+    return;
 }
 
 sub set_debug {
@@ -6421,6 +6425,7 @@ sub inner_show_stats {
     run_command( undef,
         "$confInner{edb} --stats-raw --parallel --key=$key $confInner{edbopt}"
     );
+    return;
 }
 
 sub default_handler_all {
@@ -6471,17 +6476,30 @@ sub reply_from_child {
         }
     }
 
+    # Combine the target process responces.
+    if ( exists $r->{target_output} ) {
+        foreach my $tp ( keys( %{ $r->{target_output} } ) ) {
+            $handle->{all_replys}->{target_output}{$tp} =
+              $r->{target_output}{$tp};
+        }
+    }
+
+    if ( exists $handle->{target_responce} ) {
+        foreach my $tp ( keys( %{ $handle->{target_responce} } ) ) {
+            $handle->{all_replys}->{target_responce}{$tp} =
+              $handle->{target_responce}{$tp};
+        }
+    }
+
     # Save any output we've got from this node.
     foreach my $key ( keys(%inner_output) ) {
-        $r->{target_output}{$key} = $inner_output{$key};
+        $handle->{all_replys}->{target_output}{$key} = $inner_output{$key};
     }
 
     %inner_output = ();
 
-    # If this is the last reply from a child then report upstream.
-    # print Dumper $handle;
+    # If this isn't the last child to signon don't reply up-stream yet.
     if ( $handle->{child_replys} != $handle->{children} ) {
-        my $missing = $handle->{children} - $handle->{child_replys};
         return;
     }
 
