@@ -3522,10 +3522,6 @@ sub go_parallel {
         $comm_data->{sockets}{$sl} = \%cdata;
     }
 
-    my $errors = 0;
-
-    my $report_errors = 1;
-
     my $pcmd = {
         pid => -1,
         in  => "",
@@ -3596,15 +3592,20 @@ sub go_parallel {
     waitpid( $pcmd->{pid}, 0 );
     my $res = $?;
 
-    printf("result from parallel command was $res\n")
+    if ( $comm_data->{state} ne "shutdown" ) {
+        printf(
+"Unexpected exit from parallel command (state=$comm_data->{state})\n"
+        );
+    }
+    printf("result from parallel command was $res ($comm_data->{state})\n")
       if ( $conf{"verbose"} );
 
     if ( $res != 0 ) {
         my %status = rc_status($res);
         if ( job_is_running($jobid) ) {
-            if ($report_errors) {
-                printf("Failed to run parallel command (rc = $status{rc})\n");
-            }
+            printf(
+                "Bad exit code from parallel command (exit_code=$status{rc})\n"
+            );
         } else {
             printf("Job $jobid is no longer active\n");
             return 1;
@@ -4675,7 +4676,7 @@ sub fetch_mpi_queue {
     kill( "CONT", $pid );
     my $p = gdb_attach( $g, $pid );
     if ( !$p ) {
-        debug( $vp, "Failed to attach to $pid\n" );
+        debug( $vp, "Failed to attach to process\n" );
         return;
     }
 
