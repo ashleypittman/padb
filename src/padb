@@ -5868,6 +5868,7 @@ sub show_queue {
     return if ( $lines != 0 );
 
     show_mpi_queue( $carg, $vp, $pid );
+    return;
 }
 
 sub show_clever_full_stack {
