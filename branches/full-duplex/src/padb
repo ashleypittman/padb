@@ -3597,7 +3597,7 @@ sub go_parallel {
 "Unexpected exit from parallel command (state=$comm_data->{state})\n"
         );
     }
-    printf("result from parallel command was $res ($comm_data->{state})\n")
+    printf("result from parallel command is $res (state=$comm_data->{state})\n")
       if ( $conf{"verbose"} );
 
     if ( $res != 0 ) {
@@ -5675,6 +5675,8 @@ sub show_proc {
 
     if ( -d "/proc/$pid/task" and $carg->{"proc-shows-proc"} ) {
 
+        my $threads = 0;
+
         # 2.6 kernel. (ntpl)
         opendir( DIR, "/proc/$pid/task" );
         my @tasks = readdir(DIR);
@@ -5683,7 +5685,9 @@ sub show_proc {
             next if ( $task eq "." );
             next if ( $task eq ".." );
             show_task_dir( $carg, $vp, $pid, "/proc/$pid/task/$task" );
+            $threads++;
         }
+        proc_output( $vp, "threads", $threads );
     } else {
         show_task_dir( $carg, $vp, $pid, "/proc/$pid" );
     }
