@@ -3814,7 +3814,7 @@ sub config_help {
     }
 
     foreach my $mode ( sort( keys( %{ $conf{mode_options} } ) ) ) {
-        printf("Options for mode '$mode'\n");
+        printf("\nOptions for mode '$allfns{$mode}{arg_long}'\n");
         foreach my $key ( sort( keys( %{ $conf{mode_options}{$mode} } ) ) ) {
             if ( defined $conf{mode_options}{$mode}{$key} ) {
                 printf(
