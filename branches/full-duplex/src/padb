@@ -4198,6 +4198,7 @@ sub gdb_attach {
 
     my $result = gdb_send( $gdb, "attach $pid" );
 
+    return unless defined $result;
     return if ( $result eq "error" );
 
     $gdb->{attached} = 1;
