@@ -4999,9 +4999,16 @@ sub deadlock_detect {
     print $r;
 }
 
-# For reference the other interesting options here are these two.
-# "-stack-list-arguments 1"
-# "-stack-list-locals 2"
+sub gdb_read_value {
+    my ( $gdb, $name ) = @_;
+    my %t = gdb_n_send( $gdb, "-data-evaluate-expression $name" );
+    if ( $t{status} eq "done" ) {
+        my $v = gdb_parse_reason( $t{reason} );
+        return $v->{value};
+    }
+    return;
+}
+
 sub gdb_dump_frames {
     my ( $gdb, $detail ) = @_;
     my %result = gdb_n_send( $gdb, "-stack-list-frames" );
@@ -5012,31 +5019,33 @@ sub gdb_dump_frames {
     if ( defined $detail ) {
         foreach my $frame ( @{ $data->{stack} } ) {
             my %r = gdb_n_send( $gdb,
-                "-stack-list-arguments 0 $frame->{level} $frame->{level}" );
+                "-stack-list-arguments 2 $frame->{level} $frame->{level}" );
             my $args = gdb_parse_reason( $r{reason}, "name" );
 
-            my @all;
             if ( defined $args->{"stack-args"}[0]{frame}{args} ) {
                 my @names = @{ $args->{"stack-args"}[0]{frame}{args} };
                 @{ $frame->{params} } = @names;
-                push @all, (@names);
             }
 
             gdb_send( $gdb, "-stack-select-frame $frame->{level}" );
-            my %s = gdb_n_send( $gdb, "-stack-list-locals 0" );
+            my %s = gdb_n_send( $gdb, "-stack-list-locals --simple-values" );
             if ( $s{status} eq "done" ) {
                 my $args = gdb_parse_reason( $s{reason}, "name" );
                 if ( defined $args->{locals} ) {
-                    @{ $frame->{locals} } = @{ $args->{locals} };
-                    push @all, ( @{ $args->{locals} } );
-                }
-            }
 
-            foreach my $name (@all) {
-                my %t = gdb_n_send( $gdb, "-data-evaluate-expression $name" );
-                if ( $t{status} eq "done" ) {
-                    my $v = gdb_parse_reason( $t{reason} );
-                    $frame->{vals}{$name} = $v->{value};
+                    # Some variables don't show up a value from list-locals,
+                    # __FUNCION__ and array pointers are two examples.  For
+                    # vars where the value isn't given automatically read
+                    # the value of them directly.
+                    foreach my $arg ( @{ $args->{locals} } ) {
+                        next if defined $arg->{value};
+
+                        my $value = gdb_read_value( $gdb, $arg->{name} );
+                        if ( defined $value ) {
+                            $arg->{value} = $value;
+                        }
+                    }
+                    $frame->{locals} = $args->{locals};
                 }
             }
         }
@@ -5709,6 +5718,26 @@ sub gdb_int_from_pid {
     return $nvp;
 }
 
+sub show_vars {
+    my ( $vp, $frame, $type ) = @_;
+    my %l;
+    $l{t} = 0;
+    $l{n} = 0;
+    return if ( @{ $frame->{$type} } == 0 );
+    foreach my $arg ( @{ $frame->{$type} } ) {
+        $l{t} = length( $arg->{type} ) if ( length( $arg->{type} ) > $l{t} );
+        $l{n} = length( $arg->{name} ) if ( length( $arg->{name} ) > $l{n} );
+    }
+    my $header = sprintf("  $type:");
+    output( $vp, $header );
+    foreach my $arg ( @{ $frame->{$type} } ) {
+        my $value = ( defined $arg->{value} ? $arg->{value} : "??" );
+        my $output =
+          sprintf( "  %-$l{t}s %$l{n}s = $value", $arg->{type}, $arg->{name} );
+        output( $vp, $output );
+    }
+}
+
 # Try and be clever here, attach to each and every process on this node first,
 # then go back and query them each in turn, should mean that some processes are
 # not spinning whilst gdb is doing it's thing which will mean a quicker runtime
@@ -5814,34 +5843,16 @@ sub stack_trace_from_pids {
                 next unless exists $$frame{level};
                 next unless exists $$frame{func};
 
+                output( $vp,
+                        ( $$frame{func} || "?" ) 
+                      . "() at "
+                      . ( $$frame{file} || "?" ) . ":"
+                      . ( $$frame{line} || "?" ) );
                 if ( $carg->{"stack-shows-params"} ) {
-                    my @a;
-                    foreach my $arg ( @{ $frame->{params} } ) {
-                        if ( defined $frame->{vals}{$arg} ) {
-                            push( @a, "$arg = $frame->{vals}{$arg}" );
-                        } else {
-                            push( @a, "$arg = ??" );
-                        }
-                    }
-                    my $a = join( ", ", @a );
-                    my $file = $frame->{file} || "?";
-                    my $line = $frame->{line} || "?";
-                    output( $vp, "$frame->{func}($a) at $file:$line" );
-                } else {
-                    output( $vp,
-                            ( $$frame{func} || "?" ) 
-                          . "() at "
-                          . ( $$frame{file} || "?" ) . ":"
-                          . ( $$frame{line} || "?" ) );
+                    show_vars( $vp, $frame, "params" );
                 }
                 if ( $carg->{"stack-shows-locals"} ) {
-                    foreach my $arg ( @{ $frame->{locals} } ) {
-                        if ( defined $frame->{vals}{$arg} ) {
-                            output( $vp, "  $arg = $frame->{vals}{$arg}" );
-                        } else {
-                            output( $vp, "  $arg = ??" );
-                        }
-                    }
+                    show_vars( $vp, $frame, "locals" );
                 }
 
             }
