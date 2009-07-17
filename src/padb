@@ -5001,12 +5001,43 @@ sub deadlock_detect {
 
 sub gdb_read_value {
     my ( $gdb, $name ) = @_;
-    my %t = gdb_n_send( $gdb, "-data-evaluate-expression $name" );
+    # Quote the request in case it contains spaces.
+    my %t = gdb_n_send( $gdb, "-data-evaluate-expression \"$name\"" );
     if ( $t{status} eq "done" ) {
         my $v = gdb_parse_reason( $t{reason} );
         return $v->{value};
     }
     return;
+}
+
+sub gdb_expand_vars {
+    my ( $gdb, $frame, $type ) = @_;
+
+    foreach my $arg ( @{ $frame->{$type} } ) {
+
+        # Detect simple pointers and deferefence then to show the underlying
+        # struct.  Works quite well but is a problem with very large or complex
+        # data structures.  More work is required to make this feature viable so
+        # leave it disabled for now.  Perhaps have an option for enabling it
+        # in a per-type basis?
+
+        if ( ( $arg->{type} =~ m/ \*$/ ) and $arg->{value} ne "0x0" and 0 ) {
+            my $value = gdb_read_value( $gdb, "* $arg->{name}" );
+            if ( defined $value ) {
+                $arg->{value} .= " ($value)";
+            }
+        }
+
+        # Some variables don't show up a value from list-locals,
+        # __FUNCION__ and array pointers are two examples.  For
+        # vars where the value isn't given automatically read
+        # the value of them directly.
+        next if defined $arg->{value};
+        my $value = gdb_read_value( $gdb, $arg->{name} );
+        if ( defined $value ) {
+            $arg->{value} = $value;
+        }
+    }
 }
 
 sub gdb_dump_frames {
@@ -5018,6 +5049,8 @@ sub gdb_dump_frames {
     }
     if ( defined $detail ) {
         foreach my $frame ( @{ $data->{stack} } ) {
+            gdb_send( $gdb, "-stack-select-frame $frame->{level}" );
+
             my %r = gdb_n_send( $gdb,
                 "-stack-list-arguments 2 $frame->{level} $frame->{level}" );
             my $args = gdb_parse_reason( $r{reason}, "name" );
@@ -5025,27 +5058,16 @@ sub gdb_dump_frames {
             if ( defined $args->{"stack-args"}[0]{frame}{args} ) {
                 my @names = @{ $args->{"stack-args"}[0]{frame}{args} };
                 @{ $frame->{params} } = @names;
+
+                gdb_expand_vars( $gdb, $frame, "params" );
             }
 
-            gdb_send( $gdb, "-stack-select-frame $frame->{level}" );
             my %s = gdb_n_send( $gdb, "-stack-list-locals --simple-values" );
             if ( $s{status} eq "done" ) {
                 my $args = gdb_parse_reason( $s{reason}, "name" );
                 if ( defined $args->{locals} ) {
-
-                    # Some variables don't show up a value from list-locals,
-                    # __FUNCION__ and array pointers are two examples.  For
-                    # vars where the value isn't given automatically read
-                    # the value of them directly.
-                    foreach my $arg ( @{ $args->{locals} } ) {
-                        next if defined $arg->{value};
-
-                        my $value = gdb_read_value( $gdb, $arg->{name} );
-                        if ( defined $value ) {
-                            $arg->{value} = $value;
-                        }
-                    }
                     $frame->{locals} = $args->{locals};
+                    gdb_expand_vars( $gdb, $frame, "locals" );
                 }
             }
         }
