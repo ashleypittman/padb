@@ -5150,13 +5150,6 @@ sub gdb_next_result {
     return "";
 }
 
-sub gdb_int_from_raw {
-    my $str = shift;
-    if ( $str =~ /\$\d+ \= (\d)+/ ) {
-        return $1;
-    }
-}
-
 sub stack_from_core {
     my $exe  = shift;
     my $core = shift;
@@ -5738,22 +5731,6 @@ sub show_proc {
     } else {
         show_task_dir( $carg, $vp, $pid, "/proc/$pid" );
     }
-}
-
-sub gdb_int_from_pid {
-    my $pid = shift;
-    my $var = shift;
-    my $gdb = gdb_start();
-    if ( not gdb_attach( $gdb, $pid ) ) {
-        return;
-    }
-
-    # use data-evaluate-expression here?
-    my %r = gdb_n_send( $gdb, "p $var" );
-    my $nvp = gdb_int_from_raw( $r{raw} );
-    gdb_detach($gdb);
-    gdb_quit($gdb);
-    return $nvp;
 }
 
 sub show_vars {
@@ -6361,18 +6338,12 @@ sub slurm_find_pids {
     }
 }
 
-# Local processes per node, i.e. no resource manager support.
+# Local processes per node, i.e. no resource manager support, we only
+# have one process in this case so call it process 0.
 sub local_find_pids {
     my $pid = shift;
 
-# Hard-wire this to vp 0, probably not true but without the resource manager it's difficult
-# to tell.  We should really use elan_base->state->vp here.
-    my $vp = gdb_int_from_pid( $pid, "elan_base->state->vp" );
-    if ( not defined $vp or $vp eq "" ) {
-        $vp = 0;
-    }
-
-    maybe_show_pid( $vp, $pid );
+    maybe_show_pid( 0, $pid );
 }
 
 sub mpd_find_pids {
