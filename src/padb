@@ -327,25 +327,28 @@ $rmgr{"slurm"} = {
 };
 
 $rmgr{"local"} = {
-    'get_active_jobs' => \&local_get_jobs,
-    'job_is_running'  => \&local_job_is_running,
-    'setup_pcmd'      => \&local_setup_pcmd,
-    'find_pids'       => \&local_find_pids,
+    'get_active_jobs'        => \&local_get_jobs,
+    'job_is_running'         => \&local_job_is_running,
+    'setup_pcmd'             => \&local_setup_pcmd,
+    'find_pids'              => \&local_find_pids,
+    'require_inner_callback' => 1,
 };
 
 $rmgr{"local-qsnet"} = {
-    'is_installed'    => \&local_q_is_installed,
-    'get_active_jobs' => \&local_q_get_jobs,
-    'job_is_running'  => \&local_job_is_running,
-    'setup_pcmd'      => \&local_setup_pcmd,
-    'inner_rmgr'      => "local",
+    'is_installed'           => \&local_q_is_installed,
+    'get_active_jobs'        => \&local_q_get_jobs,
+    'job_is_running'         => \&local_job_is_running,
+    'setup_pcmd'             => \&local_setup_pcmd,
+    'inner_rmgr'             => "local",
+    'require_inner_callback' => 1,
 };
 
 $rmgr{"local-fd"} = {
-    'get_active_jobs' => \&local_fd_get_jobs,
-    'job_is_running'  => \&local_job_is_running,
-    'setup_pcmd'      => \&local_setup_pcmd,
-    'inner_rmgr'      => "local",
+    'get_active_jobs'        => \&local_fd_get_jobs,
+    'job_is_running'         => \&local_job_is_running,
+    'setup_pcmd'             => \&local_setup_pcmd,
+    'inner_rmgr'             => "local",
+    'require_inner_callback' => 1,
 };
 
 ###############################################################################
@@ -2255,7 +2258,7 @@ sub local_job_is_running {
 }
 
 sub local_setup_pcmd {
-    return ( "", undef );
+    return ( "", 1, 1 );
 }
 
 ###############################################################################
@@ -2549,10 +2552,12 @@ sub setup_rmgr {
 sub find_rmgr {
 
 # If it's been set on the command line and it's valid then just use what we are given.
-# Don't do any sanity checks here to cope with non-default installs.
+# Do sanity checks here but only warn on the result to cope with non-default installs.
 
     if ( defined $rmgr{ $conf{"rmgr"} } ) {
-        if ( not $rmgr{ $conf{"rmgr"} }{is_installed}() ) {
+        if ( defined $rmgr{ $conf{"rmgr"} }{is_installed}
+            and not $rmgr{ $conf{"rmgr"} }{is_installed}() )
+        {
             printf(
 "Warning: Selected resource manager $conf{rmgr} does not appear to be installed\n"
             );
@@ -2594,10 +2599,12 @@ sub find_rmgr {
 sub find_any_rmgr {
 
 # If it's been set on the command line and it's valid then just use what we are given.
-# Don't do any sanity checks here to cope with non-default installs.
+# Do sanity checks here but only warn on the result to cope with non-default installs.
 
     if ( defined $rmgr{ $conf{"rmgr"} } ) {
-        if ( not $rmgr{ $conf{"rmgr"} }{is_installed}() ) {
+        if ( defined $rmgr{ $conf{"rmgr"} }{is_installed}
+            and not $rmgr{ $conf{"rmgr"} }{is_installed}() )
+        {
             printf(
 "Warning: Selected resource manager $conf{rmgr} does not appear to be installed\n"
             );
