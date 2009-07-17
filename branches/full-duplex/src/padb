@@ -4196,6 +4196,7 @@ sub gdb_quit {
 sub gdb_attach {
     my ( $gdb, $pid ) = @_;
 
+    send_cont_signal($pid);
     my $result = gdb_send( $gdb, "attach $pid" );
 
     return unless defined $result;
@@ -4215,7 +4216,7 @@ sub gdb_detach {
 
     $gdb->{attached} = 0;
 
-    return $gdb->{tracepid};
+    send_cont_signal( $gdb->{tracepid} );
 }
 
 sub gdb_wait_for_prompt {
@@ -4671,10 +4672,19 @@ sub launch_h {
     return @mq;
 }
 
+# Send a CONT signal to a pid, there have been problems where a program
+# is in "T" state which causes the attach to hang forever.  Send the
+# process a signal before attaching to wake it up in case this is the case.
+# gdb crashing (yes it does happen) is a common case for processes to be
+# stopped so always deliver this signal before and after attaching.
+sub send_cont_signal {
+    my $pid = shift;
+    kill( "CONT", $pid );
+}
+
 sub fetch_mpi_queue {
     my ( $carg, $vp, $pid ) = @_;
     my $g = gdb_start();
-    kill( "CONT", $pid );
     my $p = gdb_attach( $g, $pid );
     if ( !$p ) {
         debug( $vp, "Failed to attach to process\n" );
@@ -4735,7 +4745,6 @@ sub show_mpi_queue_all {
 
         debug $vp, "Attaching to $pid";
         my $gdb = gdb_start();
-        kill( "CONT", $pid );
         if ( gdb_attach( $gdb, $pid ) ) {
             $proc->{gdb} = $gdb;
             push( @all, $proc );
@@ -4778,7 +4787,6 @@ sub show_mpi_queue_for_deadlock_all {
 
         debug $vp, "Attaching to $pid";
         my $gdb = gdb_start();
-        kill( "CONT", $pid );
         if ( gdb_attach( $gdb, $pid ) ) {
             $proc->{gdb} = $gdb;
             push( @all, $proc );
@@ -5001,6 +5009,7 @@ sub deadlock_detect {
 
 sub gdb_read_value {
     my ( $gdb, $name ) = @_;
+
     # Quote the request in case it contains spaces.
     my %t = gdb_n_send( $gdb, "-data-evaluate-expression \"$name\"" );
     if ( $t{status} eq "done" ) {
@@ -5237,7 +5246,7 @@ sub run_ptrack_cmd {
     debug $vp, "running (p) $cmd";
     my $lines = 0;
 
-    kill( "CONT", $pid );
+    send_cont_signal($pid);
     open( CMD, "$cmd 2>/dev/null|" )
       || p_die( $vp, "cant start command $cmd" );
     while (<CMD>) {
@@ -5245,7 +5254,7 @@ sub run_ptrack_cmd {
         output $vp, $_;
         $lines++;
     }
-    kill( "CONT", $pid );
+    send_cont_signal($pid);
     close CMD;
     return $lines;
 }
@@ -5776,7 +5785,6 @@ sub stack_trace_from_pids {
 
         debug $vp, "Attaching to $pid";
         my $gdb = gdb_start();
-        kill( "CONT", $pid );
         if ( gdb_attach( $gdb, $pid ) ) {
             $proc->{gdb} = $gdb;
             push( @all, $proc );
@@ -5801,7 +5809,7 @@ sub stack_trace_from_pids {
 
             if ($tries) {
                 debug $vp, "Re-attaching to $pid, $tries";
-                kill( "CONT", $pid );
+                send_cont_signal($pid);
                 sleep(1);
                 my $g = gdb_start();
                 if ( gdb_attach( $g, $pid ) ) {
@@ -5824,7 +5832,6 @@ sub stack_trace_from_pids {
                 }
                 gdb_detach($gdb);
                 gdb_quit($gdb);
-                kill( "CONT", $pid );
                 if ( defined $threads[0]->{frames} ) {
                     my @frames = @{ $threads[0]->{frames} };
 
@@ -5914,12 +5921,11 @@ sub show_clever_full_stack {
     my ( $vp, $pid ) = @_;
 
     my $gdb = gdb_start();
-    kill( "CONT", $pid );
+
     if ( gdb_attach( $gdb, $pid ) ) {
         my @threads = gdb_dump_frames_per_thread( $gdb, 1 );
         gdb_detach($gdb);
         gdb_quit($gdb);
-        kill( "CONT", $pid );
 
         foreach my $thread ( sort { $a->{id} <=> $b->{id} } @threads ) {
             my @frames = @{ $thread->{frames} };
@@ -6061,7 +6067,6 @@ sub mpi_watch_all {
         my $vp  = $proc->{vp};
         my $pid = $proc->{pid};
         my $gdb = gdb_start();
-        kill( "CONT", $pid );
         if ( gdb_attach( $gdb, $pid ) ) {
             $proc->{gdb} = $gdb;
         } else {
