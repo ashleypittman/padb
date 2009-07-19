@@ -4040,7 +4040,7 @@ sub outer_main {
         map { $sig_names{$_} = 1 } split( " ", $Config{"sig_name"} );
 
         if ( not defined $sig_names{$signal} ) {
-            cmdline_error("$prog: Error: signal $signal is invalid\n");
+            cmdline_error("$prog: Error: signal \"$signal\" is invalid\n");
         }
     }
 
