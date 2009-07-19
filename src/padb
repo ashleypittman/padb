@@ -369,10 +369,8 @@ my %cinner;    # Config options to be passed to inner.
 my $rem_jobid;
 
 # Debug options.
-$conf{"verbose"}      = 0;
-$conf{"tree-verbose"} = 0;
-$conf{"dump-raw"}     = 0;
-$conf{"showcmd"}      = 0;
+$conf{"verbose"}  = 0;
+$conf{"dump-raw"} = 0;
 
 # Valid values are "none" "missing" or "all".  Anything not recognised
 # is treated as "all".
@@ -386,7 +384,6 @@ $conf{"watch-clears-screen"} = 1;
 $conf{"scripts"}             = "bash,sh,dash,ash,perl,xterm";
 $conf{"lsf-job-offset"}      = 1;
 $conf{"local-fd-name"}       = "/dev/null";
-$conf{"full-duplex"}         = 1;
 $conf{"inner-callback"}      = 0;
 
 # These two are used by deadlock and QsNet group
@@ -479,7 +476,6 @@ XXXX
   prun-timeout         Timeout to use when launching parallel job.
 
   Stack trace options:
-  tree-verbose         turn on debugging for the stack trace tree generation code.
   gdb-retry-count      Number of times to try getting a 'good' stack trace from gdb.
   stack-show-params    Show function parameters in stack traces.
   stack-show-locals    Show locals in stack traces.
@@ -579,10 +575,38 @@ my %ic_names;
 # can access secondary comamnd line argunments by name.
 my %secondary_args;
 
+# Debugging: this function is called periodically with
+# a mode, an abritary ref and a string, it can either print simply
+# the string or call dumper on the ref as well.
+# Enable with --debug=type1,type2=all
+my %debugModes;
+my $start_time = time();
+
+sub debug_log {
+    my ( $type, $handle, $str, @params ) = @_;
+    if ( not defined $debugModes{$type} ) {
+        printf("Unknown debug mode: $type\n");
+        exit(1);
+    }
+    return unless $debugModes{$type};
+    my $time = time() - $start_time;
+    printf( "DEBUG ($type): %3d: $str\n", $time, @params );
+    return if $debugModes{$type} eq "basic";
+    return unless defined $handle;
+    print Dumper $handle;
+}
+
+# Valid debug modes, a full list is maintained here so using unexpected
+# ones can generate warnings.
+$debugModes{"full-duplex"} = 0;
+$debugModes{"show-cmd"}    = 0;
+$debugModes{"all"}         = 0;
+$debugModes{"tree"}        = 0;
+
 sub parse_args_outer {
 
     Getopt::Long::Configure("bundling");
-    my $mode;
+    my $debugflag;
 
     my %optionhash = (
         "verbose|v+"          => \$conf{verbose},
@@ -607,7 +631,8 @@ sub parse_args_outer {
         "local-stats"         => \$local_stats,
         "show-jobs"           => \$show_jobs,
         "norc"                => \$norc,
-        "config-file=s"       => \$configfile
+        "config-file=s"       => \$configfile,
+        "debug=s"             => \$debugflag,
     );
 
     my %config_hash;
@@ -628,6 +653,24 @@ sub parse_args_outer {
     }
 
     GetOptions(%optionhash) or exit(1);
+
+    if ( defined $debugflag ) {
+        foreach my $f ( split( ",", $debugflag ) ) {
+            my ( $name, $v ) = split( "=", $f );
+            if ( defined $debugModes{$name} ) {
+                $debugModes{$name} = defined($v) ? $v : "basic";
+            } else {
+                printf("Attempt to set unknown debug flag \"$name\".\n");
+            }
+        }
+        if ( $debugModes{all} ) {
+            foreach my $mode ( keys(%debugModes) ) {
+                $debugModes{$mode} = $debugModes{all};
+            }
+        }
+    }
+
+    my $mode;
 
     foreach my $arg ( keys %config_hash ) {
         next unless defined $config_hash{$arg};
@@ -1808,8 +1851,7 @@ sub go_p {
     my $prev;
     my $tag = $tags[0];
 
-    printf("called tag:$tag, level:$level tags:@tags\n")
-      if $conf{"tree-verbose"};
+    debug_log( "tree", undef, "called tag:$tag, level:$level tags:@tags" );
 
     return if ( !defined($tag) );
     return if ( !defined( $lines->{$tag} ) );
@@ -1868,9 +1910,11 @@ sub go_p {
         $endlevel = ( $#{ $lines->{$tag} } );
     }
 
-    printf(
-"level $level, endlevel $endlevel, identical:@identical different:@different\n",
-    ) if $conf{"tree-verbose"};
+    debug_log(
+        "tree", undef,
+
+"level $level, endlevel $endlevel, identical:@identical different:@different"
+    );
 
     for ( my $l = $level ; $l <= $endlevel ; $l++ ) {
 
@@ -1898,9 +1942,11 @@ sub go_p {
         $prev->{children} = go_p( $endlevel + 1, $lines, @identical );
     }
 
-    printf(
-"returning level:$level endlevel:$endlevel identical:@identical different:@different\n"
-    ) if $conf{"tree-verbose"};
+    debug_log(
+        "tree", undef,
+
+"returning level:$level endlevel:$endlevel identical:@identical different:@different"
+    );
 
     if (@different) {
         my $new = go_p( $level, $lines, @different );
@@ -1942,6 +1988,7 @@ sub _show_tree {
 
 sub show_tree {
     my $ref = shift;
+    debug_log( "tree", $ref, "Complete tree" );
     return _show_tree( $ref, undef, "" );
 }
 
@@ -3195,11 +3242,8 @@ sub connect_to_children {
 sub issue_command_to_inner {
     my ( $cdata, $cmd ) = @_;
     my $str = my_encode($cmd);
-    if ( $conf{"full-duplex"} eq "debug" ) {
-        printf( "Sending command to inner, %d bytes\n", length($str) );
-        print( Dumper($cmd) );
-
-    }
+    debug_log( "full-duplex", $cmd, "Sending command to inner, %d bytes",
+        length($str) );
     $cdata->{socket}->print("$str\n");
 }
 
@@ -3357,10 +3401,7 @@ sub command_from_inner {
     # A reply from inner.
     my $d = my_decode($line);
 
-    if ( $conf{"full-duplex"} eq "debug" ) {
-        printf( "Reply from inner, %d bytes\n", length($line) );
-        print( Dumper($d) );
-    }
+    debug_log( "full-duplex", $d, "Reply from inner, %d bytes", length($line) );
 
     # The inner process has signed on.
     if ( $comm_data->{current_req}->{mode} eq "signon" ) {
@@ -3710,7 +3751,7 @@ sub go_job {
 
     #}
 
-    ( $conf{"verbose"} > 1 or $conf{"showcmd"} ) && print "$cmd\n";
+    debug_log( "show-cmd", undef, $cmd );
 
     if ( not defined $hosts ) {
         printf("Full duplex mode needs to know the host count\n");
