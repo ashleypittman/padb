@@ -584,7 +584,7 @@ my $start_time = time();
 
 sub debug_log {
     my ( $type, $handle, $str, @params ) = @_;
-    if ( not defined $debugModes{$type} ) {
+    if ( not exists $debugModes{$type} ) {
         printf("Unknown debug mode: $type\n");
         exit(1);
     }
@@ -598,10 +598,12 @@ sub debug_log {
 
 # Valid debug modes, a full list is maintained here so using unexpected
 # ones can generate warnings.
-$debugModes{"full-duplex"} = 0;
-$debugModes{"show-cmd"}    = 0;
-$debugModes{"all"}         = 0;
-$debugModes{"tree"}        = 0;
+$debugModes{"full-duplex"} = undef;
+$debugModes{"show-cmd"}    = undef;
+$debugModes{"all"}         = undef;
+$debugModes{"tree"}        = undef;
+$debugModes{"verbose"}     = undef;
+$debugModes{"signon"}      = undef;
 
 sub parse_args_outer {
 
@@ -657,7 +659,7 @@ sub parse_args_outer {
     if ( defined $debugflag ) {
         foreach my $f ( split( ",", $debugflag ) ) {
             my ( $name, $v ) = split( "=", $f );
-            if ( defined $debugModes{$name} ) {
+            if ( exists $debugModes{$name} ) {
                 $debugModes{$name} = defined($v) ? $v : "basic";
             } else {
                 printf("Attempt to set unknown debug flag \"$name\".\n");
@@ -3216,6 +3218,9 @@ sub generate_comm_tree {
 # Called once when we have the socket details of the last child.
 sub connect_to_children {
     my $comm_data = shift;
+
+    debug_log( "signon", undef, "Received last signon, connecting to inner" );
+
     @{ $comm_data->{host_ids} } = sort( keys( %{ $comm_data->{remote} } ) );
     $comm_data->{connection_tree} =
       generate_comm_tree( $comm_data->{host_ids} );
@@ -3729,6 +3734,9 @@ sub go_job {
     $conf{"verbose"} && defined $ncpus && print "Job has $ncpus processe(s)\n";
     $conf{"verbose"} && defined $hosts && print "Job spans $hosts host(s)\n";
 
+    debug_log( "verbose", undef,
+        "There are $ncpus processes over $hosts hosts" );
+
   # Maybe do it this way, edb works best when run with the same LD_LIBRARY_PATH
   # as the application.  It's very important when running the message queue
   # extraction code but less so here.  You may find you get linker errors though
@@ -3759,6 +3767,9 @@ sub go_job {
         return 1;
     }
     my $errors = go_parallel( $jobid, $cmd, $ncpus, $hosts );
+
+    debug_log( "verbose", undef, "Completed command" );
+
     cleanup_pcmd();
     return $errors;
 }
@@ -6824,52 +6835,63 @@ sub inner_loop_for_comms {
 
     my $sel = $netdata->{sel};
 
-    while ( my @data = $sel->can_read() ) {
-        foreach my $s (@data) {
-            if ( $s == $server ) {
-                my $new = $server->accept() or die("Failed accept");
-                $sel->add($new);
-                my $peer = getpeername($new);
-                my ( $port, $addr ) = unpack_sockaddr_in($peer);
-                my $ip = inet_ntoa($addr);
-                my $hostname = gethostbyaddr( $addr, AF_INET );
+    my $stime = time();
 
-                #printf "New connection from $hostname ($ip) $port\n";
-                my %sinfo;
-                $sinfo{hostname}              = $hostname;
-                $sinfo{trusted}               = 0;
-                $sinfo{port}                  = $port;
-                $sinfo{desc}                  = "$hostname:$port";
-                $sinfo{socket}                = $new;
-                $sinfo{line_cb}               = \&command_from_outer;
-                $netdata->{connections}{$new} = \%sinfo;
+    while ( $sel->count() > 0 ) {
+        while ( my @data = $sel->can_read(5) ) {
+            foreach my $s (@data) {
+                if ( $s == $server ) {
+                    my $new = $server->accept() or die("Failed accept");
+                    $sel->add($new);
+                    my $peer = getpeername($new);
+                    my ( $port, $addr ) = unpack_sockaddr_in($peer);
+                    my $ip = inet_ntoa($addr);
+                    my $hostname = gethostbyaddr( $addr, AF_INET );
 
-                # $new->printf("Hello from padb\n");
-                #$new->autoflush();
-                next;
-            }
+                    #printf "New connection from $hostname ($ip) $port\n";
+                    my %sinfo;
+                    $sinfo{hostname}              = $hostname;
+                    $sinfo{trusted}               = 0;
+                    $sinfo{port}                  = $port;
+                    $sinfo{desc}                  = "$hostname:$port";
+                    $sinfo{socket}                = $new;
+                    $sinfo{line_cb}               = \&command_from_outer;
+                    $netdata->{connections}{$new} = \%sinfo;
 
-            my $sinfo = $netdata->{connections}{$s};
-            my $d;
-            my $count = sysread( $s, $d, 65536 );
-
-            # Dead connection.
-            if ( not defined $d or $count eq 0 ) {
-
-                # printf("null read from $sinfo->{desc}\n");
-                if ( eof($s) ) {
-                    $sel->remove($s);
-                    $s->close();
-                    $sinfo->{trusted} = 0;
-                    $sinfo->{dead}    = 1;
-                    my $scount = $sel->count();
+                    # $new->printf("Hello from padb\n");
+                    #$new->autoflush();
+                    next;
                 }
-                next;
+
+                my $sinfo = $netdata->{connections}{$s};
+                my $d;
+                my $count = sysread( $s, $d, 65536 );
+
+                # Dead connection.
+                if ( not defined $d or $count eq 0 ) {
+
+                    # printf("null read from $sinfo->{desc}\n");
+                    if ( eof($s) ) {
+                        $sel->remove($s);
+                        $s->close();
+                        $sinfo->{trusted} = 0;
+                        $sinfo->{dead}    = 1;
+                        my $scount = $sel->count();
+                    }
+                    next;
+                }
+
+                $sinfo->{str} .= $d;
+                extract_line( $netdata, $sinfo );
+
             }
+        }
+        my $time = time();
 
-            $sinfo->{str} .= $d;
-            extract_line( $netdata, $sinfo );
-
+       # Should probably handle this better, if the outer or tree never signons
+       # for whatever reason silently die as it's probably the best thing do to.
+        if ( ( $sel->count() == 1 ) and ( ( $time - $stime ) > 30 ) ) {
+            exit(0);
         }
     }
     my $count = $sel->count();
