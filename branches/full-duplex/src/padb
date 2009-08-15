@@ -7074,7 +7074,7 @@ sub common_main {
             "stack-shows-locals" => 0,
             "gdb-retry-count"    => 3,
             "stack-strip-above" =>
-"elan_waitWord,elan_pollWord,elan_deviceCheck,opal_condition_wait",
+"elan_waitWord,elan_pollWord,elan_deviceCheck,opal_condition_wait,opal_progress",
             "stack-strip-below" => "main",
         },
         'secondary' => [
