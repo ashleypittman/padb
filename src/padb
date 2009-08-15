@@ -5790,6 +5790,7 @@ sub show_vars {
     my %l;
     $l{t} = 0;
     $l{n} = 0;
+    return unless defined ( $frame->{$type} );
     return if ( @{ $frame->{$type} } == 0 );
     foreach my $arg ( @{ $frame->{$type} } ) {
         $l{t} = length( $arg->{type} ) if ( length( $arg->{type} ) > $l{t} );
