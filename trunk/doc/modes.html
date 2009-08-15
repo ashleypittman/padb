@@ -134,34 +134,34 @@ at the top to facilitate the tree view shown here.
 <tr><td>
 <pre>
 -----------------
-[0-5] (6 processes)
+[0-1] (2 processes)
 -----------------
-main() at bench/tping.c:2306
-  -----------------
-  [0-1,4] (3 processes)
-  -----------------
-  timed_ping() at bench/tping.c:345
-    elan_tportRxWait() at elan4/tportRx.c:1194
-      _elan_tportRxWait() at elan4/tportRx.c:1053
-      elan_pollWord() at common/progress.c:144
-  -----------------
-  [2-3,5] (3 processes)
-  -----------------
-    timed_ping() at bench/tping.c:340
-      elan_tportTxWait() at elan4/tportTx.c:940
-        elan_wait() at common/events.c:288
-          _elan_tportTxWait() at elan4/tportTx.c:920
-            elan_waitWord() at common/progress.c:819
+main() at IMB.c:262
+  IMB_init_buffers_iter() at IMB_mem_manager.c:798
+    -----------------
+    0 (1 processes)
+    -----------------
+    IMB_pingpong() at IMB_pingpong.c:170
+      PMPI_Recv() at ?:?
+        mca_pml_ob1_recv() at ?:?
+          opal_progress() at ?:?
+    -----------------
+    1 (1 processes)
+    -----------------
+    IMB_pingpong() at IMB_pingpong.c:194
+      PMPI_Recv() at ?:?
+        mca_pml_ob1_recv() at ?:?
+          opal_progress() at ?:?
 -----------------
-6 (1 processes)
+[2-15] (14 processes)
 -----------------
-main() at bench/tping.c:2362
-  elan_gsync() at elan4/groupGsync.c:149
-    elan_gsyncShm() at elan4/groupGsync.c:464
-      elan_gsyncNet() at elan4/groupGsync.c:99
-        elan_gsyncGeneric() at elan4/groupGsync.c:76
-          _elan_aeventWait() at elan4/devent.c:361
-            elan_deviceCheck() at common/progress.c:847
+main() at IMB.c:276
+  PMPI_Barrier() at ?:?
+    ompi_coll_tuned_barrier_intra_dec_fixed() at ?:?
+      ompi_coll_tuned_barrier_intra_recursivedoubling() at ?:?
+        ompi_coll_tuned_sendrecv_actual() at ?:?
+          ompi_request_default_wait_all() at ?:?
+            opal_progress() at ?:?
 </pre>
 </tr></td>
 </table>
