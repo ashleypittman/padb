@@ -5790,7 +5790,7 @@ sub show_vars {
     my %l;
     $l{t} = 0;
     $l{n} = 0;
-    return unless defined ( $frame->{$type} );
+    return unless defined( $frame->{$type} );
     return if ( @{ $frame->{$type} } == 0 );
     foreach my $arg ( @{ $frame->{$type} } ) {
         $l{t} = length( $arg->{type} ) if ( length( $arg->{type} ) > $l{t} );
@@ -5931,6 +5931,12 @@ sub kill_proc {
     my ( $cargs, $vp, $pid ) = @_;
     my $signal = uc( $cargs->{signal} );
     kill( $signal, $pid );
+    return;
+}
+
+sub ping_rank {
+    my ( $cargs, $vp, $pid ) = @_;
+    output( $vp, "ACK" );
     return;
 }
 
@@ -7110,6 +7116,12 @@ sub common_main {
             "mpi-dll"        => undef,
             "mpi-watch-file" => undef
         }
+    };
+
+    $allfns{ping} = {
+        'handler'  => \&ping_rank,
+        'arg_long' => 'ping',
+        'help'     => "Internal ping",
     };
 
     $allfns{set_debug} = {
