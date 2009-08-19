@@ -319,11 +319,12 @@ $rmgr{"lsf-rms"} = {
 };
 
 $rmgr{"slurm"} = {
-    'is_installed'    => \&slurm_is_installed,
-    'get_active_jobs' => \&slurm_get_jobs,
-    'job_is_running'  => \&slurm_job_is_running,
-    'setup_pcmd'      => \&slurm_setup_pcmd,
-    'find_pids'       => \&slurm_find_pids,
+    'is_installed'           => \&slurm_is_installed,
+    'get_active_jobs'        => \&slurm_get_jobs,
+    'job_is_running'         => \&slurm_job_is_running,
+    'setup_pcmd'             => \&slurm_setup_pcmd,
+    'find_pids'              => \&slurm_find_pids,
+    'require_inner_callback' => 1,
 };
 
 $rmgr{"local"} = {
@@ -396,6 +397,8 @@ $conf{"inner-callback"}      = 0;
 $conf{"prun-timeout"}     = 120;
 $conf{"prun-exittimeout"} = 120;
 $conf{"rmgr"}             = "auto";
+
+$conf{"slurm-job-step"} = 0;
 
 # These settings are passed onto inner only.
 $conf{"edbopt"} = "";
@@ -604,6 +607,7 @@ $debugModes{"all"}         = undef;
 $debugModes{"tree"}        = undef;
 $debugModes{"verbose"}     = undef;
 $debugModes{"signon"}      = undef;
+$debugModes{"rmgr"}        = undef;
 
 sub parse_args_outer {
 
@@ -2207,6 +2211,21 @@ sub slurm_job_to_ncpus {
     return undef;
 }
 
+sub slurm_job_to_nodelist {
+    my $job   = shift;
+    my @steps = `squeue -s -o "%i %N" 2>/dev/null`;
+    return undef if ( $? != 0 );
+
+    my $hosts;
+    my $s = "$job." . $conf{"slurm-job-step"};
+    foreach my $step (@steps) {
+        my ( $left, $right ) = split( " ", $step );
+        $hosts = $right if ( $left eq $s );
+
+    }
+    return $hosts;
+}
+
 sub slurm_job_is_running {
     my $job    = shift;
     my $status = lc `squeue -h -j $job -o "%T"`;
@@ -2215,9 +2234,11 @@ sub slurm_job_is_running {
 }
 
 sub slurm_setup_pcmd {
-    my $job  = shift;
-    my $cpus = slurm_job_to_ncpus($job);
-    return ( "srun --jobid=$job", $cpus );
+    my $job   = shift;
+    my $cpus  = slurm_job_to_ncpus($job);
+    my @nodes = slurm_job_to_nodelist($job);
+    my $nc    = $#nodes + 1;
+    return ( "srun --jobid=$job", $cpus, $nc );
 }
 
 ###############################################################################
@@ -2720,6 +2741,7 @@ sub find_any_rmgr {
 
 sub get_all_jobids {
     my $user = shift;
+    debug_log( "rmgr", undef, "Loading active jobs list", undef );
     return $rmgr{ $conf{"rmgr"} }{get_active_jobs}($user);
 }
 
@@ -3683,6 +3705,7 @@ sub find_padb_secret {
     # Check that the file is mode 100600 (Octal)
     if ( $mode != 33152 ) {
         printf("Wrong permissions on secret file, should be 0600 ($file)\n");
+        exit(1);
     }
 
     open( SFD, $file ) or return;
