@@ -2193,15 +2193,20 @@ sub slurm_get_jobs {
     return @res;
 }
 
+# Query the process count for the "step" as that's how many
+# processes we are going to be looking for.
 sub slurm_job_to_ncpus {
     my $job   = shift;
-    my @steps = `squeue -s -o "%i %A" 2>/dev/null`;
+    my $s     = "$job." . $conf{"slurm-job-step"};
+    my @steps = `squeue -s $s -o "%i %A" 2>/dev/null`;
     return undef if ( $? != 0 );
 
-# The %A option is new so ensure we have the TASKS output before we believe what we see here...
+    # The %A option is new so ensure we have the TASKS output
+    # before we believe what we see here...
+    # Mind you %A is several years old now so if it's not there
+    # we probably can't do anything anyway.
     my $tasks;
     my $have_tasks = 0;
-    my $s          = "$job." . $conf{"slurm-job-step"};
     foreach my $step (@steps) {
         my ( $step, $cpus ) = split( " ", $step );
         $tasks      = $cpus if ( $step eq $s );
@@ -2211,19 +2216,35 @@ sub slurm_job_to_ncpus {
     return undef;
 }
 
-sub slurm_job_to_nodelist {
-    my $job   = shift;
-    my @steps = `squeue -s -o "%i %N" 2>/dev/null`;
+# Query the nodecount for the "job" as that is what we shall be running on.
+sub slurm_job_to_nodecount {
+    my $job  = shift;
+    my @jobs = `squeue -o "%i %D" 2>/dev/null`;
     return undef if ( $? != 0 );
 
-    my $hosts;
-    my $s = "$job." . $conf{"slurm-job-step"};
+    foreach my $step (@jobs) {
+        my ( $left, $right ) = split( " ", $step );
+        return $right if ( $left eq $job );
+    }
+    return undef;
+}
+
+# Query the node list for the "step" which isn't the same as the node list
+# for the job, care should be taken if using this function to ensure this
+# is correct.
+# This functions isn't used currently.
+sub slurm_job_to_nodelist {
+    my $job   = shift;
+    my $s     = "$job." . $conf{"slurm-job-step"};
+    my @steps = `squeue -s $s -o "%i %N" 2>/dev/null`;
+    return undef if ( $? != 0 );
+
     foreach my $step (@steps) {
         my ( $left, $right ) = split( " ", $step );
-        $hosts = $right if ( $left eq $s );
+        return $right if ( $left eq $s );
 
     }
-    return $hosts;
+    return undef;
 }
 
 sub slurm_job_is_running {
@@ -2234,10 +2255,9 @@ sub slurm_job_is_running {
 }
 
 sub slurm_setup_pcmd {
-    my $job   = shift;
-    my $cpus  = slurm_job_to_ncpus($job);
-    my @nodes = slurm_job_to_nodelist($job);
-    my $nc    = $#nodes + 1;
+    my $job  = shift;
+    my $cpus = slurm_job_to_ncpus($job);
+    my $nc   = slurm_job_to_nodecount($job);
     return ( "srun --jobid=$job", $cpus, $nc );
 }
 
@@ -6318,7 +6338,7 @@ sub slurm_get_ids {
     foreach my $proc (@procs) {
         my ( $pid, $job, $step, $local, $global ) = split( " ", $proc );
         next if ( $global eq "-" );
-        next unless ( $job == $jobid );
+        next unless ( $job eq $jobid );
         next unless ( $step == $confInner{"slurm-job-step"} );
         $gids{$pid} = $global;
     }
@@ -6380,16 +6400,19 @@ sub slurm_find_pids {
 
         if (%gids) {
             $vp = vp_from_pid( \%gids, \%resmgr, $pid );
-            debug $vp, "Found $vp from $pid using scontrol listpids";
+
+            # debug $vp, "Found $vp from $pid using scontrol listpids";
         }
 
         if ( not defined $vp ) {
             my %env = get_remote_env($pid);
 
-            debug undef,
+            if (0) {
+                debug undef,
 "Checking slurm pid: $pid, job $env{SLURM_JOBID}, step $env{SLURM_STEPID}, proc $env{SLURM_PROCID}, script $script";
-            debug undef,
+                debug undef,
 "Checking  rms  pid: $pid, job $env{RMS_JOBID}, proc $env{RMS_PROCID}, script $script";
+            }
 
             if ( $env{SLURM_JOBID} eq $jobid ) {
                 if ( $env{SLURM_STEPID} eq $confInner{"slurm-job-step"} ) {
@@ -6938,6 +6961,7 @@ sub inner_main {
     $confInner{"edb"}            = find_edb();
     $confInner{"minfo"}          = find_minfo();
     $confInner{"hostname"}       = hostname();
+    $confInner{"scripts"}        = "bash,sh,dash,ash,perl,xterm";
 
     # Local vars to help with command line parsing
     my $outerloc;
