@@ -1857,7 +1857,8 @@ sub go_p {
     my $prev;
     my $tag = $tags[0];
 
-    debug_log( "tree", undef, "called tag:$tag, level:$level tags:@tags" );
+    debug_log( "tree", \@tags, "called tag:%s, level:%d",
+	$tag, $level );
 
     return if ( !defined($tag) );
     return if ( !defined( $lines->{$tag} ) );
@@ -2761,7 +2762,7 @@ sub find_any_rmgr {
 
 sub get_all_jobids {
     my $user = shift;
-    debug_log( "rmgr", undef, "Loading active jobs list", undef );
+    debug_log( "rmgr", undef, "Loading active jobs list" );
     return $rmgr{ $conf{"rmgr"} }{get_active_jobs}($user);
 }
 
@@ -3778,7 +3779,7 @@ sub go_job {
     $conf{"verbose"} && defined $hosts && print "Job spans $hosts host(s)\n";
 
     debug_log( "verbose", undef,
-        "There are $ncpus processes over $hosts hosts" );
+        "There are %d processes over %d hosts", $ncpus, $hosts );
 
   # Maybe do it this way, edb works best when run with the same LD_LIBRARY_PATH
   # as the application.  It's very important when running the message queue
