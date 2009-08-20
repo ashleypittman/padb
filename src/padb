@@ -36,6 +36,12 @@
 #    global conf options.
 #  * Overhaul of the allfns (mode) callbacks and in particular their parameters
 #  * Performance improvements.
+#  * Simplify the slurm_find_pids() function to just return the output
+#    of scontrol listpids
+#  * Take the old process-tree walking code from slurm_find_pids() and make
+#    it independant and call it for all resource managers.  This allows scripts
+#    which call parallel applications to be bypassed and the applications
+#    themselves targetted.
 #
 # Version 2.5
 #  * First Non-Quadrics version
@@ -183,11 +189,6 @@
 # * Multi-pass argument handling, --kill also accepts --signal for example,
 #   this should really be done at the getopt layer.  Also proper usage
 #   info for these secondary args.
-# * slurm_find_pids() has some good code in it for finding parallel processes
-#   this should be extrapolated out and so it can be used in the mpd case,
-#   ideally on non-rms systems (RMS rocks in this regard) the rmgr callback
-#   should return a list of spawned pids and the code in slurm_find_pids() should
-#   pass this tree to find the most interesting one.
 # * The mode {handler} functions should only be called once per node, it could then
 #   correctly handle $confInner{gdb_file} and also attach to every process per node
 #   simultaneously, this would help stack trace and message queue support as doing
@@ -1857,8 +1858,7 @@ sub go_p {
     my $prev;
     my $tag = $tags[0];
 
-    debug_log( "tree", \@tags, "called tag:%s, level:%d",
-	$tag, $level );
+    debug_log( "tree", \@tags, "called tag:%s, level:%d", $tag, $level );
 
     return if ( !defined($tag) );
     return if ( !defined( $lines->{$tag} ) );
@@ -3778,8 +3778,8 @@ sub go_job {
     $conf{"verbose"} && defined $ncpus && print "Job has $ncpus processe(s)\n";
     $conf{"verbose"} && defined $hosts && print "Job spans $hosts host(s)\n";
 
-    debug_log( "verbose", undef,
-        "There are %d processes over %d hosts", $ncpus, $hosts );
+    debug_log( "verbose", undef, "There are %d processes over %d hosts",
+        $ncpus, $hosts );
 
   # Maybe do it this way, edb works best when run with the same LD_LIBRARY_PATH
   # as the application.  It's very important when running the message queue
@@ -6194,11 +6194,7 @@ sub maybe_show_pid {
 
     debug( $vp, "maybe_show_pid vp $vp, pid: $pid" );
 
-    my %d;
-    $d{vp}  = $vp;
-    $d{pid} = $pid;
-    push( @{ $confInner{"all-pids"} }, \%d );
-
+    $confInner{rmpids}{$pid}{rank} = $vp;
 }
 
 sub find_from_status {
@@ -6224,56 +6220,10 @@ sub is_resmgr_process {
     return 1 if ( defined $mgrs->{$name} );
 }
 
-sub is_pid_script {
-    my $pid = shift;
-    my $exe = readlink("/proc/$pid/exe");
-    my $cmd;
-    if ( defined $exe ) {
-        $cmd = basename($exe);
-    } else {
-        $cmd = find_from_status( $pid, "Name" );
-    }
-    my %scripts;
-    map { $scripts{$_}++ } split( ",", $confInner{"scripts"} );
-    return 1 if ( defined $scripts{$cmd} );
-    return 0;
-}
-
-sub is_desc_of_resmgr {
-    my $resmgrs = shift;
-    my $pid     = shift;
-
-    my $ppid = find_from_status( $pid, "PPid" );
-
-    while ( defined $ppid and $ppid != 1 ) {
-        return 1 if ( defined $resmgrs->{$ppid} );
-        $ppid = find_from_status( $ppid, "PPid" );
-    }
-
-    return 0;
-}
-
-sub vp_from_pid {
-    my $gids    = shift;
-    my $resmgrs = shift;
-    my $pid     = shift;
-
-    return $gids->{$pid} if ( defined $gids->{$pid} );
-
-    my $ppid = find_from_status( $pid, "PPid" );
-
-    while ( defined $ppid and $ppid != 1 ) {
-        return $gids->{$ppid} if ( defined $gids->{$ppid} );
-        return undef if ( defined $resmgrs->{$ppid} );
-        $ppid = find_from_status( $ppid, "PPid" );
-    }
-    return undef;
-}
-
-sub slurm_get_ids {
+# Report the pids as reported by slurm, don't worry about tracing children or
+# anything at this stage.
+sub slurm_find_pids {
     my $jobid = shift;
-
-    my %gids;
 
     my @procs =
       `scontrol listpids $jobid.$confInner{"slurm-job-step"} 2>/dev/null`;
@@ -6283,106 +6233,7 @@ sub slurm_get_ids {
         next if ( $global eq "-" );
         next unless ( $job eq $jobid );
         next unless ( $step == $confInner{"slurm-job-step"} );
-        $gids{$pid} = $global;
-    }
-    return %gids;
-}
-
-# Do the right thing with slurm...
-sub slurm_find_pids {
-    my $jobid = shift;
-
-    # Slurm has the concept of a "job" and a "job step" which are
-    # roughly analogous to "resource" and "job" in RMS terms,
-    # the difference being that steps within a job are counted
-    # from 0 in slurm whereas there is a global job namespace in
-    # RMS.
-    # Therefore padb *has* to target slurm jobs as they have the only
-    # globally unique identifier.  You can use
-    # -Oslurm-job-step=<step> to target individual job steps within
-    # a job however.
-
-    # Modern slurm systems have a scontol listpids option which we use however
-    # older systems require a little more legwork and aren't precise.
-
-    # These are the key variables...
-    # SLURM_JOBID=1234
-    # SLURM_STEPID=0
-    # RMS_RESOURCE=1234  (Not needed)
-    # RMS_JOBID=5678
-
-    # SLURM_JOBID
-    # RMS_JOBID
-
-    my %gids = slurm_get_ids($jobid);
-
-    opendir( DIR, "/proc/" );
-    my @pids = readdir(DIR);
-    closedir(DIR);
-
-    my %resmgr;    # All processes which are resource managers.
-
-    foreach my $pid (@pids) {
-        next unless ( $pid =~ /^\d+$/ );
-        if ( is_resmgr_process($pid) ) {
-            $resmgr{$pid} = find_from_status( $pid, "Name" );
-        }
-    }
-
-    my %pjobs;     # All parallel jobs (children of resource managers).;
-
-    foreach my $pid (@pids) {
-        next unless ( $pid =~ /^\d+$/ );
-
-        # Skip over this process unless it's spawned from a resource manager.
-        next unless is_desc_of_resmgr( \%resmgr, $pid );
-
-        my $script = is_pid_script($pid);
-
-        my $vp;
-
-        if (%gids) {
-            $vp = vp_from_pid( \%gids, \%resmgr, $pid );
-
-            # debug $vp, "Found $vp from $pid using scontrol listpids";
-        }
-
-        if ( not defined $vp ) {
-            my %env = get_remote_env($pid);
-
-            if (0) {
-                debug undef,
-"Checking slurm pid: $pid, job $env{SLURM_JOBID}, step $env{SLURM_STEPID}, proc $env{SLURM_PROCID}, script $script";
-                debug undef,
-"Checking  rms  pid: $pid, job $env{RMS_JOBID}, proc $env{RMS_PROCID}, script $script";
-            }
-
-            if ( $env{SLURM_JOBID} eq $jobid ) {
-                if ( $env{SLURM_STEPID} eq $confInner{"slurm-job-step"} ) {
-                    $vp = $env{SLURM_PROCID};
-                }
-            } elsif ( $env{RMS_JOBID} eq $jobid ) {
-                $vp = $env{RMS_PROCID};
-            }
-        }
-
-        next unless ( defined $vp );
-
-        # Ignore bash/sh/perl wrappers.
-        next if $script;
-
-        push( @{ $pjobs{$vp} }, $pid );
-
-    }
-
-    foreach my $vp ( keys(%pjobs) ) {
-
-        # If there are multiple possible processes then target each of them,
-        # this is possibly wrong and suggestions for handling this better are
-        # welcome.
-        foreach my $pid ( @{ $pjobs{$vp} } ) {
-            maybe_show_pid( $vp, $pid );
-        }
+        maybe_show_pid( $global, $pid );
     }
 }
 
@@ -6589,6 +6440,98 @@ sub reply_from_child {
     $handle->{target_responce} = undef;
 }
 
+# Convert from a pid to a command name and do it in a safe manner to avoid
+# warnings.  suid programs tend to have the exe link which is un-readable
+# so if that yeilds nothing then load the name from the status file.
+sub pid_to_name {
+    my $pid = shift;
+    my $exe = readlink("/proc/$pid/exe");
+    my $cmd;
+    if ( defined $exe ) {
+        return basename($exe);
+    } else {
+        return find_from_status( $pid, "Name" );
+    }
+}
+
+# Take the resource manager list of pids and possibly convert these into
+# more interesting pids, in particular look for pids which appear to be
+# scripts and, if they have any children, look at the children instead.
+sub convert_pids_to_child_pids {
+
+    opendir( DIR, "/proc/" );
+    my @pids = readdir(DIR);
+    closedir(DIR);
+
+    my $uid = $<;
+
+    my %scripts;
+    map { $scripts{$_}++ } split( ",", $confInner{"scripts"} );
+
+    my $ipids = $confInner{rmpids};
+
+    foreach my $pid (@pids) {
+
+        # Ignore entries that aren't numeric.
+        next unless ( $pid =~ /^\d+$/ );
+
+        # Ignore processes with the wrong ownership.
+        my ( undef, undef, undef, undef, $owner ) = stat("/proc/$pid");
+        next unless $owner == $uid;
+
+        # The resource manager pid this pid is associated with.
+        my $rmpid;
+
+        if ( defined $ipids->{$pid} ) {
+            $rmpid = $pid;
+        } else {
+            my $ppid = find_from_status( $pid, "PPid" );
+
+            while ( defined $ppid and $ppid != 1 ) {
+                if ( defined $ipids->{$ppid} ) {
+                    $rmpid = $ppid;
+                    $ppid  = undef;
+                } else {
+                    $ppid = find_from_status( $ppid, "PPid" );
+                }
+            }
+        }
+
+        next unless defined $rmpid;
+
+        if ( defined( $scripts{ pid_to_name($pid) } ) ) {
+            push( @{ $ipids->{$rmpid}{scripts} }, $pid );
+        } else {
+            push( @{ $ipids->{$rmpid}{notscripts} }, $pid );
+        }
+    }
+
+    # Now chose what pid to target.
+    foreach my $key ( keys( %{$ipids} ) ) {
+        my $ip = $ipids->{$key};
+
+        my $newpid;
+
+        if ( defined( $ip->{scripts} ) ) {
+            my @ppids = sort( @{ $ip->{scripts} } );
+            $newpid = $ppids[0];
+        }
+
+        # If there are any pids which aren't scripts then target the
+        # first one.
+        if ( defined( $ip->{notscripts} ) ) {
+            my @ppids = sort( @{ $ip->{notscripts} } );
+            $newpid = $ppids[0];
+        }
+        my %pd;
+        $pd{pid} = $newpid;
+        $pd{vp}  = $ip->{rank};
+        push( @{ $confInner{"all-pids"} }, \%pd );
+
+    }
+
+}
+
 # Find and report pids as part of the signon protocol, we should
 # also report name
 sub inner_find_pids {
@@ -6601,8 +6544,11 @@ sub inner_find_pids {
         $confInner{"orte-data"} = $cmd->{jobconfig}{"orte-data"};
     }
 
-# Query the resource manager to find the pids, they'll be added to the "all-pids" field.
+    # Query the resource manager to find the pids,
+    # they'll be added to the "all-pids" array.
     $rmgr{ $cmd->{jobconfig}{rmgr} }{find_pids}( $cmd->{jobconfig}{jobid} );
+
+    convert_pids_to_child_pids();
 
     foreach my $proc ( @{ $confInner{"all-pids"} } ) {
         my $pid   = $proc->{pid};
