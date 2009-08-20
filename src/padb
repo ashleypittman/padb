@@ -5423,64 +5423,6 @@ sub load_rms_procs {
     return @procs;
 }
 
-sub get_rms_jobid {
-    my $slurmid = shift;
-    my $rmsid   = 0;
-    my $rmsdir  = "/proc/rms/programs";
-
-    return undef unless ( -d $rmsdir );
-
-    # This is a bit odd and isn't well tested (I don't have access to slurm)
-    # We have been given the slurm ID on the command line and need to convert
-    # this to a RMS id (as the kernel module sees it).
-    # For each active RMS job on the node check if this pid translates to
-    # a slurm pid for the job we have;
-
-    my %gids = slurm_get_ids($slurmid);
-
-    opendir( DIR, $rmsdir ) or die "Unable to open $rmsdir: $!\n";
-    my @ids = readdir(DIR);
-    closedir(DIR);
-
-    for my $id (@ids) {
-        next unless ( $id =~ /^\d+$/ );
-
-        my @pids = load_rms_procs($id);
-        next unless @pids;
-
-        my $self    = $$;
-        my $is_self = 0;
-        foreach my $pid (@pids) {
-            if ( $self == $pid->{pid} ) {
-                $is_self = 1;
-            }
-        }
-        next if ($is_self);
-        my $pid = $pids[0]->{pid};
-
-        # Best way, if this pid is in the target slurm job.
-        return $id if defined $gids{$pid};
-
-        my %env = get_remote_env($pid);
-
-        # Discard this RMS job if it's the wrong job-step.
-        next
-          if ( defined $env{SLURM_STEPID}
-            and $env{SLURM_STEPID} ne $confInner{"slurm-job-step"} );
-
-        # The prefered although not perfect way...
-        if ( $env{SLURM_JOBID} eq $slurmid ) {
-            return $id;
-        }
-
-        # Seems to be a legacy option no longer used.
-        # `scontrol pid2jobid $pid 2>&1` =~ m/id (\d+) /;
-        # return $id if ( $1 == $slurmid );
-    }
-
-    return undef;
-}
-
 sub show_task_file {
     my ( $vp, $file, $prefix ) = @_;
     return unless ( -f $file );
