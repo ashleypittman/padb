@@ -4302,7 +4302,14 @@ sub gdb_attach {
     send_cont_signal($pid);
     my $result = gdb_send( $gdb, "attach $pid" );
 
-    return unless defined $result;
+    if ( not defined $result ) {
+        $gdb->{error} = "Failed to attach to process";
+        if ( not find_exe("gdb") ) {
+            $gdb->{error} = "Failed to attach to process (gdb not installed?)";
+        }
+        return;
+    }
+
     return if ( $result eq "error" );
 
     $gdb->{attached} = 1;
@@ -5812,7 +5819,11 @@ sub stack_trace_from_pids {
             $proc->{gdb} = $gdb;
             push( @all, $proc );
         } else {
-            output $vp, "Failed to attach to process";
+            if ( defined $gdb->{error} ) {
+                output $vp, $gdb->{error};
+            } else {
+                output $vp, "Failed to attach to process";
+            }
         }
 
     }
@@ -5838,7 +5849,11 @@ sub stack_trace_from_pids {
                 if ( gdb_attach( $g, $pid ) ) {
                     $gdb = $g;
                 } else {
-                    output $vp, "Failed to attach to process";
+                    if ( defined $gdb->{error} ) {
+                        output $vp, $gdb->{error};
+                    } else {
+                        output $vp, "Failed to attach to process";
+                    }
                 }
             } else {
                 $gdb = $proc->{gdb};
