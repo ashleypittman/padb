@@ -221,6 +221,7 @@ use MIME::Base64;
 use Config;
 use IO::Socket;
 use IO::Select;
+use Carp;
 
 ###############################################################################
 #
@@ -1790,7 +1791,7 @@ sub local_stats_from_job {
 
     my @data;
     open( PCMD, "edb -k $key --stats-raw 2>/dev/null|" )
-      or die "$prog: cant open file: $!\n";
+      or confess "$prog: cant open file: $!\n";
     local $/ = "\n\n";
     while (<PCMD>) {
         s/\n//g;
@@ -3629,7 +3630,7 @@ sub shift_from_range {
             unshift( @parts, "$lower-$upper" );
         }
     } else {
-        die("Failed to recognise $part as range\n");
+        confess("Failed to recognise $part as range\n");
     }
 
     my $r = join( ",", @parts );
@@ -3648,7 +3649,7 @@ sub create_local_port {
 
     if ( not defined $range ) {
         my $sl = IO::Socket::INET->new(%options)
-          or die("Failed to create local port: $!");
+          or confess("Failed to create local port: $!");
         return $sl;
     }
 
@@ -3699,7 +3700,7 @@ sub go_parallel {
     };
 
     $pcmd->{pid} = open3( $pcmd->{in}, *OUT, *ERR, $cmd )
-      or die "Unable to open3() pcmd: $!\n";
+      or confess "Unable to open3() pcmd: $!\n";
 
     close $pcmd->{in};
 
@@ -4600,7 +4601,7 @@ sub new_parse {
         my ( $this, $l ) = strip_first_quotes($value);
         return ( $key, $this, $l );
     } else {
-        die("unknown type '$type' str '$str'");
+        confess("unknown type '$type' str '$str'");
     }
 
     return ( $key, \%res, $leftover );
@@ -4815,7 +4816,7 @@ sub launch_h {
 
     my $cmd = $confInner{"minfo"};
     $h->{hpid} = open3( $h->{wtr}, $h->{rdr}, $h->{err}, $cmd )
-      or die "Unable to popen() h: $!\n";
+      or confess "Unable to popen() h: $!\n";
 
     my $handle = $h->{rdr};
 
@@ -6838,7 +6839,7 @@ sub inner_loop_for_comms {
             PeerAddr => $ohost,
             PeerPort => $oport,
             Proto    => 'tcp',
-        ) or die("Failed to connect to outer");
+        ) or confess("Failed to connect to outer");
         my $secret = find_padb_secret();
         die("No secret") if not defined $secret;
         $os->print("Hello $secret $hostname $lport $key\n");
@@ -6865,7 +6866,7 @@ sub inner_loop_for_comms {
         while ( my @data = $sel->can_read(5) ) {
             foreach my $s (@data) {
                 if ( $s == $server ) {
-                    my $new = $server->accept() or die("Failed accept");
+                    my $new = $server->accept() or confess("Failed accept");
                     $sel->add($new);
                     my $peer = getpeername($new);
                     my ( $port, $addr ) = unpack_sockaddr_in($peer);
@@ -6941,7 +6942,7 @@ sub inner_main {
 
     Getopt::Long::Configure("bundling");
 
-    GetOptions(%optionhash) or die("could not parse options\n");
+    GetOptions(%optionhash) or confess("could not parse options\n");
 
     $confInner{"myld"} = $ENV{"LD_LIBRARY_PATH"};
 
