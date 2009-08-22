@@ -378,8 +378,6 @@ $conf{"dump-raw"} = 0;
 # is treated as "all".
 $conf{"check-signon"} = "all";
 
-$conf{slurm_job_step} = "0";
-
 # Output options.
 $conf{"interval"}            = 10;
 $conf{"watch-clears-screen"} = 1;
@@ -406,6 +404,9 @@ $conf{"edbopt"} = "";
 
 $conf{"edb"}   = find_edb();
 $conf{"minfo"} = find_minfo();
+
+# Option to define a list of ports used by padb.
+$conf{"port-range"} = undef;
 
 my $norc       = 0;
 my $configfile = "/etc/padb.conf";
@@ -3591,6 +3592,80 @@ sub handle_event_from_port {
     $comm_data->{sockets}{$new} = \%cdata;
 }
 
+# "shift" a rank or port number from the standard spec format, returns the id
+# and the range with the first entry removed.  Returns both the first entry and
+# the new range with the first removed.
+sub shift_from_range {
+    my ($range) = @_;
+
+    my $newrange;
+
+    return undef unless defined $range;
+    return undef if $range eq "";
+    return undef if $range eq "[]";
+
+    if ( $range =~ m/^\[([\d\-\,]+)\]$/ ) {
+        $newrange = $1;
+    } else {
+        die("Failed to recognise $range as range\n");
+    }
+
+    my @parts = split( ",", $newrange );
+
+    my $part = shift(@parts);
+
+    my $id;
+
+    if ( $part =~ m/^(\d+)$/ ) {
+        $id = $1;
+    } elsif ( $part =~ m/^(\d+)\-(\d+)$/ ) {
+        my $lower = $1;
+        my $upper = $2;
+        $id = $lower;
+        if ( $lower > $upper ) {
+            die("Invalid range $lower-$upper\n");
+        }
+        if ( $lower++ != $upper ) {
+            unshift( @parts, "$lower-$upper" );
+        }
+    } else {
+        die("Failed to recognise $part as range\n");
+    }
+
+    my $r = join( ",", @parts );
+
+    return ( $id, "[$r]" );
+}
+
+sub create_local_port {
+    my ($range) = @_;
+
+    my %options = (
+        Reuse  => 1,
+        Proto  => 'tcp',
+        Listen => 2,
+    );
+
+    if ( not defined $range ) {
+        my $sl = IO::Socket::INET->new(%options)
+          or die("Failed to create local port: $!");
+        return $sl;
+    }
+
+    my $irange = $range;
+    my $port;
+
+    while ( ( $port, $range ) = shift_from_range($range) and defined $port ) {
+        $options{LocalPort} = $port;
+        my $sl = IO::Socket::INET->new(%options);
+        return $sl if defined $sl;
+
+        #$range = $nrange;
+    }
+
+    die("Failed to create local port, no free range (\"$irange\")\n");
+}
+
 sub go_parallel {
     my $jobid      = shift;
     my $cmd        = shift;
@@ -3601,11 +3676,7 @@ sub go_parallel {
 
     my $sel = IO::Select->new();
     if ( $conf{"inner-callback"} ) {
-        my $sl = IO::Socket::INET->new(
-            Reuse  => 1,
-            Proto  => 'tcp',
-            Listen => 2,
-        ) or die("Failed to create local port");
+        my $sl = create_local_port( $conf{"port-range"} );
 
         $comm_data->{listen} = $sl;
         my $port     = $sl->sockport();
@@ -3617,6 +3688,8 @@ sub go_parallel {
         $cdata{event_cb} = \&handle_event_from_port;
         $comm_data->{sockets}{$sl} = \%cdata;
     }
+
+    debug_log( "show-cmd", undef, $cmd );
 
     my $pcmd = {
         pid => -1,
@@ -3802,8 +3875,6 @@ sub go_job {
     $cmd .= " $0 --inner";
 
     #}
-
-    debug_log( "show-cmd", undef, $cmd );
 
     if ( not defined $hosts ) {
         printf("Full duplex mode needs to know the host count\n");
@@ -6755,11 +6826,7 @@ sub command_from_outer {
 sub inner_loop_for_comms {
     my ($outerloc) = @_;
 
-    my $server = IO::Socket::INET->new(
-        Reuse  => 1,
-        Proto  => 'tcp',
-        Listen => 2,
-    ) or die("Failed to create local port");
+    my $server = create_local_port();
 
     my $lport    = $server->sockport();
     my $hostname = hostname();
