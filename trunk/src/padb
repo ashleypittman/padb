@@ -42,6 +42,8 @@
 #    it independant and call it for all resource managers.  This allows scripts
 #    which call parallel applications to be bypassed and the applications
 #    themselves targetted.
+#  * Added "port-range" option to limit port usage in case people try and use
+#    padb with firewalls enabled.
 #
 # Version 2.5
 #  * First Non-Quadrics version
@@ -263,6 +265,10 @@ my $secret;
 # Config options the inner knows about, only forward options if they are in this list.
 my @inner_conf = qw(edb edbopt minfo rmgr scripts slurm-job-step verbose);
 
+# More config options the inner knows about, these are forwarded on the command line
+# rather than over the sockets.
+my @inner_conf_cmd = qw(port-range);
+
 ###############################################################################
 #
 # Resource manager setup
@@ -368,7 +374,9 @@ $rmgr{"local-fd"} = {
 
 my %allfns;
 
-my %cinner;    # Config options to be passed to inner.
+my %cinner;        # Config options to be passed to inner.
+my %cinner_cmd;    # Config options to be passed to inner.
+
 my $rem_jobid;
 
 # Debug options.
@@ -575,7 +583,9 @@ my $compress_C;
 my $tree;
 
 my @config_options;
+
 my %ic_names;
+my %ic_names_cmd;
 
 # Populated in the outer args section so that outer code
 # can access secondary comamnd line argunments by name.
@@ -3664,7 +3674,7 @@ sub create_local_port {
         #$range = $nrange;
     }
 
-    die("Failed to create local port, no free range (\"$irange\")\n");
+    die("Failed to create local port, no free ports in range \"$irange\"\n");
 }
 
 sub go_parallel {
@@ -3877,6 +3887,8 @@ sub go_job {
 
     #}
 
+    map { $cmd .= " --$_=\"$cinner_cmd{$_}\"" } keys(%cinner_cmd);
+
     if ( not defined $hosts ) {
         printf("Full duplex mode needs to know the host count\n");
         printf("Which is doesn't for this resource manager: $conf{rmgr}\n");
@@ -3904,6 +3916,7 @@ sub cmdline_error {
 
 sub config_init {
     map { $ic_names{$_}++ } @inner_conf;
+    map { $ic_names_cmd{$_}++ } @inner_conf_cmd;
 }
 
 sub config_set {
@@ -3927,6 +3940,11 @@ sub config_set {
     if ( defined $ic_names{$key} ) {
         $cinner{$key} = $value;
     }
+
+    if ( defined $ic_names_cmd{$key} ) {
+        $cinner_cmd{$key} = $value;
+    }
+
 }
 
 sub config_from_file {
@@ -6827,7 +6845,7 @@ sub command_from_outer {
 sub inner_loop_for_comms {
     my ($outerloc) = @_;
 
-    my $server = create_local_port();
+    my $server = create_local_port( $confInner{"port-range"} );
 
     my $lport    = $server->sockport();
     my $hostname = hostname();
@@ -6934,11 +6952,16 @@ sub inner_main {
     $confInner{"minfo"}          = find_minfo();
     $confInner{"hostname"}       = hostname();
     $confInner{"scripts"}        = "bash,sh,dash,ash,perl,xterm";
+    $confInner{"port-range"}     = undef;
 
     # Local vars to help with command line parsing
     my $outerloc;
 
     my %optionhash = ( "outer=s" => \$outerloc, );
+
+    foreach my $key (@inner_conf_cmd) {
+        $optionhash{"$key=s"} = \$confInner{$key};
+    }
 
     Getopt::Long::Configure("bundling");
 
