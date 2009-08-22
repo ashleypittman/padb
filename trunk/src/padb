@@ -3617,6 +3617,8 @@ sub shift_from_range {
 
     if ( $range =~ m/^\[([\d\-\,]+)\]$/ ) {
         $newrange = $1;
+    } elsif ( $range =~ m/^(\d+)$/ ) {
+        $newrange = $1;
     } else {
         die("Failed to recognise $range as range\n");
     }
