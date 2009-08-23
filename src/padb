@@ -293,7 +293,7 @@ my @inner_conf_cmd = qw(port_range outer);
 
 my %rmgr;
 
-$rmgr{"rms"} = {
+$rmgr{rms} = {
     'is_installed'    => \&rms_is_installed,
     'get_active_jobs' => \&rms_get_jobs,
     'job_is_running'  => \&rms_job_is_running,
@@ -302,7 +302,7 @@ $rmgr{"rms"} = {
     'find_pids'       => \&rms_find_pids,
 };
 
-$rmgr{"mpd"} = {
+$rmgr{mpd} = {
     'is_installed'           => \&mpd_is_installed,
     'get_active_jobs'        => \&mpd_get_jobs,
     'setup_pcmd'             => \&mpd_setup_pcmd,
@@ -311,7 +311,7 @@ $rmgr{"mpd"} = {
     'require_inner_callback' => 1,
 };
 
-$rmgr{"orte"} = {
+$rmgr{orte} = {
     'is_installed'    => \&open_is_installed,
     'get_active_jobs' => \&open_get_jobs,
     'setup_pcmd'      => \&open_setup_pcmd,
@@ -326,7 +326,7 @@ $rmgr{"lsf-rms"} = {
     'inner_rmgr'      => "rms",
 };
 
-$rmgr{"slurm"} = {
+$rmgr{slurm} = {
     'is_installed'           => \&slurm_is_installed,
     'get_active_jobs'        => \&slurm_get_jobs,
     'job_is_running'         => \&slurm_job_is_running,
@@ -335,7 +335,7 @@ $rmgr{"slurm"} = {
     'require_inner_callback' => 1,
 };
 
-$rmgr{"local"} = {
+$rmgr{local} = {
     'get_active_jobs'        => \&local_get_jobs,
     'job_is_running'         => \&local_job_is_running,
     'setup_pcmd'             => \&local_setup_pcmd,
@@ -614,13 +614,13 @@ sub debug_log {
 
 # Valid debug modes, a full list is maintained here so using unexpected
 # ones can generate warnings.
-$debugModes{"full-duplex"} = undef;
-$debugModes{"show-cmd"}    = undef;
-$debugModes{"all"}         = undef;
-$debugModes{"tree"}        = undef;
-$debugModes{"verbose"}     = undef;
-$debugModes{"signon"}      = undef;
-$debugModes{"rmgr"}        = undef;
+$debugModes{full_duplex} = undef;
+$debugModes{show_cmd }  = undef;
+$debugModes{all}         = undef;
+$debugModes{tree}        = undef;
+$debugModes{verbose}     = undef;
+$debugModes{signon}      = undef;
+$debugModes{rmgr}        = undef;
 
 sub parse_args_outer {
 
@@ -2127,11 +2127,11 @@ sub rms_setup_pcmd {
     # nodes run different versions of edb which can cause problems
     # XXX: Fixme.  This isn't high enough.
     if ( $conf{prun_exittimeout} != 0 ) {
-        $ENV{"RMS_EXITTIMEOUT"} = $conf{prun_exittimeout};
+        $ENV{RMS_EXITTIMEOUT} = $conf{prun_exittimeout};
     }
 
     if ( $conf{prun_timeout} != 0 ) {
-        $ENV{"RMS_TIMELIMIT"} = $conf{prun_timeout};
+        $ENV{RMS_TIMELIMIT} = $conf{prun_timeout};
     }
 
     {
@@ -2141,8 +2141,8 @@ sub rms_setup_pcmd {
         # for a while, the second one is limited
         # to 'qsrmslibs-2.82-15'
         my $partition = rms_res_to_partition($res);
-        $ENV{"RMS_PARTITION"}  = "$partition";
-        $ENV{"RMS_RESOURCEID"} = "$partition.$res";
+        $ENV{RMS_PARTITION}  = $partition;
+        $ENV{RMS_RESOURCEID} = "$partition.$res";
     }
 
     my $cmd = "prun -i /dev/null -T $res";
@@ -3297,7 +3297,7 @@ sub connect_to_children {
 sub issue_command_to_inner {
     my ( $cdata, $cmd ) = @_;
     my $str = my_encode($cmd);
-    debug_log( "full-duplex", $cmd, "Sending command to inner, %d bytes",
+    debug_log( "full_duplex", $cmd, "Sending command to inner, %d bytes",
         length($str) );
     $cdata->{socket}->print("$str\n");
 }
@@ -3317,7 +3317,7 @@ sub first_command {
     $req->{jobconfig}{rmgr}  = $conf{rmgr};
 
     if ( $conf{rmgr} eq "orte" ) {
-        $req->{jobconfig}{"orte-data"} = $open_jobs{ $comm_data->{jobid} };
+        $req->{jobconfig}{orte_data} = $open_jobs{ $comm_data->{jobid} };
     }
 
     $req->{cinner} = \%cinner;
@@ -3454,7 +3454,7 @@ sub command_from_inner {
     # A reply from inner.
     my $d = my_decode($line);
 
-    debug_log( "full-duplex", $d, "Reply from inner, %d bytes", length($line) );
+    debug_log( "full_duplex", $d, "Reply from inner, %d bytes", length($line) );
 
     # The inner process has signed on.
     if ( $comm_data->{current_req}->{mode} eq "signon" ) {
@@ -3697,7 +3697,7 @@ sub go_parallel {
 
     map { $cmd .= " --$_=\"$cinner_cmd{$_}\"" } keys(%cinner_cmd);
 
-    debug_log( "show-cmd", undef, $cmd );
+    debug_log( "show_cmd", undef, $cmd );
 
     my $pcmd = {
         pid => -1,
@@ -4227,7 +4227,7 @@ sub outer_main {
     if ( defined($mode) and ( $mode eq "kill" ) ) {
         my $signal = uc( $secondary_args{signal} );
         my %sig_names;
-        map { $sig_names{$_} = 1 } split( " ", $Config{"sig_name"} );
+        map { $sig_names{$_} = 1 } split( " ", $Config{sig_name} );
 
         if ( not defined $sig_names{$signal} ) {
             cmdline_error("$prog: Error: signal \"$signal\" is invalid\n");
@@ -5697,7 +5697,7 @@ my %proc_keys;
 
 sub proc_output {
     my ( $vp, $key, $value ) = @_;
-    if ( $confInner{mode} eq "proc-summary" ) {
+    if ( $confInner{mode} eq "proc_summary" ) {
         if ( defined $proc_keys{ lc($key) } ) {
             $proc_info->{$vp}{ lc($key) } = $value;
         }
@@ -5824,7 +5824,7 @@ sub show_proc_all {
         }
     }
 
-    if ( $confInner{mode} eq "proc-summary" ) {
+    if ( $confInner{mode} eq "proc_summary" ) {
         return $proc_info;
     }
     return;
@@ -6027,8 +6027,7 @@ sub show_queue {
     my %remote_env = get_remote_env($pid);
 
     if ( defined $remote_env{LD_LIBRARY_PATH} ) {
-        $ENV{"LD_LIBRARY_PATH"} =
-          "$remote_env{LD_LIBRARY_PATH}:$confInner{myld}";
+        $ENV{LD_LIBRARY_PATH} = "$remote_env{LD_LIBRARY_PATH}:$confInner{myld}";
     }
 
     my $lines = run_ptrack_cmd( $vp, $pid,
@@ -6320,13 +6319,13 @@ sub slurm_find_pids {
     my $jobid = shift;
 
     my @procs =
-      `scontrol listpids $jobid.$confInner{"slurm-job-step"} 2>/dev/null`;
+      `scontrol listpids $jobid.$confInner{slurm_job_step} 2>/dev/null`;
     return undef if ( $? != 0 );
     foreach my $proc (@procs) {
         my ( $pid, $job, $step, $local, $global ) = split( " ", $proc );
         next if ( $global eq "-" );
         next unless ( $job eq $jobid );
-        next unless ( $step == $confInner{"slurm-job-step"} );
+        next unless ( $step == $confInner{slurm_job_step} );
         maybe_show_pid( $global, $pid );
     }
 }
@@ -6355,9 +6354,9 @@ sub open_find_pids {
 
     # Be careful here, we are the inner process then load data from
     # the outer.
-    if ( defined $confInner{"orte-data"} ) {
+    if ( defined $confInner{orte_data} ) {
         %open_jobs = ();
-        $open_jobs{$job} = $confInner{"orte-data"};
+        $open_jobs{$job} = $confInner{orte_data};
     } else {
         open_get_data();
     }
@@ -6635,7 +6634,7 @@ sub inner_find_pids {
     # data in $netdata->{target_responce} and $netdata->??
 
     if ( $cmd->{jobconfig}{rmgr} eq "orte" ) {
-        $confInner{"orte-data"} = $cmd->{jobconfig}{"orte-data"};
+        $confInner{orte_data} = $cmd->{jobconfig}{orte_data};
     }
 
     # Query the resource manager to find the pids,
@@ -6834,7 +6833,7 @@ sub command_from_outer {
 sub inner_loop_for_comms {
     my ($outerloc) = @_;
 
-    my $server = create_local_port( $confInner{"port-range"} );
+    my $server = create_local_port( $confInner{port_range} );
 
     my $lport    = $server->sockport();
     my $hostname = hostname();
@@ -6961,7 +6960,7 @@ sub inner_main {
 
     GetOptions(%optionhash) or confess("could not parse options\n");
 
-    $confInner{myld} = $ENV{"LD_LIBRARY_PATH"};
+    $confInner{myld} = $ENV{LD_LIBRARY_PATH};
 
     inner_loop_for_comms( $confInner{outer} );
     exit(0);
@@ -7078,7 +7077,7 @@ sub common_main {
 
     };
 
-    $allfns{"proc-summary"} = {
+    $allfns{proc_summary} = {
         'handler_all' => \&show_proc_all,
         'out_handler' => \&show_proc_format,
         'arg_long'    => 'proc-summary',
