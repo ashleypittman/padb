@@ -404,7 +404,7 @@ $conf{inner_callback}      = 0;
 # Tuning options.
 $conf{prun_timeout}     = 120;
 $conf{prun_exittimeout} = 120;
-$conf{rmgr}             = "auto";
+$conf{rmgr}             = undef;
 
 $conf{slurm_job_step} = 0;
 
@@ -2652,7 +2652,12 @@ sub find_rmgr {
 # If it's been set on the command line and it's valid then just use what we are given.
 # Do sanity checks here but only warn on the result to cope with non-default installs.
 
-    if ( defined $rmgr{ $conf{rmgr} } ) {
+    if ( defined $conf{rmgr} ) {
+        if ( not defined $rmgr{ $conf{rmgr} } ) {
+            printf("Error, resource manager \"$conf{rmgr}\" not supported\n");
+            exit(1);
+        }
+
         if ( defined $rmgr{ $conf{rmgr} }{is_installed}
             and not $rmgr{ $conf{rmgr} }{is_installed}() )
         {
@@ -2662,11 +2667,6 @@ sub find_rmgr {
         }
         setup_rmgr( $conf{rmgr} );
         return;
-    }
-
-    if ( $conf{rmgr} ne "auto" ) {
-        printf("Error, resource manager \"$conf{rmgr}\" not supported\n");
-        exit(1);
     }
 
     my @ok;
@@ -2699,7 +2699,12 @@ sub find_any_rmgr {
 # If it's been set on the command line and it's valid then just use what we are given.
 # Do sanity checks here but only warn on the result to cope with non-default installs.
 
-    if ( defined $rmgr{ $conf{rmgr} } ) {
+    if ( defined $conf{rmgr} ) {
+        if ( not defined $rmgr{ $conf{rmgr} } ) {
+            printf("Error, resource manager \"$conf{rmgr}\" not supported\n");
+            exit(1);
+        }
+
         if ( defined $rmgr{ $conf{rmgr} }{is_installed}
             and not $rmgr{ $conf{rmgr} }{is_installed}() )
         {
@@ -2709,11 +2714,6 @@ sub find_any_rmgr {
         }
         setup_rmgr( $conf{rmgr} );
         return;
-    }
-
-    if ( $conf{rmgr} ne "auto" ) {
-        printf("Error, resource manager \"$conf{rmgr}\" not supported\n");
-        exit(1);
     }
 
     my @installed;
