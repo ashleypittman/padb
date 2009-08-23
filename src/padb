@@ -381,7 +381,6 @@ my $rem_jobid;
 
 # Debug options.
 $conf{verbose}  = 0;
-$conf{dump_raw} = 0;
 
 # Valid values are "none" "missing" or "all".  Anything not recognised
 # is treated as "all".
@@ -1459,8 +1458,6 @@ sub show_inst {
 sub read_stats {
     my @data = @_;
 
-    printf Dumper \@data if $conf{dump_raw};
-
     my $header = parse_header( shift @data );
 
     return undef unless $header;
@@ -1472,8 +1469,6 @@ sub read_stats {
             push( @out, $parsed );
         }
     }
-
-    printf Dumper \@out if $conf{dump_raw};
 
     return \@out;
 }
@@ -2999,8 +2994,6 @@ sub show_proc_format {
 # XXX: Now only called when loading things from file.
 sub show_results {
     my ( $nlines, $mode, $handle ) = @_;
-
-    printf Dumper $nlines if $conf{dump_raw};
 
     my $lines = $nlines->{lines};
 
