@@ -4320,20 +4320,6 @@ sub debug {
 
 }
 
-sub output_dtype {
-    my ( $vp, $ref ) = @_;
-    if ( defined $vp ) {
-        my $p = nfreeze $ref;
-        my $q = encode_base64($p);
-        foreach my $l ( split( "\n", $q ) ) {
-            print "$vp:raw:$l\n";
-        }
-    } else {
-        my $str = Dumper $ref;
-        print "$confInner{hostname}.-1:ERROR: $str\n";
-    }
-}
-
 my %inner_output;
 
 sub output {
@@ -5011,8 +4997,6 @@ sub show_mpi_queue_for_deadlock_all {
 
         my @mq = fetch_mpi_queue_gdb( $carg, $vp, $pid, $gdb );
         $ret->{$vp} = \@mq;
-
-        #output_dtype( $vp, \@mq );
     }
 
     foreach my $proc (@all) {
