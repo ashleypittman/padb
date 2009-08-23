@@ -1802,8 +1802,6 @@ sub local_stats_from_job {
         push @data, $_;
     }
 
-    # print Dumper \@data;
-
     my $s = read_stats(@data);
 
     # $stats_total = 1;
@@ -2887,7 +2885,6 @@ EOF
 sub show_mpi_watch {
     my ( $handle, $lines ) = @_;
 
-    #     print Dumper $lines;
     my $s = "";
     foreach my $l ( sort { $a <=> $b } ( keys %{ $lines->{target_responce} } ) )
     {
@@ -4849,9 +4846,6 @@ sub launch_h {
     close( $h->{wtr} );
     close( $h->{err} );
 
-    # Useful for tuning the dll itself...
-    # print Dumper \%stats;
-
     return @mq;
 }
 
@@ -5137,8 +5131,6 @@ sub go_deadlock_detect {
     }
 
     return "$ret";
-
-    # print Dumper \%ad;
 }
 
 sub deadlock_detect {
@@ -5155,7 +5147,6 @@ sub deadlock_detect {
         $data = $lines->{lines};
     }
 
-    # print Dumper $data;
     my %coll_data;
     foreach my $rank ( keys( %{$data} ) ) {
         my $r = $data->{$rank};
@@ -5181,8 +5172,6 @@ sub deadlock_detect {
         }
         $coll_data{$rank} = \%lid;
     }
-
-    # print Dumper \%coll_data;
 
     my $r = go_deadlock_detect( $carg, \%coll_data );
     print $r;
@@ -6778,7 +6767,6 @@ sub command_from_outer {
     if ( not $cdata->{trusted} ) {
         if ( $line eq "hello $netdata->{key}" ) {
 
-            #printf("Trusting connection from $cdata->{desc}\n");
             $cdata->{trusted} = 1;
             $cdata->{str}     = "";
             $s->printf("Welcome\n");
