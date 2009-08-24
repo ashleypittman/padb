@@ -3120,7 +3120,7 @@ sub default_output_handler {
         }
     } else {
         my $nprocesses = keys( %{ $d->{target_output} } );
-        foreach my $process ( sort( keys( %{ $d->{target_output} } ) ) ) {
+        foreach my $process ( sortn( keys( %{ $d->{target_output} } ) ) ) {
             foreach my $line ( @{ $d->{target_output}{$process} } ) {
                 if ( $nprocesses == 1 ) {
                     print "$line\n";
