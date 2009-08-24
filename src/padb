@@ -2841,11 +2841,11 @@ sub strip_stack_traces {
         $main_idx = 0 if not defined $main_idx;
         if ( $main_idx != 0 or $wait_idx != 0 ) {
             my $end =
-              ( $cargs->{"strip-above-wait"} and $wait_idx )
+              ( $cargs->{strip_above_wait} and $wait_idx )
               ? $wait_idx
               : $#{ $lines->{$tag} };
             my $start =
-              ( $cargs->{"strip-below-main"} and $main_idx ) ? $main_idx : 0;
+              ( $cargs->{strip_below_main} and $main_idx ) ? $main_idx : 0;
 
             printf( "Stripping 0.."
                   . $#{ $lines->{$tag} }
@@ -2910,7 +2910,7 @@ sub show_proc_format {
 
     my $separator = $carg->{column_seperator};
 
-    my @columns = split( ",", $carg->{"proc-format"} );
+    my @columns = split( ",", $carg->{proc_format} );
     foreach my $column (@columns) {
 
         $show_fields = 1 if ( $column eq "fields" );
@@ -3087,7 +3087,7 @@ sub default_output_handler {
     $output = $req->{out_format} if defined $req->{out_format};
 
     if ( $mode eq "stack" or $input_file ) {
-        if ( $cargs->{"strip-below-main"} or $cargs->{"strip-above-wait"} ) {
+        if ( $cargs->{strip_below_main} or $cargs->{strip_above_wait} ) {
             strip_stack_traces( $cargs, $lines );
         }
     }
@@ -4152,7 +4152,7 @@ sub outer_main {
         push_command("deadlock");
 
         my %c;
-        $c{"strip-above-wait"} = 0;
+        $c{strip_above_wait} = 0;
         push_command( "stack", "tree", \%c );
 
         go_job($full_report);
@@ -5693,8 +5693,8 @@ sub show_proc_all {
 
     %proc_keys = ();
 
-    if ( defined $carg->{"proc-format"} ) {
-        my @columns = split( ",", $carg->{"proc-format"} );
+    if ( defined $carg->{proc_format} ) {
+        my @columns = split( ",", $carg->{proc_format} );
         foreach my $column (@columns) {
             my ( $name, $desc ) = split( "=", $column );
             $proc_keys{ lc($name) } = 1;
@@ -6957,6 +6957,7 @@ sub inner_main {
 sub to_arg {
     my $arg = shift;
     my $res = "$arg->{arg_long}";
+    $res =~ s/\_/-/g;
     if ( defined $arg->{arg_short} ) {
         $res .= "|$arg->{arg_short}";
     }
@@ -7064,7 +7065,7 @@ sub common_main {
         },
         'secondary' => [
             {
-                'arg_long' => 'proc-format',
+                'arg_long' => 'proc_format',
                 'type'     => '=s',
                 'default' =>
 'vp=vpid,hostname,pid,vmsize,vmrss,stat.state=S,load1=uptime,pcpu=%cpu,stat.processor=lcore,name=command'
@@ -7088,12 +7089,12 @@ sub common_main {
         },
         'secondary' => [
             {
-                'arg_long' => 'strip-below-main',
+                'arg_long' => 'strip_below_main',
                 'type'     => '!',
                 'default'  => 1,
             },
             {
-                'arg_long' => 'strip-above-wait',
+                'arg_long' => 'strip_above_wait',
                 'type'     => '!',
                 'default'  => 1,
             },
