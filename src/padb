@@ -4467,9 +4467,9 @@ sub gdb_attach {
     my ( $gdb, $pid ) = @_;
 
     send_cont_signal($pid);
-    my $result = gdb_send( $gdb, "attach $pid" );
+    my %p = gdb_n_send( $gdb, "attach $pid" );
 
-    if ( not defined $result ) {
+    if ( not defined $p{status} ) {
         $gdb->{error} = "Failed to attach to process";
         if ( not find_exe("gdb") ) {
             $gdb->{error} = "Failed to attach to process (gdb not installed?)";
@@ -4477,7 +4477,15 @@ sub gdb_attach {
         return;
     }
 
-    return if ( $result eq "error" );
+    if ( $p{status} eq "error" ) {
+        my $r = gdb_parse_reason( $p{reason} );
+        if ( defined $r->{msg} ) {
+            $gdb->{error} = "Failed to attach to process: $r->{msg}";
+        } else {
+            $gdb->{error} = "Failed to attach to process";
+        }
+        return;
+    }
 
     $gdb->{attached} = 1;
     $gdb->{tracepid} = $pid;
