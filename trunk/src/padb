@@ -4400,6 +4400,10 @@ my %inner_error;
 sub output {
     my ( $vp, $str ) = @_;
 
+    if ( not defined $str ) {
+        carp("no output");
+    }
+
     push( @{ $inner_output{$vp} }, $str );
 
 }
@@ -4942,14 +4946,30 @@ sub launch_h {
                 debug( $vp, "Failed dll request $r\n" );
             }
         } else {
-            push @mq, $r;
+            push( @mq, $r );
         }
     }
+
+    my $sc = keys(%stats);
 
     waitpid( $h->{hpid}, 0 );
     close( $h->{rdr} );
     close( $h->{wtr} );
     close( $h->{err} );
+
+    if ( $sc == 0 ) {
+
+        # No interaction was had with minfo, abort with nothing.
+        target_error( $vp, "Error running $confInner{minfo}: No contact" );
+        return undef;
+    }
+
+    if ( $? ne 0 ) {
+
+        # Bad exit code but we did talk to it so run with what we have.
+        target_error( $vp,
+            "Error running $confInner{minfo}: Bad exit code $?" );
+    }
 
     return @mq;
 }
@@ -5011,6 +5031,7 @@ sub show_mpi_queue {
     my ( $carg, $vp, $pid ) = @_;
 
     my @mq = fetch_mpi_queue( $carg, $vp, $pid );
+    return unless $mq[0];
     foreach my $o (@mq) {
         output( $vp, $o );
     }
@@ -5043,8 +5064,10 @@ sub show_mpi_queue_all {
         my $gdb = $proc->{gdb};
 
         my @mq = fetch_mpi_queue_gdb( $carg, $vp, $pid, $gdb );
-        foreach my $o (@mq) {
-            output( $vp, $o );
+        if ( $mq[0] ) {
+            foreach my $o (@mq) {
+                output( $vp, $o );
+            }
         }
     }
 
