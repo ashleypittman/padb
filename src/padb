@@ -191,22 +191,16 @@
 # * Multi-pass argument handling, --kill also accepts --signal for example,
 #   this should really be done at the getopt layer.  Also proper usage
 #   info for these secondary args.
-# * The mode {handler} functions should only be called once per node, it could then
-#   correctly handle $confInner{gdb_file} and also attach to every process per node
-#   simultaneously, this would help stack trace and message queue support as doing
-#   then one at a time results in weird artifacts.  (Done for stack traces but not
-#   message queues).
-# * Output parsing, {out_handler} is a good start but in stack traces the tree
-#   format is optional, maybe have the secondary arg have a {out_hander} attached?
+# * Paramater checking of secondary args, signal has a hacky implementation and
+#   port-range doesn't have any checking currently.
 # * libunwind support?  lighter weight than gdb and possibly more reliable.
-# * --watch should launch one persistent parallel job rather than a new one every go,
-#   this would require full-duplex comms between inner and outer however so could
-#   present scaling problems.  Maybe PMI would help here?
+# * Maybe PMI would help?
 # * POD? generated man page?
 # * mode specific defaults, for example --mpi-watch should enable --watch
 #   -Owatch-clears-screen=0
 # * Make -q fallback to -Q if tports are not available
 # * ???
+# * Allow ranges of ranks to be specified.
 
 ###############################################################################
 
@@ -3836,15 +3830,9 @@ sub go_job {
 
     # Setup whatever is needed for running parallel commands, note this might
     # involve setting environment variables.
-    my @res = setup_pcmd($jobid);
+    my ( $cmd, $ncpus, $hosts ) = setup_pcmd($jobid);
 
-    return 1 unless (@res);
-
-    my $cmd = $res[0];
-
-    # These two are only defined by some resource managers.
-    my $ncpus = $res[1];
-    my $hosts = $res[2];
+    return 1 unless ($cmd);
 
     $conf{verbose} && defined $ncpus && print "Job has $ncpus process(es)\n";
     $conf{verbose} && defined $hosts && print "Job spans $hosts host(s)\n";
@@ -3852,27 +3840,7 @@ sub go_job {
     debug_log( "verbose", undef, "There are %d processes over %d hosts",
         $ncpus, $hosts );
 
-  # Maybe do it this way, edb works best when run with the same LD_LIBRARY_PATH
-  # as the application.  It's very important when running the message queue
-  # extraction code but less so here.  You may find you get linker errors though
-  # although they shouldn't be to hard to work around.
-
-   # Another problem, if using slurm then the key isn't valid, you need to
-   # convert from jobId to key locally on the node, hence you need to use
-   # a padb-helper process
-   #if ( $stats_total or $group ) {
-   #    $stats = 1;
-   #    if ( defined $key ) {
-   #        $cmd .=
-   #          " $conf{edb} --stats-raw --parallel --key=$key $conf{edbopt}";
-   #    } else {
-   #        $cmd .=
-   #          " $0 --inner --jobid=$rem_jobid $rops --stats-full $conf{edbopt}";
-   #    }
-   #} else {
     $cmd .= " $0 --inner";
-
-    #}
 
     if ( not defined $hosts ) {
         printf("Full duplex mode needs to know the host count\n");
@@ -4132,27 +4100,11 @@ sub outer_main {
         printf("padb version $version\n");
         printf("full job report for job $full_report\n\n");
 
-        # Bit of a cheat here, do two things at once...
-        # This should probably me modified to work better on
-        # non Quadrics systems.
-        #my $res;
-        #$stats_total = 1;
-        #$group       = 1;
-        #$res         = go_job( $full_report, "stats" );
-        #undef $stats_total;
-        #undef $group;
-
-        # Don't exit on failure here.
-        #if ( $res != 0 ) {
-        #    exit 1;
-        #}
-
         push_command( "mqueue", "compress" );
 
         push_command("deadlock");
 
-        my %c;
-        $c{strip_above_wait} = 0;
+        my %c = ( 'strip_above_wait' => 0 );
         push_command( "stack", "tree", \%c );
 
         go_job($full_report);
