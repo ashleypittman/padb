@@ -3188,7 +3188,7 @@ sub connect_to_child {
         PeerAddr => $host,
         PeerPort => $port,
         Proto    => 'tcp',
-    ) or die("Failed to connect to child ($host:port)");
+    ) or die("Failed to connect to child ($host:$port)");
 
     print $socket "hello $word\n";
 
@@ -3474,7 +3474,8 @@ sub command_from_inner {
     if ( defined $d->{target_error} ) {
         printf("Warning: errors reported by some ranks\n========\n");
         foreach my $error ( sort( keys( %{ $d->{target_error} } ) ) ) {
-            printf("$d->{target_error}{$error}: $error\n");
+            printf( "%s: $error\n",
+                rng_convert_to_user( $d->{target_error}{$error} ) );
         }
         printf("========\n");
     }
@@ -3588,175 +3589,154 @@ sub handle_event_from_port {
     $comm_data->{sockets}{$new} = \%cdata;
 }
 
-sub sub_range_assemble {
-    my ( $lower, $upper ) = @_;
+###############################################################################
+#
+# Range mapping functions.
+#
+###############################################################################
 
-    if ( $lower == $upper ) {
-        return $lower;
-    } else {
-        return "$lower-$upper";
-    }
-}
+# A common set of functions for dealing with (integer based) ranges.
+#
+# Internally a array format is used for speed, functions exist to convert from
+# the normal list format "[0-12,15,16]" to the internal one and back again.
 
-sub add_value_to_range {
-    my ( $range, $value ) = @_;
+# rng_convert_from_user($userrange)
+# rc_convert_to_user($range)
+# Convert to and from the normal type to the internal type.
 
-    if ( $range =~ m/^\[([\d\-\,]+)\]$/ ) {
-        $range = $1;
-    } else {
-        carp("Bad range $range");
-        printf("Bad range $range");
-        return undef;
+# rng_shift($range)
+# Pop the lowest value off the range.
 
-    }
+# rng_add_value($range,$value)
+# Add a value to the range.
 
-    my @parts;
+# rng_merge($range,$new)
+# Merge two ranges.
 
-    my $added = 0;
+# Potentially needed but not implemented yet
 
-    # Walk through the individal contigous sub-ranges adding the
-    # value to any subrange it's adjacent to.  If it falls between two
-    # then insert it as a new subrange, if it's not found then add it
-    # after the last subrange.
-    # If a sub-range is extended upwards then it's possible it not
-    # meets the subsequent one so handle that case as well.
+# rng_user_verify()
+# is_value_in_range()
+# nvalues_in_range()
 
-    my $prev_part_upper;
-    my $prev_part_lower;
-
-    foreach my $part ( split( ",", $range ) ) {
-        my $lower;
-        my $upper;
-
-        if ( $part =~ m/^(\d+)$/ ) {
-            $lower = $1;
-            $upper = $1;
-        } elsif ( $part =~ m/^(\d+)\-(\d+)$/ ) {
-            $lower = $1;
-            $upper = $2;
-        } else {
-            carp("Bad range $range");
-            return undef;
-        }
-
-        if ( not $added ) {
-            if ( $lower == $value + 1 ) {
-                $lower--;
-                $added = 1;
-            } elsif ( $upper == $value - 1 ) {
-
-                # Extend the current part upwards to include the new value.
-                $upper++;
-                $added           = 1;
-                $prev_part_upper = $upper;
-                $prev_part_lower = $lower;
-                next;
-            } elsif ( $lower > $value ) {
-
-                # If we have skipped over the value then add it now.
-                # note that we are adding it here and hence cannot have extended
-                # the last sub-range.
-                push( @parts, $value );
-                $added = 1;
-            }
-        }
-
-        if ( defined $prev_part_upper ) {
-
-            # We have extended a segment.
-            if ( $prev_part_upper == $lower - 1 ) {
-                $part = sub_range_assemble( $prev_part_lower, $upper );
-                push( @parts, $part );
-            } else {
-                $part =
-                  sub_range_assemble( $prev_part_lower, $prev_part_upper );
-                push( @parts, $part );
-                $part = sub_range_assemble( $lower, $upper );
-                push( @parts, $part );
-            }
-            undef($prev_part_upper);
-            undef($prev_part_lower);
-        } else {
-            $part = sub_range_assemble( $lower, $upper );
-            push( @parts, $part );
-        }
-    }
-
-    if ( defined $prev_part_upper ) {
-        my $part = sub_range_assemble( $prev_part_lower, $prev_part_upper );
-        push( @parts, $part );
-    }
-
-    # If we haven't add it stick it on the end now.
-    if ( not $added ) {
-        push( @parts, $value );
-    }
-
-    my $newrange = join( ",", @parts );
-
-    return "[$newrange]";
-}
-
-# Merge two port ranges.  For now just do the simple thing,
-# this really needs to be re-visited from a scalability aspect however.
-sub merge_ranges {
-    my ( $left, $right ) = @_;
-
-    my ( $val, $range ) = shift_from_range($right);
-
-    while ( defined $val ) {
-        $left = add_value_to_range( $left, $val );
-        ( $val, $range ) = shift_from_range($range);
-    }
-
-    return "[$left]";
-}
-
-# "shift" a rank or port number from the standard spec format, returns the id
-# and the range with the first entry removed.  Returns both the first entry and
-# the new range with the first removed.
-sub shift_from_range {
+# Convert from a user range to a internal one.
+sub rng_convert_from_user {
     my ($range) = @_;
-
-    my $newrange;
 
     return undef unless defined $range;
     return undef if $range eq "";
     return undef if $range eq "[]";
+
+    my $newrange;
 
     if ( $range =~ m/^\[([\d\-\,]+)\]$/ ) {
         $newrange = $1;
     } elsif ( $range =~ m/^(\d+)$/ ) {
         $newrange = $1;
     } else {
-        die("Failed to recognise $range as range\n");
+        confess("Failed to recognise $range as range\n");
     }
 
-    my @parts = split( ",", $newrange );
+    my @user_parts = split( ",", $newrange );
 
-    my $part = shift(@parts);
+    my @parts;
 
-    my $id;
-
-    if ( $part =~ m/^(\d+)$/ ) {
-        $id = $1;
-    } elsif ( $part =~ m/^(\d+)\-(\d+)$/ ) {
-        my $lower = $1;
-        my $upper = $2;
-        $id = $lower;
-        if ( $lower > $upper ) {
-            die("Invalid range $lower-$upper\n");
+    foreach my $part (@user_parts) {
+        my %part;
+        if ( $part =~ m/^(\d+)$/ ) {
+            $part{l} = $1;
+            $part{u} = $1;
+        } elsif ( $part =~ m/^(\d+)\-(\d+)$/ ) {
+            $part{l} = $1;
+            $part{u} = $2;
+        } else {
+            confess("Failed to recognise $part as range\n");
         }
-        if ( $lower++ != $upper ) {
-            unshift( @parts, "$lower-$upper" );
+        push( @parts, \%part );
+    }
+    return \@parts;
+}
+
+sub rng_convert_to_user {
+    my ($rg) = @_;
+
+    my @entries;
+    foreach my $part ( @{$rg} ) {
+        if ( $part->{l} == $part->{u} ) {
+            push( @entries, $part->{l} );
+        } else {
+            push( @entries, "$part->{l}-$part->{u}" );
         }
+    }
+    my $range = join( ",", @entries );
+    return "[$range]";
+}
+
+sub rng_shift {
+    my ($rg) = @_;
+
+    # Return undef if this range is empty.
+    return undef if ( $#{$rg} == -1 );
+
+    my $value = $rg->[0]->{l};
+    if ( $rg->[0]->{l} == $rg->[0]->{u} ) {
+        shift( @{$rg} );
     } else {
-        confess("Failed to recognise $part as range\n");
+        $rg->[0]->{l}++;
+    }
+    return $value;
+}
+
+sub rng_add_value {
+    my ( $rg, $value ) = @_;
+
+    # If it's after the last value then just add it.
+    if ( $value > $rg->[-1]->{u} + 1 ) {
+        push( @{$rg}, { 'l' => $value, 'u' => $value } );
+        return;
     }
 
-    my $r = join( ",", @parts );
+    my $idx = 0;
+    foreach my $part ( @{$rg} ) {
 
-    return ( $id, "[$r]" );
+        if ( $value == $part->{l} - 1 ) {
+
+            # Extend the current entry downwards.
+            $part->{l}--;
+            return;
+        } elsif ( $value < $part->{l} ) {
+
+            # If it's before the current entry then insert it.
+            splice( @{$rg}, $idx, 0, { 'l' => $value, 'u' => $value } );
+            return;
+        } elsif ( $value == $part->{u} + 1 ) {
+
+            # Extend the current entry upwards.
+            $part->{u}++;
+
+            # If we meet the subsequent entry then merge the two.
+            if ( exists $rg->[ $idx + 1 ]
+                and $part->{u} + 1 == $rg->[ $idx + 1 ]->{l} )
+            {
+                $part->{u} = $rg->[ $idx + 1 ]->{u};
+                splice( @{$rg}, $idx + 1, 1 );
+            }
+            return;
+        }
+        $idx++;
+    }
+    confess("Failed to add value to range");
+}
+
+sub rng_merge {
+    my ( $rg, $new ) = @_;
+
+    # Need to use defined here as zero is a valid value to store
+    # in a range.
+    while ( defined( my $val = rng_shift($new) ) ) {
+        rng_add_value( $rg, $val );
+    }
+    return;
 }
 
 sub create_local_port {
@@ -3774,18 +3754,15 @@ sub create_local_port {
         return $sl;
     }
 
-    my $irange = $range;
-    my $port;
+    my $rg = rng_convert_from_user($range);
 
-    while ( ( $port, $range ) = shift_from_range($range) and defined $port ) {
+    while ( my $port = rng_shift($rg) ) {
         $options{LocalPort} = $port;
         my $sl = IO::Socket::INET->new(%options);
         return $sl if defined $sl;
-
-        #$range = $nrange;
     }
 
-    die("Failed to create local port, no free ports in range \"$irange\"\n");
+    die("Failed to create local port, no free ports in range \"$range\"\n");
 }
 
 sub go_parallel {
@@ -4413,10 +4390,9 @@ sub target_error {
     my ( $rank, $error ) = @_;
 
     if ( defined $inner_error{$error} ) {
-        $inner_error{$error} =
-          add_value_to_range( $inner_error{$error}, $rank );
+        rng_add_value( $inner_error{$error}, $rank );
     } else {
-        $inner_error{$error} = "[$rank]";
+        $inner_error{$error} = rng_convert_from_user($rank);
     }
 }
 
@@ -6616,8 +6592,7 @@ sub reply_from_child {
     # Merge in local target responces.
     foreach my $key ( keys(%inner_error) ) {
         if ( defined $handle->{all_replys}->{target_error}{$key} ) {
-            $handle->{all_replys}->{target_error}{$key} =
-              merge_ranges( $handle->{all_replys}->{target_error}{$key},
+            rng_merge( $handle->{all_replys}->{target_error}{$key},
                 $inner_error{$key} );
         } else {
             $handle->{all_replys}->{target_error}{$key} = $inner_error{$key};
