@@ -3396,46 +3396,45 @@ sub next_command {
 
 sub report_failed_signon {
     my ( $key, $data ) = @_;
-    my %values;
-    foreach my $proc ( keys( %{$data} ) ) {
-        push( @{ $values{ $data->{$proc}{$key} } }, $proc );
-    }
     my %c;
     $c{i} = length($key);
     printf("$key : ranks\n");
-    foreach my $value ( sort( keys(%values) ) ) {
-        printf( "%$c{i}s : %s\n", $value, compress( @{ $values{$value} } ) );
+    foreach my $value ( sort( keys( %{$data} ) ) ) {
+        printf( "%$c{i}s : %s\n",
+            $value, rng_convert_to_user( $data->{$value} ) );
     }
 }
 
 sub check_signon {
     my ( $comm_data, $data ) = @_;
     return if ( $conf{check_signon} eq "none" );
+    my %here;
+    while (
+        defined( my $proc = rng_shift( $data->{target_data}{found}{yes} ) ) )
+    {
+        $here{$proc} = 1;
+    }
     my @missing;
-    my %target_state;
-    my %target_exe;
     for ( my $proc = 0 ; $proc < $comm_data->{nprocesses} ; $proc++ ) {
-        if ( not defined $data->{target_responce}{$proc} ) {
+        if ( not defined $here{$proc} ) {
             push( @missing, $proc );
-            next;
         }
-        $target_exe{ $data->{target_responce}{$proc}{name} }++;
-        $target_state{ $data->{target_responce}{$proc}{state} }++;
     }
     if ( $#missing != -1 ) {
         printf( "Warning, failed to locate ranks %s\n", compress(@missing) );
     }
     return if ( $conf{check_signon} eq "missing" );
-    my $exe_count = keys(%target_exe);
-    if ( $exe_count != 1 ) {
+
+    if ( keys( %{ $data->{target_data}{name} } ) != 1 ) {
         printf("Warning, remote process name differs across ranks\n");
-        report_failed_signon( "name", $data->{target_responce} );
+        report_failed_signon( "name", \%{ $data->{target_data}{name} } );
     }
-    my $state_count = keys(%target_state);
-    if ( $state_count != 1 ) {
+
+    if ( keys( %{ $data->{target_data}{state} } ) != 1 ) {
         printf("Warning, remote process state differs across ranks\n");
-        report_failed_signon( "state", $data->{target_responce} );
+        report_failed_signon( "state", \%{ $data->{target_data}{state} } );
     }
+
 }
 
 sub command_from_inner {
@@ -6756,9 +6755,6 @@ sub convert_pids_to_child_pids {
 sub inner_find_pids {
     my ( $netdata, $cmd ) = @_;
 
-    # Cache config data and search for pids, storing
-    # data in $netdata->{target_responce} and $netdata->??
-
     if ( $cmd->{jobconfig}{rmgr} eq "orte" ) {
         $confInner{orte_data} = $cmd->{jobconfig}{orte_data};
     }
@@ -6774,8 +6770,9 @@ sub inner_find_pids {
         my $vp    = $proc->{vp};
         my $name  = readlink("/proc/$pid/exe");
         my $state = find_from_status( $pid, "State" );
-        $netdata->{target_responce}{$vp}->{name}  = $name;
-        $netdata->{target_responce}{$vp}->{state} = $state;
+        target_key_pair( $vp, "found", "yes" );
+        target_key_pair( $vp, "name",  $name );
+        target_key_pair( $vp, "state", $state );
     }
 }
 
@@ -6937,7 +6934,9 @@ sub command_from_outer {
 
     if ( $netdata->{children} == 0 ) {
         my $res;
-        $res->{target_responce} = $netdata->{target_responce};
+        if ( defined $netdata->{target_responce} ) {
+            $res->{target_responce} = $netdata->{target_responce};
+        }
 
         # Save any output we've got from this node.
         foreach my $key ( keys(%inner_output) ) {
