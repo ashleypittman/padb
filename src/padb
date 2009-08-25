@@ -3315,7 +3315,7 @@ sub first_command {
     $req->{jobconfig}{rmgr}  = $conf{rmgr};
 
     if ( $conf{rmgr} eq "orte" ) {
-        $req->{jobconfig}{orte_data} = $open_jobs{ $comm_data->{jobid} };
+        $req->{jobconfig}{orte_data} = $open_jobs{ $comm_data->{jobid} }{ranks};
     }
 
     $req->{cinner} = \%cinner;
@@ -6468,8 +6468,8 @@ sub open_find_pids {
 
     my $hostname = $confInner{hostname};
 
-    foreach my $rank ( keys( %{ $confInner{orte_data}{ranks}{$hostname} } ) ) {
-        maybe_show_pid( $rank, $confInner{orte_data}{ranks}{$hostname}{$rank} );
+    foreach my $rank ( keys( %{ $confInner{orte_data}{$hostname} } ) ) {
+        maybe_show_pid( $rank, $confInner{orte_data}{$hostname}{$rank} );
     }
 }
 
