@@ -410,6 +410,8 @@ $conf{minfo} = find_minfo();
 # Option to define a list of ports used by padb.
 $conf{port_range} = undef;
 
+$conf{tree_width} = 4;
+
 my $norc       = 0;
 my $configfile = "/etc/padb.conf";
 
@@ -615,6 +617,7 @@ $debugModes{tree}        = undef;
 $debugModes{verbose}     = undef;
 $debugModes{signon}      = undef;
 $debugModes{rmgr}        = undef;
+$debugModes{ctree}       = undef;
 
 sub parse_args_outer {
 
@@ -680,7 +683,9 @@ sub parse_args_outer {
         }
         if ( $debugModes{all} ) {
             foreach my $mode ( keys(%debugModes) ) {
-                $debugModes{$mode} = $debugModes{all};
+                if ( not defined $debugModes{$mode} ) {
+                    $debugModes{$mode} = $debugModes{all};
+                }
             }
         }
     }
@@ -3245,11 +3250,8 @@ sub extract_line {
 
 }
 
-# For each remote process generate a tree, giving each
-# process a parent and a number of children.
-# Currently just make this a simple "ladder" but should
-# probably be a f-nomial tree.
-sub generate_comm_tree {
+# A simple "ladder" or 1-wide tree
+sub generate_comm_tree_ladder {
     my ($a)  = @_;
     my @b    = @{$a};
     my $last = "root";
@@ -3263,18 +3265,64 @@ sub generate_comm_tree {
     return \%comm_tree;
 }
 
+# Fairly simple this, walk through the hosts keeping a list
+# of joints (Those able to accept children this iteration) and
+# leaves (those able to accept children next iteration) and
+# loop until there are no more hosts left to add.
+sub generate_binary_tree {
+    my ( $a, $width ) = @_;
+    my @b    = @{$a};
+    my $last = "root";
+    my %comm_tree;
+
+    my @leaves;
+
+    my $root = shift( @{$a} );
+
+    my @joints;
+    push( @joints, $root );
+
+    $comm_tree{root}{children}[0] = $root;
+
+    while ( @{$a} ) {
+        foreach my $joint (@joints) {
+            my @children = splice( @{$a}, 0, $width );
+            if ( $#children > -1 ) {
+                push( @leaves, @children );
+                @{ $comm_tree{$joint}{children} } = @children;
+            }
+        }
+        @joints = @leaves;
+        @leaves = ();
+    }
+
+    return \%comm_tree;
+}
+
+# For each remote process generate a tree, giving each
+# process a parent and a number of children.
+# Currently just make this a simple "ladder" but should
+# probably be a f-nomial tree.
+sub generate_comm_tree {
+    my ($a) = @_;
+
+    return generate_binary_tree( $a, $conf{tree_width} );
+}
+
 # Called once when we have the socket details of the last child.
 sub connect_to_children {
     my $comm_data = shift;
 
     debug_log( "signon", undef, "Received last signon, connecting to inner" );
 
-    @{ $comm_data->{host_ids} } = sort( keys( %{ $comm_data->{remote} } ) );
+    @{ $comm_data->{host_ids} } = sortn( keys( %{ $comm_data->{remote} } ) );
     $comm_data->{connection_tree} =
       generate_comm_tree( $comm_data->{host_ids} );
+
     my $td = $comm_data->{connection_tree}->{root}{children}[0];
 
-    #printf("I'm connecting to $td\n");
+    debug_log( "ctree", $comm_data->{connection_tree}, "connection tree" );
+
     my $cdata;
     $cdata->{socket} = connect_to_child(
         $td,
@@ -6174,6 +6222,7 @@ sub kill_proc {
 
 sub ping_rank {
     my ( $cargs, $vp, $pid ) = @_;
+    target_key_pair( $vp, "PING", "ACK" );
     output( $vp, "ACK" );
     return;
 }
