@@ -3188,7 +3188,7 @@ sub connect_to_child {
         PeerAddr => $host,
         PeerPort => $port,
         Proto    => 'tcp',
-    ) or die("Failed to connect to child");
+    ) or die("Failed to connect to child ($host:port)");
 
     print $socket "hello $word\n";
 
