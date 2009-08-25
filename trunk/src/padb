@@ -552,7 +552,8 @@ EOF
 ###############################################################################
 
 my $user = getpwuid($<);
-my @ranks;
+my $rank_rng;
+
 my @target_groups;
 my $all;
 my $any;
@@ -620,10 +621,12 @@ sub parse_args_outer {
     Getopt::Long::Configure("bundling");
     my $debugflag;
 
+    my @ranks;
+
     my %optionhash = (
         "verbose|v+"          => \$conf{verbose},
         "user|u=s"            => \$user,
-        "rank|r=i"            => \@ranks,
+        "rank|r=s"            => \@ranks,
         "group-id=s"          => \@target_groups,
         "help|h"              => \&usage,
         "all|a"               => \$all,
@@ -688,6 +691,14 @@ sub parse_args_outer {
         next unless defined $config_hash{$arg};
         $mode = $arg;
         $have_allfns_option++;
+    }
+
+    if (@ranks) {
+        $rank_rng = rng_convert_from_user( shift(@ranks) );
+
+        foreach my $rank (@ranks) {
+            rng_merge( $rank_rng, rng_convert_from_user($rank) );
+        }
     }
 
     # Put the args in a hash so that they can be referenced by name.
@@ -1489,9 +1500,10 @@ sub show_stats {
 
         if ( $conf{stats_short} ) {
             my $new;
-            if ( $#ranks != -1 ) {
+            if ( defined $rank_rng ) {
                 my @ret;
-                foreach my $rank (@ranks) {
+                my $rng = rng_dup($rank_rng);
+                while ( defined( my $rank = rng_shift($rng) ) ) {
                     if ( defined $d->[$rank] ) {
                         push( @ret, summarise( $d->[$rank] ) );
                     } else {
@@ -1508,8 +1520,9 @@ sub show_stats {
             return;
         }
 
-        if ( $#ranks != -1 ) {
-            foreach my $rank (@ranks) {
+        if ( defined $rank_rng ) {
+            my $rng = rng_dup($rank_rng);
+            while ( defined( my $rank = rng_shift($rng) ) ) {
                 if ( defined $d->[$rank] ) {
                     print show_name $conf{stats_name}, $d->[$rank];
                 } else {
@@ -3349,8 +3362,8 @@ sub next_command {
 
     # XXX: Should only send this list over if it makes sense, for example
     # the deadlock code only works when targetting all ranks.
-    if ( $#ranks != -1 ) {
-        @{ $req->{ranks} } = @ranks;
+    if ( defined $rank_rng ) {
+        $req->{ranks} = $rank_rng;
     }
 
     if ( defined $cmd->{out_format} ) {
@@ -3723,6 +3736,8 @@ sub rng_add_value {
                 splice( @{$rg}, $idx + 1, 1 );
             }
             return;
+        } elsif ( $value >= $part->{l} and $value <= $part->{u} ) {
+            confess("Failed to add value to range (Value already in range)");
         }
         $idx++;
     }
@@ -3738,6 +3753,11 @@ sub rng_merge {
         rng_add_value( $rg, $val );
     }
     return;
+}
+
+sub rng_dup {
+    my ($rg) = @_;
+    return dclone($rg);
 }
 
 sub create_local_port {
@@ -6819,11 +6839,13 @@ sub command_from_parent {
     # If supplied with a rank list then use it now to generate a list of
     # processes to inspect.
     if ( exists( $cmd->{ranks} ) ) {
-        my @ranks = @{ $cmd->{ranks} };
-        foreach my $proc ( @{ $confInner{all_pids} } ) {
-            my $vp  = $proc->{vp};
-            my $pid = $proc->{pid};
-            foreach my $rank (@ranks) {
+        my $rng = rng_dup( $cmd->{ranks} );
+
+        # Loop over ranks first as there are potentially more of them.
+        while ( defined( my $rank = rng_shift($rng) ) ) {
+            foreach my $proc ( @{ $confInner{all_pids} } ) {
+                my $vp  = $proc->{vp};
+                my $pid = $proc->{pid};
                 if ( $vp == $rank ) {
                     push @{$pid_list}, $proc;
                 }
