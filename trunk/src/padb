@@ -6714,7 +6714,26 @@ sub reply_from_child {
 
     # Copy the network target errors into responce.
     if ( exists $r->{target_data} ) {
-        $handle->{all_replys}->{target_data} = $r->{target_data};
+        if ( exists $handle->{all_replys}->{target_data} ) {
+            foreach my $key ( keys( %{ $r->{target_data} } ) ) {
+                foreach my $value ( keys( %{ $r->{target_data}{$key} } ) ) {
+                    if (
+                        defined $handle->{all_replys}
+                        ->{target_data}{$key}{$value} )
+                    {
+                        rng_merge(
+                            $handle->{all_replys}->{target_data}{$key}{$value},
+                            $r->{target_data}{$key}{$value}
+                        );
+                    } else {
+                        $handle->{all_replys}->{target_data}{$key}{$value} =
+                          $r->{target_data}{$key}{$value};
+                    }
+                }
+            }
+        } else {
+            $handle->{all_replys}->{target_data} = $r->{target_data};
+        }
     }
 
     # Merge in local target responces.
