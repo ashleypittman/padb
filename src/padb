@@ -3485,14 +3485,15 @@ sub command_from_inner {
     # sending.
     my $mode = $comm_data->{current_req}->{mode};
 
-    if ( defined $d->{target_error} ) {
+    if ( defined $d->{target_data}{error} ) {
         printf("Warning: errors reported by some ranks\n========\n");
-        foreach my $error ( sort( keys( %{ $d->{target_error} } ) ) ) {
+        foreach my $error ( sort( keys( %{ $d->{target_data}{error} } ) ) ) {
             printf( "%s: $error\n",
-                rng_convert_to_user( $d->{target_error}{$error} ) );
+                rng_convert_to_user( $d->{target_data}{error}{$error} ) );
         }
         printf("========\n");
     }
+
     if ( defined( $allfns{$mode}{out_handler} ) ) {
         $allfns{$mode}{out_handler}( $conf{mode_options}{$mode}, $d );
     } else {
@@ -4393,7 +4394,7 @@ sub debug {
 }
 
 my %inner_output;
-my %inner_error;
+my %local_target_data;
 
 sub output {
     my ( $vp, $str ) = @_;
@@ -4409,11 +4410,18 @@ sub output {
 # Report a single string error for a given target rank.
 sub target_error {
     my ( $rank, $error ) = @_;
+    target_key_pair( $rank, "error", $error );
+    return;
+}
 
-    if ( defined $inner_error{$error} ) {
-        rng_add_value( $inner_error{$error}, $rank );
+# Report a single string error for a given target rank.
+sub target_key_pair ($$$) {
+    my ( $rank, $key, $value ) = @_;
+
+    if ( defined $local_target_data{$key}{$value} ) {
+        rng_add_value( $local_target_data{$key}{$value}, $rank );
     } else {
-        $inner_error{$error} = rng_convert_from_user($rank);
+        $local_target_data{$key}{$value} = rng_convert_from_user($rank);
     }
 }
 
@@ -6605,28 +6613,32 @@ sub reply_from_child {
         }
     }
 
-    # Copy the network target errors into responce.
-    if ( exists $r->{target_error} ) {
-        $handle->{all_replys}->{target_error} = $r->{target_error};
-    }
-
-    # Merge in local target responces.
-    foreach my $key ( keys(%inner_error) ) {
-        if ( defined $handle->{all_replys}->{target_error}{$key} ) {
-            rng_merge( $handle->{all_replys}->{target_error}{$key},
-                $inner_error{$key} );
-        } else {
-            $handle->{all_replys}->{target_error}{$key} = $inner_error{$key};
-        }
-    }
-
     # Save any output we've got from this node.
     foreach my $key ( keys(%inner_output) ) {
         $handle->{all_replys}->{target_output}{$key} = $inner_output{$key};
     }
 
     %inner_output = ();
-    %inner_error  = ();
+
+    # Copy the network target errors into responce.
+    if ( exists $r->{target_data} ) {
+        $handle->{all_replys}->{target_data} = $r->{target_data};
+    }
+
+    # Merge in local target responces.
+    foreach my $key ( keys(%local_target_data) ) {
+        foreach my $value ( keys( %{ $local_target_data{$key} } ) ) {
+            if ( defined $handle->{all_replys}->{target_data}{$key}{$value} ) {
+                rng_merge( $handle->{all_replys}->{target_data}{$key}{$value},
+                    $local_target_data{$key}{$value} );
+            } else {
+                $handle->{all_replys}->{target_data}{$key}{$value} =
+                  $local_target_data{$key}{$value};
+            }
+        }
+    }
+
+    %local_target_data = ();
 
     # If this isn't the last child to signon don't reply up-stream yet.
     if ( $handle->{child_replys} != $handle->{children} ) {
@@ -6645,7 +6657,6 @@ sub reply_from_child {
     $handle->{all_replys}      = undef;
     $handle->{child_replys}    = 0;
     $handle->{target_responce} = undef;
-    $handle->{target_error}    = undef;
 }
 
 # Convert from a pid to a command name and do it in a safe manner to avoid
@@ -6933,15 +6944,15 @@ sub command_from_outer {
             $res->{target_output}{$key} = $inner_output{$key};
         }
 
-        if (%inner_error) {
-            $res->{target_error} = \%inner_error;
+        if (%local_target_data) {
+            $res->{target_data} = \%local_target_data;
         }
 
         reply_to_parent( $netdata, $res );
 
         # Clear down the local inputs.
-        %inner_error                = ();
         %inner_output               = ();
+        %local_target_data          = ();
         $netdata->{target_responce} = undef;
 
         if ( $netdata->{shutdown} ) {
