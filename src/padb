@@ -3311,14 +3311,13 @@ sub first_command {
     # Also send over some of the per-run (as opposed to per-mode)
     # configuration  options.
     # XXX: Need to send over scripts and other stuff here as well.
-    $req->{jobconfig}{jobid} = $comm_data->{jobid};
-    $req->{jobconfig}{rmgr}  = $conf{rmgr};
 
     if ( $conf{rmgr} eq "orte" ) {
-        $req->{jobconfig}{orte_data} = $open_jobs{ $comm_data->{jobid} }{ranks};
+        $req->{orte_data} = $open_jobs{ $comm_data->{jobid} }{ranks};
     }
 
     $req->{cinner} = \%cinner;
+    $req->{cinner}{jobid} = $comm_data->{jobid};
 
     return $req;
 }
@@ -6755,13 +6754,13 @@ sub convert_pids_to_child_pids {
 sub inner_find_pids {
     my ( $netdata, $cmd ) = @_;
 
-    if ( $cmd->{jobconfig}{rmgr} eq "orte" ) {
-        $confInner{orte_data} = $cmd->{jobconfig}{orte_data};
+    if ( $confInner{rmgr} eq "orte" ) {
+        $confInner{orte_data} = $cmd->{orte_data};
     }
 
     # Query the resource manager to find the pids,
     # they'll be added to the "all_pids" array.
-    $rmgr{ $cmd->{jobconfig}{rmgr} }{find_pids}( $cmd->{jobconfig}{jobid} );
+    $rmgr{ $confInner{rmgr} }{find_pids}( $confInner{jobid} );
 
     convert_pids_to_child_pids();
 
