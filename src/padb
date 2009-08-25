@@ -3413,15 +3413,19 @@ sub check_signon {
     {
         $here{$proc} = 1;
     }
-    my @missing;
+    my $rng = rng_create_empty();
+
     for ( my $proc = 0 ; $proc < $comm_data->{nprocesses} ; $proc++ ) {
         if ( not defined $here{$proc} ) {
-            push( @missing, $proc );
+            rng_add_value( $rng, $proc );
         }
     }
-    if ( $#missing != -1 ) {
-        printf( "Warning, failed to locate ranks %s\n", compress(@missing) );
+
+    if ( not rng_empty($rng) ) {
+        printf( "Warning, failed to locate ranks %s\n",
+            rng_convert_to_user($rng) );
     }
+
     return if ( $conf{check_signon} eq "missing" );
 
     if ( keys( %{ $data->{target_data}{name} } ) != 1 ) {
@@ -3615,22 +3619,37 @@ sub handle_event_from_port {
 
 # rng_convert_from_user($userrange)
 # rc_convert_to_user($range)
-# Convert to and from the normal type to the internal type.
+#   Convert to and from the normal type to the internal type.
 
 # rng_shift($range)
-# Pop the lowest value off the range.
+#   Pop the lowest value off the range.
 
 # rng_add_value($range,$value)
-# Add a value to the range.
+#   Add a value to the range.
 
 # rng_merge($range,$new)
-# Merge two ranges.
+#   Merge two ranges.
+
+# rng_dup($range)
+#   Duplicate a range
+
+# rng_create_from_array(@array)
+#   Create a range from an array
+
+# rng_create_empty
+#   Create a empty range
+
+# rng_empty
+#   Test for emptyness.
 
 # Potentially needed but not implemented yet
 
 # rng_user_verify()
 # is_value_in_range()
 # nvalues_in_range()
+# rng_find_missing()
+#   Take two ranges and return all that are in the first but not in the
+#   second. (see check_signon).
 
 # Convert from a user range to a internal one.
 sub rng_convert_from_user {
@@ -3703,6 +3722,11 @@ sub rng_shift {
 sub rng_add_value {
     my ( $rg, $value ) = @_;
 
+    if ( ref( $rg->[0] ) eq "" ) {
+        push( @{$rg}, { 'l' => $value, 'u' => $value } );
+        return;
+    }
+
     # If it's after the last value then just add it.
     if ( $value > $rg->[-1]->{u} + 1 ) {
         push( @{$rg}, { 'l' => $value, 'u' => $value } );
@@ -3757,6 +3781,27 @@ sub rng_merge {
 sub rng_dup {
     my ($rg) = @_;
     return dclone($rg);
+}
+
+sub rng_create_from_array {
+    my (@r) = @_;
+
+    my $rng = rng_convert_from_user( shift(@r) );
+    while ( defined( my $v = shift(@r) ) ) {
+        rng_add_value( $rng, $v );
+    }
+    return $rng;
+}
+
+sub rng_create_empty {
+    my @r;
+    return \@r;
+}
+
+sub rng_empty {
+    my ($rg) = @_;
+
+    return ( ref( $rg->[0] ) eq "" );
 }
 
 sub create_local_port {
