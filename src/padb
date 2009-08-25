@@ -3072,7 +3072,8 @@ sub default_output_handler {
 
     my $cargs = $req->{cargs};
 
-    # Could warn on missing output here...
+    # Warn on missing output here...
+    return unless exists $d->{target_output};
 
     my $lines  = $d->{target_output};
     my $mode   = $req->{mode};
