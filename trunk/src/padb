@@ -5085,14 +5085,24 @@ sub fetch_mpi_queue {
     my $g = gdb_start();
     my $p = gdb_attach( $g, $pid );
     if ( !$p ) {
-        debug( $vp, "Failed to attach to process\n" );
+        if ( defined $g->{error} ) {
+            target_error( $vp, $g->{error} );
+        } else {
+            target_error( $vp, "Failed to attach to process" );
+        }
         return;
+    }
+
+    my $base = gdb_var_addr( $g, "MPIR_dll_name" );
+    if ( !defined $base ) {
+        target_error( $vp,
+            "Process does not appear to be using MPI (No MPIR_dll_name symbol)"
+        );
     }
 
     if ( defined $carg->{mpi_dll} ) {
         $ENV{MPINFO_DLL} = $carg->{mpi_dll};
     } else {
-        my $base = gdb_var_addr( $g, "MPIR_dll_name" );
         if ( !defined $base ) {
             gdb_detach($g);
             gdb_quit($g);
@@ -5110,10 +5120,16 @@ sub fetch_mpi_queue {
 sub fetch_mpi_queue_gdb {
     my ( $carg, $vp, $pid, $g ) = @_;
 
+    my $base = gdb_var_addr( $g, "MPIR_dll_name" );
+    if ( !defined $base ) {
+        target_error( $vp,
+            "Process does not appear to be using MPI (No MPIR_dll_name symbol)"
+        );
+    }
+
     if ( defined $carg->{mpi_dll} ) {
         $ENV{MPINFO_DLL} = $carg->{mpi_dll};
     } else {
-        my $base = gdb_var_addr( $g, "MPIR_dll_name" );
         if ( !defined $base ) {
             return;
         }
@@ -5148,7 +5164,11 @@ sub show_mpi_queue_all {
             $proc->{gdb} = $gdb;
             push( @all, $proc );
         } else {
-            output $vp, "Failed to attach to to process";
+            if ( defined $gdb->{error} ) {
+                target_error( $vp, $gdb->{error} );
+            } else {
+                target_error( $vp, "Failed to attach to process" );
+            }
         }
 
     }
@@ -6135,9 +6155,9 @@ sub stack_trace_from_pids {
                     $gdb = $g;
                 } else {
                     if ( defined $gdb->{error} ) {
-                        output $vp, $gdb->{error};
+                        target_error( $vp, $gdb->{error} );
                     } else {
-                        output $vp, "Failed to attach to process";
+                        target_error( $vp, "Failed to attach to process" );
                     }
                 }
             } else {
