@@ -2922,6 +2922,24 @@ sub array_from_target_namespace {
     return @all;
 }
 
+sub tree_from_namespace {
+    my ($r) = @_;
+
+    my %res;
+
+    foreach my $namespace ( keys( %{$r} ) ) {
+        foreach my $value ( keys( %{ $r->{$namespace} } ) ) {
+            while (
+                defined( my $rank = rng_shift( $r->{$namespace}{$value} ) ) )
+            {
+                $res{$rank}{$namespace} = $value;
+            }
+        }
+    }
+
+    return \%res;
+}
+
 sub show_mpi_watch {
     my ( $handle, $lines ) = @_;
 
@@ -2970,7 +2988,8 @@ sub show_proc_format {
     }
 
     my @all;
-    my $lines = $nlines->{target_responce};
+
+    my $lines = tree_from_namespace( $nlines->{target_data} );
     foreach my $tag ( sort ( keys %$lines ) ) {
         my %hash;
         $hash{vp} = $tag;
@@ -5980,7 +5999,6 @@ sub pcpu_total {
     return sprintf( "%d", $used );
 }
 
-my $proc_info;
 my %proc_keys;
 
 sub proc_output {
@@ -5988,7 +6006,6 @@ sub proc_output {
     if ( $confInner{mode} eq "proc_summary" ) {
         if ( defined $proc_keys{ lc($key) } ) {
             target_key_pair( $vp, lc($key), $value );
-            $proc_info->{$vp}{ lc($key) } = $value;
         }
     } else {
         output( $vp, "$key: $value" );
@@ -6007,8 +6024,6 @@ sub show_proc_all {
             $proc_keys{ lc($name) } = 1;
         }
     }
-
-    $proc_info = undef;
 
     my @all;
 
@@ -6113,9 +6128,6 @@ sub show_proc_all {
         }
     }
 
-    if ( $confInner{mode} eq "proc_summary" ) {
-        return $proc_info;
-    }
     return;
 }
 
