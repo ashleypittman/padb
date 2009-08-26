@@ -2907,15 +2907,31 @@ EOF
     printf("$l\n");
 }
 
+# Convert back from a set of values (with ranges) in a namespace to a array of
+# ranks containing the values.  Assume that each rank only appears in the
+# namespace with one value.
+sub array_from_target_namespace {
+    my ($r) = @_;
+
+    my @all;
+    foreach my $value ( sort( keys( %{$r} ) ) ) {
+        while ( defined( my $rank = rng_shift( $r->{$value} ) ) ) {
+            $all[$rank] = $value;
+        }
+    }
+    return @all;
+}
+
 sub show_mpi_watch {
     my ( $handle, $lines ) = @_;
 
-    my $s = "";
-    foreach my $l ( sort { $a <=> $b } ( keys %{ $lines->{target_responce} } ) )
-    {
-        $s .= $lines->{target_responce}{$l}{state};
+    my @all = array_from_target_namespace( $lines->{target_data}{state} );
+
+    my $o = "";
+    while ( defined( my $v = shift(@all) ) ) {
+        $o .= $v;
     }
-    print("$s\n");
+    print("$o\n");
 }
 
 # Nicely format process information.
@@ -6456,7 +6472,6 @@ sub mpi_watch_load {
 sub mpi_watch_all {
 
     my ( $carg, $list ) = @_;
-    my %res;
     my $fns = mpi_watch_load($carg);
 
     foreach my $proc ( @{$list} ) {
@@ -6466,7 +6481,7 @@ sub mpi_watch_all {
         # Load the status now before we attach with GDB,
         # otherwise we'll just see it as "T" (Stopped).
         my $m = find_from_status( $pid, "State" );
-        target_key_pair( $vp, "state", $m );
+        target_key_pair( $vp, "proc_state", $m );
         if ( $m eq "R" ) {
             $m = ",";
         } elsif ( $m eq "S" ) {
@@ -6493,7 +6508,7 @@ sub mpi_watch_all {
         my $pid = $proc->{pid};
 
         if ( not defined $proc->{gdb} ) {
-            $res{$vp}{state} = $proc->{state};
+            target_key_pair( $vp, "state", $proc->{state} );
             next;
         }
 
@@ -6536,7 +6551,7 @@ sub mpi_watch_all {
                     $mode = "m";
                 }
             }
-            $res{$vp}{state} = $mode;
+            target_key_pair( $vp, "state", $mode );
             next;
         }
 
@@ -6554,13 +6569,13 @@ sub mpi_watch_all {
         }
 
         if ( defined $fnmode ) {
-            $res{$vp}{state} = $fns->{names}{$fnmode};
+            target_key_pair( $vp, "state", $fns->{names}{$fnmode} );
             next;
 
         }
 
         # Fall through case.
-        $res{$vp}{state} = $proc->{state};
+        target_key_pair( $vp, "state", $proc->{state} );
     }
 
     foreach my $proc ( @{$list} ) {
@@ -6570,7 +6585,6 @@ sub mpi_watch_all {
         }
     }
 
-    return \%res;
 }
 
 sub maybe_show_pid {
