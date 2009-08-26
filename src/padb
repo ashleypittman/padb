@@ -618,6 +618,7 @@ $debugModes{verbose}     = undef;
 $debugModes{signon}      = undef;
 $debugModes{rmgr}        = undef;
 $debugModes{ctree}       = undef;
+$debugModes{tdata}       = undef;
 
 sub parse_args_outer {
 
@@ -3513,6 +3514,20 @@ sub maybe_show_header {
     $header_shown = 1;
 }
 
+sub format_target_data {
+    my ($td) = @_;
+
+    my $ret = "\n";
+    foreach my $name ( sort( keys( %{$td} ) ) ) {
+        $ret .= "Namespace: \"$name\"\n";
+        foreach my $value ( sortn( keys( %{ $td->{$name} } ) ) ) {
+            $ret .= "    $value\t";
+            $ret .= rng_convert_to_user( $td->{$name}{$value} ) . "\n";
+        }
+    }
+    return $ret;
+}
+
 sub command_from_inner {
     my ( $comm_data, $cdata, $line ) = @_;
 
@@ -3551,6 +3566,14 @@ sub command_from_inner {
     my $req = next_command($comm_data);
     if ( not $watch ) {
         issue_command_to_inner( $cdata, $req );
+    }
+
+    if ( defined $d->{target_data} ) {
+        debug_log(
+            "tdata", $d->{target_data},
+            "Target data %s",
+            format_target_data( $d->{target_data} )
+        );
     }
 
     maybe_clear_screen();
@@ -5948,6 +5971,7 @@ sub proc_output {
     my ( $vp, $key, $value ) = @_;
     if ( $confInner{mode} eq "proc_summary" ) {
         if ( defined $proc_keys{ lc($key) } ) {
+            target_key_pair( $vp, lc($key), $value );
             $proc_info->{$vp}{ lc($key) } = $value;
         }
     } else {
@@ -6442,6 +6466,7 @@ sub mpi_watch_all {
         # Load the status now before we attach with GDB,
         # otherwise we'll just see it as "T" (Stopped).
         my $m = find_from_status( $pid, "State" );
+        target_key_pair( $vp, "state", $m );
         if ( $m eq "R" ) {
             $m = ",";
         } elsif ( $m eq "S" ) {
