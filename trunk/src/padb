@@ -2884,6 +2884,7 @@ sub sort_proc_hashes {
 }
 
 sub pre_mpi_watch {
+    my ($nprocs) = @_;
     my $header = <<EOF;
 u: unexpected messages U: unexpected and other messages
 s: sending messages r: receiving messages m: sending and receiving
@@ -2891,7 +2892,18 @@ b: Barrier B: Broadcast g: Gather G: AllGather r: reduce: R: AllReduce
 a: alltoall A: alltoalls w: waiting
 .: consuming CPU cycles ,: using CPU but no queue data -: sleeping *: error
 EOF
-    printf($header);
+    print($header);
+    my $l = "0";
+    for ( my $i = 1 ; $i < $nprocs ; $i++ ) {
+        if ( $i % 10 == 0 ) {
+            $l .= substr( $i, 0, 1 );
+        } elsif ( $i % 5 == 0 ) {
+            $l .= "5";
+        } else {
+            $l .= ".";
+        }
+    }
+    printf("$l\n");
 }
 
 sub show_mpi_watch {
@@ -3488,6 +3500,19 @@ sub check_signon {
 
 }
 
+my $header_shown = 0;
+
+sub maybe_show_header {
+    my ($comm_data) = @_;
+    return if ($header_shown);
+    my $mode = $comm_data->{current_req}{mode};
+
+    if ( defined $allfns{$mode}{pre_out_handler} ) {
+        $allfns{$mode}{pre_out_handler}( $comm_data->{nprocesses} );
+    }
+    $header_shown = 1;
+}
+
 sub command_from_inner {
     my ( $comm_data, $cdata, $line ) = @_;
 
@@ -3529,6 +3554,7 @@ sub command_from_inner {
     }
 
     maybe_clear_screen();
+    maybe_show_header($comm_data);
 
     # Mode here is the mode for the reply we just got, this
     # may not be the same thing as the request we are currently
@@ -4450,10 +4476,6 @@ sub outer_main {
 
         printf "\nCollecting information for job '$jobid'\n\n"
           if ( $conf{verbose} or ( $#jobids > 0 ) );
-
-        if ( defined $allfns{$mode}{pre_out_handler} ) {
-            $allfns{$mode}{pre_out_handler}();
-        }
 
         my $of;
         $of = "tree"       if $tree;
