@@ -2409,6 +2409,11 @@ sub mpd_get_data {
         }
         if ( $key eq "rank" ) {
             $jobs{$job}{pids}{$host}{$pid} = $value;
+            if (   ( not defined $jobs{$job}{lastproc} )
+                or ( $value > $jobs{$job}{lastproc} ) )
+            {
+                $jobs{$job}{lastproc} = $value;
+            }
         }
     }
     return \%jobs;
@@ -2446,7 +2451,7 @@ sub mpd_setup_pcmd {
 
     my $hosts = $#hosts + 1;
 
-    return ( $cmd, undef, $hosts );
+    return ( $cmd, $d->{$job}{lastproc} + 1, $hosts );
 }
 
 sub mpd_cleanup_pcmd {
