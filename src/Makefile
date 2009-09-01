@@ -1,6 +1,7 @@
 
 INSTALL_DIR=/usr/local/
 CONFIG_DIR=/etc
+VERSION=3.0-rc1
 
 FILES = Makefile minfo.c mpi_interface.h padb
 
@@ -20,10 +21,9 @@ clean:
 	/bin/rm -f minfo.x
 
 tarfile:
-	/bin/rm -f padb-2.5.tgz
-	/bin/rm -rf padb-2.5
-	mkdir padb-2.5
-	/bin/cp ${FILES} padb-2.5
-	svnversion > padb-2.5/svnversion
-	tar -czf padb-2.5.tgz padb-2.5
-
+	/bin/rm -f padb-${VERSION}.tgz
+	/bin/rm -rf padb-${VERSION}
+	mkdir padb-${VERSION}
+	/bin/cp ${FILES} padb-${VERSION}
+	svnversion > padb-${VERSION}/svnversion
+	tar -czf padb-${VERSION}.tgz padb-${VERSION}
