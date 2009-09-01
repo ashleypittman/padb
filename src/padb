@@ -2124,6 +2124,8 @@ sub rms_setup_pcmd {
 
     my $ncpus = rms_job_to_ncpus($job);
 
+    my $nhosts = rms_job_to_nhosts($job);
+
     if ( $res eq "" ) {
         printf("Job '$job' doesn't have a associated resource\n");
         return undef;
@@ -2153,7 +2155,7 @@ sub rms_setup_pcmd {
 
     my $cmd = "prun -i /dev/null -T $res";
 
-    return ( $cmd, $ncpus );
+    return ( $cmd, $ncpus, $nhosts );
 }
 
 # Not exported...
@@ -2185,6 +2187,55 @@ sub rms_job_to_ncpus {
     printf("extracted $ncpus from $cpus and $nodes\n") if $conf{verbose} > 1;
 
     return $ncpus;
+}
+
+sub rms_job_to_nhosts {
+    my $job      = shift;
+    my $nodeSpec = `rmsquery "select hostnames from jobs where name=\'$job\'"`;
+
+    chomp $nodeSpec;
+    my $i;
+    my @nodeList;
+    my $prefix;
+    my $suffix;
+
+    # deal with multiple entries
+    foreach ( split( " ", $nodeSpec ) ) {
+        if (m/([^\[]+)\[([0-9-,]+)\]([^\[]*)/) {
+            $prefix = $1;
+            $suffix = $3;
+
+            foreach ( split( ",", $2 ) ) {
+                if ( !m/([0-9]+)-?([0-9]+)?/ ) {
+                    print "malformed nodespec '$_'\n";
+                    exit(1);
+                }
+
+                if ( defined($2) ) {
+
+                    # square braces with range, eg 		    'machine[0-3]'
+                    for ( $i = $1 ; $i <= $2 ; $i++ ) {
+                        push( @nodeList, $prefix . $i . $suffix );
+                    }
+                } else {
+
+                    # no range, just suffix
+                    push( @nodeList, $prefix . $1 . $suffix );
+                }
+            }
+        } else {
+
+            # no square braces, just node name, eg 'machine0'
+            if ( !m/([^\[]+)([0-9]+)([^\[]*)/ ) {
+                print "malformed nodespec '$_'\n";
+                exit(1);
+            }
+
+            push( @nodeList, $1 . $2 . $3 );
+        }
+    }
+
+    return $#nodeList + 1;
 }
 
 sub rms_res_to_partition {
