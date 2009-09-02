@@ -1,0 +1,39 @@
+
+###
+This file is part of Padb.
+
+Padb is free software: you can redistribute it and/or modify
+it under the terms of the GNU Lesser General Public License as published by
+the Free Software Foundation, either version 2.1 of the License, or
+(at your option) any later version.
+
+Foobar is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Lesser General Public License for more details.
+
+You should have received a copy of the GNU Lesser General Public License
+along with Padb.  If not, see <http://www.gnu.org/licenses/>.
+###
+
+Building:
+
+Padb itself is a perl script and does not require any building
+however some functionality uses helper programs which do.  To build
+these programs enter the following commands:
+
+cd src
+make
+
+
+Installing:
+
+Padb needs to be available on all nodes where it is expected to run,
+this can either be achieved by installing to a shared directory
+or installing to every node in your cluster.  In addition a optional 
+configuration file can be installed to any node where the padb command
+might be executed.  To install on a cluster run the following commands:
+
+cd src
+sudo make install
+sudo make config_install
