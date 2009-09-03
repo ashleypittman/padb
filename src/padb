@@ -250,7 +250,7 @@ use Carp;
 # Main.
 
 my $prog    = basename $0;
-my $version = "3.0-rc1";
+my $version = '3.0-rc1';
 
 my %conf;
 
@@ -313,11 +313,11 @@ $rmgr{orte} = {
     'find_pids'       => \&open_find_pids,
 };
 
-$rmgr{"lsf-rms"} = {
+$rmgr{'lsf-rms'} = {
     'is_installed'    => \&lsf_is_installed,
     'get_active_jobs' => \&lsf_get_jobs,
     'setup_pcmd'      => \&lsf_setup_pcmd,
-    'inner_rmgr'      => "rms",
+    'inner_rmgr'      => 'rms',
 };
 
 $rmgr{slurm} = {
@@ -337,20 +337,20 @@ $rmgr{local} = {
     'require_inner_callback' => 1,
 };
 
-$rmgr{"local-qsnet"} = {
+$rmgr{'local-qsnet'} = {
     'is_installed'           => \&local_q_is_installed,
     'get_active_jobs'        => \&local_q_get_jobs,
     'job_is_running'         => \&local_job_is_running,
     'setup_pcmd'             => \&local_setup_pcmd,
-    'inner_rmgr'             => "local",
+    'inner_rmgr'             => 'local',
     'require_inner_callback' => 1,
 };
 
-$rmgr{"local-fd"} = {
+$rmgr{'local-fd'} = {
     'get_active_jobs'        => \&local_fd_get_jobs,
     'job_is_running'         => \&local_job_is_running,
     'setup_pcmd'             => \&local_setup_pcmd,
-    'inner_rmgr'             => "local",
+    'inner_rmgr'             => 'local',
     'require_inner_callback' => 1,
 };
 
@@ -378,14 +378,14 @@ $conf{verbose} = 0;
 
 # Valid values are "none" "missing" or "all".  Anything not recognised
 # is treated as "all".
-$conf{check_signon} = "all";
+$conf{check_signon} = 'all';
 
 # Output options.
 $conf{interval}            = 10;
 $conf{watch_clears_screen} = 1;
-$conf{scripts}             = "bash,sh,dash,ash,perl,xterm";
+$conf{scripts}             = 'bash,sh,dash,ash,perl,xterm';
 $conf{lsf_job_offset}      = 1;
-$conf{local_fd_name}       = "/dev/null";
+$conf{local_fd_name}       = '/dev/null';
 $conf{inner_callback}      = 0;
 
 # These two are used by deadlock and QsNet group
@@ -413,15 +413,15 @@ $conf{port_range} = undef;
 $conf{tree_width} = 4;
 
 my $norc       = 0;
-my $configfile = "/etc/padb.conf";
+my $configfile = '/etc/padb.conf';
 
 # Look for edb in the default install location only.
 sub find_edb {
-    return "/usr/lib/qsnet/elan4/bin/"
-      if ( -d "/usr/lib/qsnet/elan4/bin/" );
-    return "/usr/lib64/qsnet/elan4/bin/"
-      if ( -d "/usr/lib64/qsnet/elan4/bin/" );
-    return "edb";
+    return '/usr/lib/qsnet/elan4/bin/'
+      if ( -d '/usr/lib/qsnet/elan4/bin/' );
+    return '/usr/lib64/qsnet/elan4/bin/'
+      if ( -d '/usr/lib64/qsnet/elan4/bin/' );
+    return 'edb';
 }
 
 # Look for minfo.x in the same directory as padb.
@@ -603,7 +603,7 @@ sub debug_log {
     return unless $debugModes{$type};
     my $time = time() - $start_time;
     printf( "DEBUG ($type): %3d: $str\n", $time, @params );
-    return if $debugModes{$type} eq "basic";
+    return if $debugModes{$type} eq 'basic';
     return unless defined $handle;
     print Dumper($handle);
     return;
@@ -623,36 +623,36 @@ $debugModes{tdata}       = undef;
 
 sub parse_args_outer {
 
-    Getopt::Long::Configure("bundling");
+    Getopt::Long::Configure('bundling');
     my $debugflag;
 
     my @ranks;
 
     my %optionhash = (
-        "verbose|v+"          => \$conf{verbose},
-        "user|u=s"            => \$user,
-        "rank|r=s"            => \@ranks,
-        "group-id=s"          => \@target_groups,
-        "help|h"              => \&usage,
-        "all|a"               => \$all,
-        "any|A"               => \$any,
-        "version|V"           => \&show_version,
-        "compress|c"          => \$compress,
-        "compress-long|C"     => \$compress_C,
-        "tree|t"              => \$tree,
-        "input-file|file|i=s" => \$input_file,
-        "config-option|O=s"   => \@config_options,
-        "full-report=s"       => \$full_report,
-        "core-stack"          => \$core_stack,
-        "core=s"              => \$core_name,
-        "exe=s"               => \$exe_name,
-        "list-rmgrs"          => \$list_rmgrs,
-        "watch"               => \$watch,
-        "local-stats"         => \$local_stats,
-        "show-jobs"           => \$show_jobs,
-        "norc"                => \$norc,
-        "config-file=s"       => \$configfile,
-        "debug=s"             => \$debugflag,
+        'verbose|v+'          => \$conf{verbose},
+        'user|u=s'            => \$user,
+        'rank|r=s'            => \@ranks,
+        'group-id=s'          => \@target_groups,
+        'help|h'              => \&usage,
+        'all|a'               => \$all,
+        'any|A'               => \$any,
+        'version|V'           => \&show_version,
+        'compress|c'          => \$compress,
+        'compress-long|C'     => \$compress_C,
+        'tree|t'              => \$tree,
+        'input-file|file|i=s' => \$input_file,
+        'config-option|O=s'   => \@config_options,
+        'full-report=s'       => \$full_report,
+        'core-stack'          => \$core_stack,
+        'core=s'              => \$core_name,
+        'exe=s'               => \$exe_name,
+        'list-rmgrs'          => \$list_rmgrs,
+        'watch'               => \$watch,
+        'local-stats'         => \$local_stats,
+        'show-jobs'           => \$show_jobs,
+        'norc'                => \$norc,
+        'config-file=s'       => \$configfile,
+        'debug=s'             => \$debugflag,
     );
 
     my %config_hash;
@@ -678,7 +678,7 @@ sub parse_args_outer {
         foreach my $f ( split( ",", $debugflag ) ) {
             my ( $name, $v ) = split( "=", $f );
             if ( exists $debugModes{$name} ) {
-                $debugModes{$name} = defined($v) ? $v : "basic";
+                $debugModes{$name} = defined($v) ? $v : 'basic';
             } else {
                 printf("Attempt to set unknown debug flag \"$name\".\n");
             }
@@ -733,7 +733,7 @@ sub _hex {
     my $str = shift;
     if ( not defined $str ) {
         return 0;
-    } elsif ( $str eq "0xffffffffffffffff" ) {
+    } elsif ( $str eq '0xffffffffffffffff' ) {
         return -1;
     } else {
 
@@ -810,19 +810,19 @@ sub sum_tally {
 }
 
 my @scales = (
-    "Bytes",     "Kilobytes", "Megabytes", "Gigabytes",
-    "Terabytes", "Petabytes", "Exabytes"
+    'Bytes',     'Kilobytes', 'Megabytes', 'Gigabytes',
+    'Terabytes', 'Petabytes', 'Exabytes'
 );
 
 my @bin_names = (
-    "0 bytes",   "1 byte",    "2 bytes",   "4 bytes",
-    "8 bytes",   "16 bytes",  "32 bytes",  "64 bytes",
-    "128 bytes", "256 bytes", "512 bytes", "1kb",
-    "2kb",       "4kb",       "8kb",       "16kb",
-    "32kb",      "64kb",      "128kb",     "256kb",
-    "512kb",     "1mb",       "2mb",       "4mb",
-    "8mb",       "16mb",      "32mb",      "64mb",
-    "128mb",     "256mb",     "512mb",     "overflow"
+    '0 bytes',   '1 byte',    '2 bytes',   '4 bytes',
+    '8 bytes',   '16 bytes',  '32 bytes',  '64 bytes',
+    '128 bytes', '256 bytes', '512 bytes', '1kb',
+    '2kb',       '4kb',       '8kb',       '16kb',
+    '32kb',      '64kb',      '128kb',     '256kb',
+    '512kb',     '1mb',       '2mb',       '4mb',
+    '8mb',       '16mb',      '32mb',      '64mb',
+    '128mb',     '256mb',     '512mb',     'overflow'
 );
 
 sub show_counter {
@@ -918,7 +918,7 @@ sub show_bin {
                 if ( $d->{$bin}{raw}[$j] or $conf{show_all_stats} > 1 ) {
                     push(
                         @vals,
-                        sprintf( "%9s: %10d",
+                        sprintf( '%9s: %10d',
                             $bin_names[$j], $d->{$bin}{raw}[$j] )
                     );
 
@@ -939,16 +939,16 @@ sub show_bin {
 
 # These must stay in the correct order, that is the order
 # they appear in shared memory.
-my @stat_types = ( "Counter", "Tally", "Bin", "Attribute" );
+my @stat_types = qw(Counter Tally Bin Attribute);
 
 my @display_order = qw(Attribute Counter Tally Bin);
 
 my %stat_types2 = (
     Counter =>
-      { size => "1", displayfn => \&show_counter, sumfn => \&sum_counter },
-    Tally => { size => "3",  displayfn => \&show_tally, sumfn => \&sum_tally },
-    Bin   => { size => "35", displayfn => \&show_bin,   sumfn => \&sum_bin },
-    Attribute => { size => "1", displayfn => \&show_attr, sumfn => \&sum_attr },
+      { size => '1', displayfn => \&show_counter, sumfn => \&sum_counter },
+    Tally => { size => '3',  displayfn => \&show_tally, sumfn => \&sum_tally },
+    Bin   => { size => '35', displayfn => \&show_bin,   sumfn => \&sum_bin },
+    Attribute => { size => '1', displayfn => \&show_attr, sumfn => \&sum_attr },
 );
 
 sub parse_header {
@@ -957,7 +957,7 @@ sub parse_header {
 
     my @header;
 
-    if ( $a[0] ne "ELAN STATS" or $a[1] ne "falcon" ) {
+    if ( $a[0] ne 'ELAN STATS' or $a[1] ne 'falcon' ) {
         return;
     }
 
@@ -1056,7 +1056,7 @@ sub find_rail {
     my $rail = _hex $r;
 
     if ( $rail == -1 ) {
-        return "ELAN_RAIL_ALL";
+        return 'ELAN_RAIL_ALL';
     } else {
         return $rail;
     }
@@ -1347,9 +1347,9 @@ $hash->{Counter}, $hash->{Tally}, $hash->{Bin}
 .
     local $~;
     if ( defined $hash->{vp} ) {
-        $~ = "WITH_VP";
+        $~ = 'WITH_VP';
     } else {
-        $~ = "WITHOUT_VP";
+        $~ = 'WITHOUT_VP';
     }
     write STDOUT;
     return;
@@ -1361,7 +1361,7 @@ sub display_hashes {
 
     my $rev = $reverse;
 
-    $rev = not $rev if ( $sort eq "vp" );
+    $rev = not $rev if ( $sort eq 'vp' );
 
     if ($rev) {
         foreach my $e ( sort { $a->{$sort} <=> $b->{$sort} } ( @{$hashes} ) ) {
@@ -1561,14 +1561,14 @@ sub group_status_helper {
     my $ret;
     my $sstr = defined $size ? " (size $size)" : "";
 
-    my $members = "members";
-    my $are     = "are";
-    my $have    = "have";
+    my $members = 'members';
+    my $are     = 'are';
+    my $have    = 'have';
 
     if ( $#identical == 0 ) {
-        $members = "member";
-        $are     = "is";
-        $have    = "has";
+        $members = 'member';
+        $are     = 'is';
+        $have    = 'has';
     }
 
     if ($possessive) {
@@ -1680,7 +1680,7 @@ sub group_status {
             if ( $#invalid != -1 ) {
                 if ( $conf{show_all_groups} ) {
                     $ret .= $gstr
-                      . group_status_helper( "showing the group as removed",
+                      . group_status_helper( 'showing the group as removed',
                         0, $ad{$gid}{size}, @invalid );
                     $gstr = "";
                 }
@@ -1704,12 +1704,12 @@ sub group_status {
                 if ( $conf{show_all_groups} ) {
                     $ret .= $gstr
                       . group_status_helper(
-                        "no statistics for this group *(1)",
+                        'no statistics for this group *(1)',
                         1, $ad{$gid}{size}, @identical );
                     $gstr = "";
                 } else {
                     $gstr .=
-                      group_status_helper( "no statistics for this group *(1)",
+                      group_status_helper( 'no statistics for this group *(1)',
                         1, $ad{$gid}{size}, @identical );
                 }
             }
@@ -1762,7 +1762,7 @@ sub group_status {
             }
             if ( $#inactive != -1 ) {
                 $ret .= $gstr
-                  . group_status_helper( "not in a call to the collectives",
+                  . group_status_helper( 'not in a call to the collectives',
                     0, $ad{$gid}{size}, @inactive );
                 $gstr = "";
             }
@@ -1772,11 +1772,11 @@ sub group_status {
     my $count = keys(%ad);
 
     if ( $count == 1 ) {
-        my $use_str = ( $i_count == 1 ) ? "" : " not";
+        my $use_str = ( $i_count == 1 ) ? "" : ' not';
         $ret .= "Total: $count group which is$use_str in use.\n";
     } else {
-        my $d_str = ( $d_count == 1 ) ? "is" : "are";
-        my $i_str = ( $i_count == 1 ) ? "is" : "are";
+        my $d_str = ( $d_count == 1 ) ? 'is' : 'are';
+        my $i_str = ( $i_count == 1 ) ? 'is' : 'are';
         $ret .=
 "Total: $count groups of which $d_count $d_str destroyed and $i_count $i_str in use.\n";
     }
@@ -1827,13 +1827,13 @@ sub local_stats_from_job {
 
 # Show stats for all jobs on this node.
 sub local_stats {
-    opendir( DH, "/proc/rms/programs" );
+    opendir( DH, '/proc/rms/programs' );
     my @files = readdir(DH);
     closedir(DH);
 
     foreach my $job (@files) {
-        next if ( $job eq ".." );
-        next if ( $job eq "." );
+        next if ( $job eq '..' );
+        next if ( $job eq '.' );
 
         local_stats_from_job($job);
 
@@ -1879,7 +1879,7 @@ sub go_p {
     my $prev;
     my $tag = $tags[0];
 
-    debug_log( "tree", \@tags, "called tag:%s, level:%d", $tag, $level );
+    debug_log( 'tree', \@tags, 'called tag:%s, level:%d', $tag, $level );
 
     return if ( !defined($tag) );
     return if ( !defined( $lines->{$tag} ) );
@@ -1939,7 +1939,7 @@ sub go_p {
     }
 
     debug_log(
-        "tree", undef,
+        'tree', undef,
 
 "level $level, endlevel $endlevel, identical:@identical different:@different"
     );
@@ -1971,7 +1971,7 @@ sub go_p {
     }
 
     debug_log(
-        "tree", undef,
+        'tree', undef,
 
 "returning level:$level endlevel:$endlevel identical:@identical different:@different"
     );
@@ -2016,7 +2016,7 @@ sub _show_tree {
 
 sub show_tree {
     my $ref = shift;
-    debug_log( "tree", $ref, "Complete tree" );
+    debug_log( 'tree', $ref, 'Complete tree' );
     return _show_tree( $ref, undef, "" );
 }
 
@@ -2098,7 +2098,7 @@ sub find_exe {
 }
 
 sub rms_is_installed {
-    return ( find_exe("prun") and find_exe("rmsquery") );
+    return ( find_exe('prun') and find_exe('rmsquery') );
 }
 
 sub rms_get_jobs {
@@ -2113,7 +2113,7 @@ sub rms_job_is_running {
     my $job    = shift;
     my $status = `rmsquery "select status from jobs where name=\'$job\'"`;
     chomp $status;
-    return ( $status eq "running" );
+    return ( $status eq 'running' );
 }
 
 sub rms_job_to_key {
@@ -2256,7 +2256,7 @@ sub rms_res_to_partition {
 ###############################################################################
 
 sub slurm_is_installed {
-    return ( find_exe("srun") and find_exe("squeue") and find_exe("scontrol") );
+    return ( find_exe('srun') and find_exe('squeue') and find_exe('scontrol') );
 }
 
 sub slurm_get_jobs {
@@ -2283,7 +2283,7 @@ sub slurm_job_to_ncpus {
     foreach my $step (@steps) {
         my ( $step, $cpus ) = split( " ", $step );
         $tasks      = $cpus if ( $step eq $s );
-        $have_tasks = 1     if ( $cpus eq "TASKS" );
+        $have_tasks = 1     if ( $cpus eq 'TASKS' );
     }
     return $tasks if $have_tasks;
     return;
@@ -2324,7 +2324,7 @@ sub slurm_job_is_running {
     my $job    = shift;
     my $status = lc `squeue -h -j $job -o "%T"`;
     chomp $status;
-    return ( $status eq "running" );
+    return ( $status eq 'running' );
 }
 
 sub slurm_setup_pcmd {
@@ -2342,7 +2342,7 @@ sub slurm_setup_pcmd {
 
 sub local_get_jobs {
     my $user = shift;
-    opendir( DIR, "/proc/" );
+    opendir( DIR, '/proc/' );
     my @pids = readdir(DIR);
     closedir(DIR);
     my @jobs;
@@ -2368,7 +2368,7 @@ sub local_get_jobs {
 sub local_fd_get_jobs_real {
     my $user = shift;
     my $file = shift;
-    opendir( DIR, "/proc/" );
+    opendir( DIR, '/proc/' );
     my @pids = readdir(DIR);
     closedir(DIR);
     my @jobs;
@@ -2407,12 +2407,12 @@ sub local_fd_get_jobs {
 }
 
 sub local_q_is_installed {
-    return ( -d "/proc/qsnet" );
+    return ( -d '/proc/qsnet' );
 }
 
 sub local_q_get_jobs {
     my $user = shift;
-    return local_fd_get_jobs_real( $user, "/proc/qsnet/elan/user" );
+    return local_fd_get_jobs_real( $user, '/proc/qsnet/elan/user' );
 }
 
 sub local_job_is_running {
@@ -2431,7 +2431,7 @@ sub local_setup_pcmd {
 ###############################################################################
 
 sub mpd_is_installed {
-    return ( find_exe("mpdlistjobs") and find_exe("mpdrun") );
+    return ( find_exe('mpdlistjobs') and find_exe('mpdrun') );
 }
 
 sub mpd_get_data {
@@ -2447,22 +2447,22 @@ sub mpd_get_data {
         next unless $value;
         $key =~ s/ //g;
         chomp $value;
-        if ( $key eq "jobid" ) {
+        if ( $key eq 'jobid' ) {
             my ( $j, $host ) = split( "@", $value );
             $job = $j;
         }
-        if ( $key eq "username" ) {
+        if ( $key eq 'username' ) {
             $jobs{$job}{user} = $value;
         }
-        if ( $key eq "host" ) {
+        if ( $key eq 'host' ) {
             $host = $value;
             $jobs{$job}{host}{$value}++;
         }
-        if ( $key eq "pid" ) {
+        if ( $key eq 'pid' ) {
             $pid = $value;
             $jobs{$job}{pids}{$host}{$value}++;
         }
-        if ( $key eq "rank" ) {
+        if ( $key eq 'rank' ) {
             $jobs{$job}{pids}{$host}{$pid} = $value;
             if (   ( not defined $jobs{$job}{lastproc} )
                 or ( $value > $jobs{$job}{lastproc} ) )
@@ -2494,7 +2494,7 @@ sub mpd_setup_pcmd {
     my @hosts = keys %{ $d->{$job}{host} };
     my $i     = @hosts;
 
-    my ( $fh, $fn ) = tempfile("/tmp/padb.XXXXXXXX");
+    my ( $fh, $fn ) = tempfile('/tmp/padb.XXXXXXXX');
     foreach my $host (@hosts) {
         print $fh "$host:1\n";
     }
@@ -2533,7 +2533,7 @@ sub find_ompi_prefix {
 }
 
 sub open_is_installed {
-    return ( find_exe("ompi-ps") and find_exe("orterun") );
+    return ( find_exe('ompi-ps') and find_exe('orterun') );
 }
 
 my %open_jobs;
@@ -2576,7 +2576,7 @@ sub open_get_data {
                 my $host = $elems[4];
                 $host =~ s/ //g;
                 $host =~ s/\t//g;
-                next if $host eq "Node";
+                next if $host eq 'Node';
                 $open_jobs{$job}{hosts}{$host}++;
 
                 my $name = $elems[1];
@@ -2611,7 +2611,7 @@ sub open_setup_pcmd {
     my @hosts = keys %{ $open_jobs{$job}{hosts} };
     my $i     = @hosts;
 
-    my ( $fh, $fn ) = tempfile("/tmp/padb.XXXXXXXX");
+    my ( $fh, $fn ) = tempfile('/tmp/padb.XXXXXXXX');
 
     foreach my $host (@hosts) {
         print $fh "$host\n";
@@ -2642,7 +2642,7 @@ sub lsf_is_installed {
 
     # Check for both LSF and RMS, I know LSF works in other ways but I don't
     # know how to launch jobs then...
-    return ( find_exe("bjobs") and rms_is_installed() );
+    return ( find_exe('bjobs') and rms_is_installed() );
 }
 
 sub lsf_get_jobs {
@@ -2656,7 +2656,7 @@ sub lsf_get_jobs {
     foreach my $l (@out) {
         my ( $job, $user, $stat, $queue, $from, $exec, $name, $time ) =
           split( " ", $l );
-        next if ( $job eq "JOBID" );
+        next if ( $job eq 'JOBID' );
         next unless ( defined $time );
         push @jobs, $job;
     }
@@ -2751,8 +2751,8 @@ sub find_rmgr {
         printf(
 "Error, multiple resource managers detected, use -Ormgr=<resource manager>\n"
         );
-        push @ok, "local-fd";
-        push @ok, "local";
+        push @ok, 'local-fd';
+        push @ok, 'local';
         printf("@ok\n");
         exit(1);
     }
@@ -2808,8 +2808,8 @@ sub find_any_rmgr {
         printf(
 "Error, multiple resource managers detected, use -Ormgr=<resource manager>\n"
         );
-        push @installed, "local-fd";
-        push @installed, "local";
+        push @installed, 'local-fd';
+        push @installed, 'local';
         printf("@installed\n");
         exit(1);
     }
@@ -2833,15 +2833,15 @@ sub find_any_rmgr {
     printf(
 "Error, multiple active resource managers detected, use -Ormgr=<resource manager>\n"
     );
-    push @installed, "local-fd";
-    push @installed, "local";
+    push @installed, 'local-fd';
+    push @installed, 'local';
     printf("@installed\n");
     exit(1);
 }
 
 sub get_all_jobids {
     my $user = shift;
-    debug_log( "rmgr", undef, "Loading active jobs list" );
+    debug_log( 'rmgr', undef, 'Loading active jobs list' );
     return $rmgr{ $conf{rmgr} }{get_active_jobs}($user);
 }
 
@@ -2927,7 +2927,7 @@ sub strip_stack_traces {
             my $start =
               ( $cargs->{strip_below_main} and $main_idx ) ? $main_idx : 0;
 
-            printf( "Stripping 0.."
+            printf( 'Stripping 0..'
                   . $#{ $lines->{$tag} }
                   . " to $start..$end for $tag\n" )
               if $conf{verbose} > 1;
@@ -2962,14 +2962,14 @@ a: alltoall A: alltoalls w: waiting
 .: consuming CPU cycles ,: using CPU but no queue data -: sleeping *: error
 EOF
     print($header);
-    my $l = "0";
+    my $l = '0';
     for ( my $i = 1 ; $i < $nprocs ; $i++ ) {
         if ( $i % 10 == 0 ) {
             $l .= substr( $i, 0, 1 );
         } elsif ( $i % 5 == 0 ) {
-            $l .= "5";
+            $l .= '5';
         } else {
-            $l .= ".";
+            $l .= '.';
         }
     }
     printf("$l\n");
@@ -3042,7 +3042,7 @@ sub show_proc_format {
     my @columns = split( ",", $carg->{proc_format} );
     foreach my $column (@columns) {
 
-        $show_fields = 1 if ( $column eq "fields" );
+        $show_fields = 1 if ( $column eq 'fields' );
 
         my ( $name, $desc ) = split( "=", $column );
         if ( defined $desc ) {
@@ -3217,21 +3217,21 @@ sub default_output_handler {
 
     my $lines  = $d->{target_output};
     my $mode   = $req->{mode};
-    my $output = "raw";
+    my $output = 'raw';
 
     $output = $req->{out_format} if defined $req->{out_format};
 
-    if ( $mode eq "stack" or $input_file ) {
+    if ( $mode eq 'stack' or $input_file ) {
         if ( $cargs->{strip_below_main} or $cargs->{strip_above_wait} ) {
             strip_stack_traces( $cargs, $lines );
         }
     }
 
-    if ( $output eq "tree" ) {
+    if ( $output eq 'tree' ) {
         print show_tree go_p( 0, $lines,
             ( sort { $a <=> $b } ( keys %$lines ) ) );
 
-    } elsif ( $output eq "compress" ) {
+    } elsif ( $output eq 'compress' ) {
 
         foreach my $tag ( sort { $a <=> $b } ( keys %$lines ) ) {
             next if ( !defined( $lines->{$tag} ) );
@@ -3250,7 +3250,7 @@ sub default_output_handler {
                 print("$data\n");
             }
         }
-    } elsif ( $output eq "compress_c" ) {
+    } elsif ( $output eq 'compress_c' ) {
         foreach my $tag ( sort { $a <=> $b } ( keys %$lines ) ) {
             print("----------------\n");
             print("$tag\n");
@@ -3379,7 +3379,7 @@ sub extract_line {
 sub generate_comm_tree_ladder {
     my ($a)  = @_;
     my @b    = @{$a};
-    my $last = "root";
+    my $last = 'root';
     my %comm_tree;
     foreach my $c (@b) {
         $comm_tree{$c}{parent} = $last;
@@ -3397,7 +3397,7 @@ sub generate_comm_tree_ladder {
 sub generate_binary_tree {
     my ( $a, $width ) = @_;
     my @b    = @{$a};
-    my $last = "root";
+    my $last = 'root';
     my %comm_tree;
 
     my @leaves;
@@ -3438,7 +3438,7 @@ sub generate_comm_tree {
 sub connect_to_children {
     my $comm_data = shift;
 
-    debug_log( "signon", undef, "Received last signon, connecting to inner" );
+    debug_log( 'signon', undef, 'Received last signon, connecting to inner' );
 
     @{ $comm_data->{host_ids} } = sortn( keys( %{ $comm_data->{remote} } ) );
     $comm_data->{connection_tree} =
@@ -3446,7 +3446,7 @@ sub connect_to_children {
 
     my $td = $comm_data->{connection_tree}->{root}{children}[0];
 
-    debug_log( "ctree", $comm_data->{connection_tree}, "connection tree" );
+    debug_log( 'ctree', $comm_data->{connection_tree}, 'connection tree' );
 
     my $cdata;
     $cdata->{socket} = connect_to_child(
@@ -3456,7 +3456,7 @@ sub connect_to_children {
     );
     $cdata->{active}   = 1;
     $cdata->{str}      = "";
-    $cdata->{fd_desc}  = "child socket";
+    $cdata->{fd_desc}  = 'child socket';
     $cdata->{line_cb}  = \&command_from_inner;
     $cdata->{eof_cb}   = \&eof_from_fd;
     $cdata->{event_cb} = \&handle_event_from_socket;
@@ -3469,7 +3469,7 @@ sub connect_to_children {
 sub issue_command_to_inner {
     my ( $cdata, $cmd ) = @_;
     my $str = my_encode($cmd);
-    debug_log( "full_duplex", $cmd, "Sending command to inner, %d bytes",
+    debug_log( 'full_duplex', $cmd, 'Sending command to inner, %d bytes',
         length($str) );
     $cdata->{socket}->print("$str\n");
     return;
@@ -3479,7 +3479,7 @@ sub first_command {
     my $comm_data = shift;
 
     my $req;
-    $req->{mode}            = "signon";
+    $req->{mode}            = 'signon';
     $req->{connection_tree} = $comm_data->{connection_tree};
     $req->{remote}          = $comm_data->{remote};
 
@@ -3487,7 +3487,7 @@ sub first_command {
     # configuration  options.
     # XXX: Need to send over scripts and other stuff here as well.
 
-    if ( $conf{rmgr} eq "orte" ) {
+    if ( $conf{rmgr} eq 'orte' ) {
         $req->{orte_data} = $open_jobs{ $comm_data->{jobid} }{ranks};
     }
 
@@ -3516,7 +3516,7 @@ sub next_command {
 
     if ( $#commands == -1 ) {
         my $req;
-        $req->{mode} = "exit";
+        $req->{mode} = 'exit';
         return $req;
     }
 
@@ -3583,7 +3583,7 @@ sub report_failed_signon {
 
 sub check_signon {
     my ( $comm_data, $data ) = @_;
-    return if ( $conf{check_signon} eq "none" );
+    return if ( $conf{check_signon} eq 'none' );
     my %here;
     while (
         defined( my $proc = rng_shift( $data->{target_data}{found}{yes} ) ) )
@@ -3603,16 +3603,16 @@ sub check_signon {
             rng_convert_to_user($rng) );
     }
 
-    return if ( $conf{check_signon} eq "missing" );
+    return if ( $conf{check_signon} eq 'missing' );
 
     if ( keys( %{ $data->{target_data}{name} } ) != 1 ) {
         printf("Warning, remote process name differs across ranks\n");
-        report_failed_signon( "name", \%{ $data->{target_data}{name} } );
+        report_failed_signon( 'name', \%{ $data->{target_data}{name} } );
     }
 
     if ( keys( %{ $data->{target_data}{state} } ) != 1 ) {
         printf("Warning, remote process state differs across ranks\n");
-        report_failed_signon( "state", \%{ $data->{target_data}{state} } );
+        report_failed_signon( 'state', \%{ $data->{target_data}{state} } );
     }
     return;
 }
@@ -3649,7 +3649,7 @@ sub command_from_inner {
     my ( $comm_data, $cdata, $line ) = @_;
 
     # Initial signon from child.
-    if ( $line eq "Welcome" ) {
+    if ( $line eq 'Welcome' ) {
         my $req = first_command($comm_data);
         $comm_data->{current_req} = $req;
         issue_command_to_inner( $cdata, $req );
@@ -3659,20 +3659,20 @@ sub command_from_inner {
     # A reply from inner.
     my $d = my_decode($line);
 
-    debug_log( "full_duplex", $d, "Reply from inner, %d bytes", length($line) );
+    debug_log( 'full_duplex', $d, 'Reply from inner, %d bytes', length($line) );
 
     # The inner process has signed on.
-    if ( $comm_data->{current_req}->{mode} eq "signon" ) {
+    if ( $comm_data->{current_req}->{mode} eq 'signon' ) {
         $comm_data->{current_req} = next_command($comm_data);
         issue_command_to_inner( $cdata, $comm_data->{current_req} );
-        $comm_data->{state} = "live";
+        $comm_data->{state} = 'live';
         check_signon( $comm_data, $d );
         return;
     }
 
     # The inner process is about to exit.
-    if ( $comm_data->{current_req}->{mode} eq "exit" ) {
-        $comm_data->{state} = "shutdown";
+    if ( $comm_data->{current_req}->{mode} eq 'exit' ) {
+        $comm_data->{state} = 'shutdown';
         return;
     }
 
@@ -3687,8 +3687,8 @@ sub command_from_inner {
 
     if ( defined $d->{target_data} ) {
         debug_log(
-            "tdata", $d->{target_data},
-            "Target data %s",
+            'tdata', $d->{target_data},
+            'Target data %s',
             format_target_data( $d->{target_data} )
         );
     }
@@ -3744,7 +3744,7 @@ sub hello_from_inner {
 
     # Children connect back with "Hello $outerkey $hostname $port $innernkey";
     my @words = split( " ", $line );
-    if ( $#words != 4 or $words[0] ne "Hello" or $words[1] ne $secret ) {
+    if ( $#words != 4 or $words[0] ne 'Hello' or $words[1] ne $secret ) {
         printf("Bad signon $line\n");
         return 0;
     }
@@ -3764,11 +3764,11 @@ sub hello_from_inner {
 sub inner_stdout_cb {
     my ( $comm_data, $cdata, $line ) = @_;
     my @words = split( " ", $line );
-    if ( $#words == 3 and $words[0] eq "connect" ) {
+    if ( $#words == 3 and $words[0] eq 'connect' ) {
 
         handle_signon( $comm_data, $words[1], $words[2], $words[3] );
         return;
-    } elsif ( $words[0] eq "debug" ) {
+    } elsif ( $words[0] eq 'debug' ) {
         my $count = $comm_data->{sel}->count();
         print("There are $count sockets\n");
         return;
@@ -3786,7 +3786,7 @@ sub inner_stderr_cb {
 sub eof_from_fd {
     my ( $comm_data, $cdata ) = @_;
 
-    if ( $comm_data->{state} ne "shutdown" ) {
+    if ( $comm_data->{state} ne 'shutdown' ) {
         printf("Unexpected EOF from $cdata->{fd_desc} ($comm_data->{state})\n");
     }
 
@@ -3981,12 +3981,12 @@ sub rng_add_value {
             }
             return;
         } elsif ( $value >= $part->{l} and $value <= $part->{u} ) {
-            carp("Failed to add value to range (Value already in range)");
+            carp('Failed to add value to range (Value already in range)');
             return;
         }
         $idx++;
     }
-    confess("Failed to add value to range");
+    confess('Failed to add value to range');
 }
 
 sub rng_merge {
@@ -4067,7 +4067,7 @@ sub go_parallel {
         $comm_data->{listen} = $sl;
         my $port     = $sl->sockport();
         my $hostname = hostname();
-        config_set_internal( "outer", "$hostname:$port" );
+        config_set_internal( 'outer', "$hostname:$port" );
         $sel->add($sl);
 
         my %cdata;
@@ -4077,7 +4077,7 @@ sub go_parallel {
 
     map { $cmd .= " --$_=\"$cinner_cmd{$_}\"" } keys(%cinner_cmd);
 
-    debug_log( "show_cmd", undef, $cmd );
+    debug_log( 'show_cmd', undef, $cmd );
 
     my $pcmd = {
         pid => -1,
@@ -4098,7 +4098,7 @@ sub go_parallel {
     $comm_data->{signons}    = 0;
 
     # State, one of "connecting" "live" and "shutdown";
-    $comm_data->{state} = "connecting";
+    $comm_data->{state} = 'connecting';
 
     $sel->add( $pcmd->{out} );
     $sel->add( $pcmd->{err} );
@@ -4110,7 +4110,7 @@ sub go_parallel {
     $op{str}                              = "";
     $op{line_cb}                          = \&inner_stdout_cb;
     $op{eof_cb}                           = \&eof_from_fd;
-    $op{fd_desc}                          = "Inner stdout";
+    $op{fd_desc}                          = 'Inner stdout';
     $op{event_cb}                         = \&handle_event_from_socket;
     $comm_data->{sockets}{ $pcmd->{out} } = \%op;
 
@@ -4118,7 +4118,7 @@ sub go_parallel {
     $ep{str}                              = "";
     $ep{line_cb}                          = \&inner_stderr_cb;
     $ep{eof_cb}                           = \&eof_from_fd;
-    $ep{fd_desc}                          = "Inner stderr";
+    $ep{fd_desc}                          = 'Inner stderr';
     $ep{event_cb}                         = \&handle_event_from_socket;
     $comm_data->{sockets}{ $pcmd->{err} } = \%ep;
 
@@ -4149,7 +4149,7 @@ sub go_parallel {
     waitpid( $pcmd->{pid}, 0 );
     my $res = $?;
 
-    if ( $comm_data->{state} ne "shutdown" ) {
+    if ( $comm_data->{state} ne 'shutdown' ) {
         printf(
 "Unexpected exit from parallel command (state=$comm_data->{state})\n"
         );
@@ -4233,7 +4233,7 @@ sub go_job {
     $conf{verbose} && defined $ncpus && print "Job has $ncpus process(es)\n";
     $conf{verbose} && defined $hosts && print "Job spans $hosts host(s)\n";
 
-    debug_log( "verbose", undef, "There are %d processes over %d hosts",
+    debug_log( 'verbose', undef, 'There are %d processes over %d hosts',
         $ncpus, $hosts );
 
     $cmd .= " $0 --inner";
@@ -4245,7 +4245,7 @@ sub go_job {
     }
     my $errors = go_parallel( $jobid, $cmd, $ncpus, $hosts );
 
-    debug_log( "verbose", undef, "Completed command" );
+    debug_log( 'verbose', undef, 'Completed command' );
 
     cleanup_pcmd();
     return $errors;
@@ -4326,7 +4326,7 @@ sub config_from_env {
 
     foreach my $key ( keys(%conf) ) {
         $key =~ s/\-/\_/g;
-        my $name = "PADB_" . uc($key);
+        my $name = 'PADB_' . uc($key);
         if ( defined $ENV{$name} ) {
             config_set( $key, $ENV{$name} );
         }
@@ -4334,7 +4334,7 @@ sub config_from_env {
 
     foreach my $key ( keys( %{ $conf{mode_options_reverse} } ) ) {
         $key =~ s/\-/\_/g;
-        my $name = "PADB_" . uc($key);
+        my $name = 'PADB_' . uc($key);
         if ( defined $ENV{$name} ) {
             config_set( $key, $ENV{$name} );
         }
@@ -4348,14 +4348,14 @@ sub config_help {
     my $max_len = 0;
 
     foreach my $key ( keys(%conf) ) {
-        next if ( ref( $conf{$key} ) eq "HASH" );
+        next if ( ref( $conf{$key} ) eq 'HASH' );
         if ( length $key > $max_len ) {
             $max_len = length $key;
         }
     }
 
     foreach my $key ( sort( keys(%conf) ) ) {
-        next if ( ref( $conf{$key} ) eq "HASH" );
+        next if ( ref( $conf{$key} ) eq 'HASH' );
         my $name = $key;
         $name =~ s/\_/\-/g;
         if ( defined $conf{$key} ) {
@@ -4420,7 +4420,7 @@ sub outer_main {
 
         $key =~ s/\-/\_/g;
 
-        if ( $key eq "scriptDir" ) {
+        if ( $key eq 'scriptDir' ) {
             printf(
 "$prog: -OscriptDir deprecated, use -Oedb=/path/to/edb instead\n"
             );
@@ -4444,16 +4444,16 @@ sub outer_main {
 
     if ($list_rmgrs) {
         foreach my $res ( sort( keys %rmgr ) ) {
-            my $working = "yes";
+            my $working = 'yes';
 
             if ( defined $rmgr{$res}{is_installed}
                 and not $rmgr{$res}{is_installed}() )
             {
-                $working = "no";
+                $working = 'no';
             }
             my $r = $res;
 
-            if ( $working eq "yes" ) {
+            if ( $working eq 'yes' ) {
                 printf("$r: ");
                 my @jobs = $rmgr{$res}{get_active_jobs}($user);
                 if ( $#jobs > -1 ) {
@@ -4501,12 +4501,12 @@ sub outer_main {
         printf("padb version $version\n");
         printf("full job report for job $full_report\n\n");
 
-        push_command( "mqueue", "compress" );
+        push_command( 'mqueue', 'compress' );
 
-        push_command("deadlock");
+        push_command('deadlock');
 
         my %c = ( 'strip_above_wait' => 0 );
-        push_command( "stack", "tree", \%c );
+        push_command( 'stack', 'tree', \%c );
 
         go_job($full_report);
         exit(0);
@@ -4534,12 +4534,12 @@ sub outer_main {
     }
 
     if ( $all or $any ) {
-        if ( $#ARGV ne "-1" ) {
+        if ( $#ARGV != -1 ) {
             cmdline_error(
                 "$prog: Error: --all incompatible with specific ids\n");
         }
     } elsif ( !$input_file ) {
-        if ( $#ARGV eq "-1" ) {
+        if ( $#ARGV == -1 ) {
             cmdline_error(
                 "$prog: Error: no jobs specified, use --all or jobids\n");
         }
@@ -4567,7 +4567,7 @@ sub outer_main {
     }
 
     # If delivering a signal check that it's valid.
-    if ( defined($mode) and ( $mode eq "kill" ) ) {
+    if ( defined($mode) and ( $mode eq 'kill' ) ) {
         my $signal = uc( $secondary_args{signal} );
         my %sig_names;
         map { $sig_names{$_} = 1 } split( " ", $Config{sig_name} );
@@ -4577,12 +4577,12 @@ sub outer_main {
         }
     }
 
-    if ( $tree and !( ( defined $mode && $mode eq "stack" ) or $input_file ) ) {
+    if ( $tree and !( ( defined $mode && $mode eq 'stack' ) or $input_file ) ) {
         cmdline_error("$prog: Error: --tree only works with --stack-trace\n");
     }
 
     if ( defined($input_file) ) {
-        my $m = "input";
+        my $m = 'input';
         if ( defined $mode ) {
             $m = $mode;
         }
@@ -4630,9 +4630,9 @@ sub outer_main {
           if ( $conf{verbose} or ( $#jobids > 0 ) );
 
         my $of;
-        $of = "tree"       if $tree;
-        $of = "compress"   if $compress;
-        $of = "compress_c" if $compress_C;
+        $of = 'tree'       if $tree;
+        $of = 'compress'   if $compress;
+        $of = 'compress_c' if $compress_C;
         push_command( $mode, $of, $conf{mode_options}{$mode} );
         go_job($jobid);
     }
@@ -4667,7 +4667,7 @@ sub output {
     my ( $vp, $str ) = @_;
 
     if ( not defined $str ) {
-        carp("no output");
+        carp('no output');
     }
 
     push( @{ $inner_output{$vp} }, $str );
@@ -4677,7 +4677,7 @@ sub output {
 # Report a single string error for a given target rank.
 sub target_error {
     my ( $rank, $error ) = @_;
-    target_key_pair( $rank, "error", $error );
+    target_key_pair( $rank, 'error', $error );
     return;
 }
 
@@ -4702,7 +4702,7 @@ sub p_die {
 
 sub is_parent_resmgr {
     my $pid = shift;
-    my $parent_pid = find_from_status( $pid, "PPid" );
+    my $parent_pid = find_from_status( $pid, 'PPid' );
     return is_resmgr_process($parent_pid);
 }
 
@@ -4719,7 +4719,7 @@ sub gdb_start {
         err      => "",
     };
 
-    my $cmd = "gdb --interpreter=mi -q";
+    my $cmd = 'gdb --interpreter=mi -q';
     if ( defined $core ) {
         $cmd .= " $exe $core";
     }
@@ -4732,7 +4732,7 @@ sub gdb_start {
 
 sub gdb_quit {
     my ($gdb) = @_;
-    my $result = gdb_send( $gdb, "quit" );
+    my $result = gdb_send( $gdb, 'quit' );
     waitpid( $gdb->{gdbpid}, 0 );
     close( $gdb->{rdr} );
     close( $gdb->{wtr} );
@@ -4747,19 +4747,19 @@ sub gdb_attach {
     my %p = gdb_n_send( $gdb, "attach $pid" );
 
     if ( not defined $p{status} ) {
-        $gdb->{error} = "Failed to attach to process";
-        if ( not find_exe("gdb") ) {
-            $gdb->{error} = "Failed to attach to process (gdb not installed?)";
+        $gdb->{error} = 'Failed to attach to process';
+        if ( not find_exe('gdb') ) {
+            $gdb->{error} = 'Failed to attach to process (gdb not installed?)';
         }
         return;
     }
 
-    if ( $p{status} eq "error" ) {
+    if ( $p{status} eq 'error' ) {
         my $r = gdb_parse_reason( $p{reason} );
         if ( defined $r->{msg} ) {
             $gdb->{error} = "Failed to attach to process: $r->{msg}";
         } else {
-            $gdb->{error} = "Failed to attach to process";
+            $gdb->{error} = 'Failed to attach to process';
         }
         return;
     }
@@ -4772,9 +4772,9 @@ sub gdb_attach {
 
 sub gdb_detach {
     my ($gdb) = @_;
-    my $result = gdb_send( $gdb, "-target-detach" );
+    my $result = gdb_send( $gdb, '-target-detach' );
 
-    return if ( $result eq "error" );
+    return if ( $result eq 'error' );
 
     $gdb->{attached} = 0;
 
@@ -4914,7 +4914,7 @@ sub new_parse {
         $key   = $1;
         $value = $2;
     } else {
-        $key   = "tuple";
+        $key   = 'tuple';
         $value = $str;
     }
     my $leftover;
@@ -4942,7 +4942,7 @@ sub new_parse {
                 $l = $c;
             }
             my %q;
-            if ( $kk eq "tuple" or defined $collapse and $kk eq $collapse ) {
+            if ( $kk eq 'tuple' or defined $collapse and $kk eq $collapse ) {
                 push @b, $vv;
             } else {
                 $q{$kk} = $vv;
@@ -4967,7 +4967,7 @@ sub new_parse {
                 $c = strip_leading_comma($c);
                 $l = $c;
             }
-            if ( defined $collapse and $key eq "thread-ids" ) {
+            if ( defined $collapse and $key eq 'thread-ids' ) {
                 my %r;
                 $r{$kk} = $vv;
                 push @all, \%r;
@@ -4975,7 +4975,7 @@ sub new_parse {
                 $res{$kk} = $vv;
             }
         }
-        if ( defined $collapse and $key eq "thread-ids" ) {
+        if ( defined $collapse and $key eq 'thread-ids' ) {
             return ( $key, \@all, $r );
         } else {
             return ( $key, \%res, $r );
@@ -5067,7 +5067,7 @@ sub gdb_strip_quotes {
 sub gdb_type_size {
     my ( $gdb, $type ) = @_;
     my %p = gdb_n_send( $gdb, "-data-evaluate-expression sizeof($type)" );
-    return unless ( $p{status} eq "done" );
+    return unless ( $p{status} eq 'done' );
     return gdb_strip_value( $p{reason} );
 }
 
@@ -5075,14 +5075,14 @@ sub gdb_type_offset {
     my ( $gdb, $type, $field ) = @_;
     my %p =
       gdb_n_send( $gdb, "-data-evaluate-expression \"&(($type *)0)->$field\"" );
-    return unless ( $p{status} eq "done" );
+    return unless ( $p{status} eq 'done' );
     return hex( gdb_strip_value( $p{reason} ) );
 }
 
 sub gdb_func_addr {
     my ( $gdb, $func ) = @_;
     my %p = gdb_n_send( $gdb, "-data-evaluate-expression $func" );
-    return unless ( $p{status} eq "done" );
+    return unless ( $p{status} eq 'done' );
     my $value = gdb_strip_value( $p{reason} );
     my @a     = split( " ", $value );
     my $hex   = $a[-2];
@@ -5092,7 +5092,7 @@ sub gdb_func_addr {
 sub gdb_var_addr {
     my ( $gdb, $var ) = @_;
     my %p = gdb_n_send( $gdb, "-data-evaluate-expression &$var" );
-    return unless ( $p{status} eq "done" );
+    return unless ( $p{status} eq 'done' );
     $p{reason} =~ /value=\"(.+)\"$/;    #"
     return $1;
 }
@@ -5109,8 +5109,8 @@ sub gdb_read_raw {
           gdb_n_send( $gdb, "-data-read-memory -o $offset $ptr x 1 1 $count" );
         $offset += $count;
 
-        return unless ( $p{status} eq "done" );
-        my $val = gdb_parse_reason( $p{reason}, "thread-ids" );
+        return unless ( $p{status} eq 'done' );
+        my $val = gdb_parse_reason( $p{reason}, 'thread-ids' );
         push( @d, @{ $val->{memory}[0]{data} } );
 
     } while ( $offset < $size );
@@ -5126,7 +5126,7 @@ sub gdb_string {
     foreach my $d (@s) {
         my $v = hex($d);
         return $str if ( $v == 0 );
-        $str .= sprintf( "%c", $v );
+        $str .= sprintf( '%c', $v );
     }
     return $str;
 }
@@ -5138,36 +5138,36 @@ sub handle_query {
     my $b      = shift @params;
     my $cmd    = shift @params;
     my $res;
-    return "fail" unless defined $cmd;
-    if ( $cmd eq "size" ) {
+    return 'fail' unless defined $cmd;
+    if ( $cmd eq 'size' ) {
         $res = gdb_type_size( $gdb, $params[0] );
         $stats->{size}++;
-    } elsif ( $cmd eq "offset" ) {
+    } elsif ( $cmd eq 'offset' ) {
         $res = gdb_type_offset( $gdb, $params[0], $params[1] );
         $stats->{offset}++;
-    } elsif ( $cmd eq "string" ) {
+    } elsif ( $cmd eq 'string' ) {
         my $str = gdb_string( $gdb, $params[1] );
         if ( defined $str ) {
             $stats->{string}++;
             $res = $str;
         }
-    } elsif ( $cmd eq "func" ) {
+    } elsif ( $cmd eq 'func' ) {
         $res = gdb_func_addr( $gdb, $params[0] );
         $stats->{function}++;
-    } elsif ( $cmd eq "sym" ) {
+    } elsif ( $cmd eq 'sym' ) {
         $res = gdb_var_addr( $gdb, $params[0] );
         $stats->{symbol}++;
-    } elsif ( $cmd eq "data" ) {
+    } elsif ( $cmd eq 'data' ) {
         my @r = gdb_read_raw( $gdb, $params[0], $params[1] );
         if ( defined( $r[0] ) ) {
             $res = "@r";
             $stats->{datareads}++;
             $stats->{databytes} += $params[1];
         }
-    } elsif ( $cmd eq "rank" ) {
+    } elsif ( $cmd eq 'rank' ) {
         $res = $vp;
         $stats->{rank}++;
-    } elsif ( $cmd eq "image" ) {
+    } elsif ( $cmd eq 'image' ) {
         my $image = readlink("/proc/$gdb->{tracepid}/exe");
         if ( defined $image ) {
             $res = $image;
@@ -5180,7 +5180,7 @@ sub handle_query {
     }
     $stats->{errors}++;
 
-    return "fail";
+    return 'fail';
 }
 
 sub launch_h {
@@ -5217,7 +5217,7 @@ sub launch_h {
 
             # Some things *do* fail here, symbol lookups
             # and we don't need to report it.
-            if ( $res eq "fail" ) {
+            if ( $res eq 'fail' ) {
                 debug( $vp, "Failed dll request $r\n" );
             }
         } else {
@@ -5256,7 +5256,7 @@ sub launch_h {
 # stopped so always deliver this signal before and after attaching.
 sub send_cont_signal {
     my $pid = shift;
-    kill( "CONT", $pid );
+    kill( 'CONT', $pid );
     return;
 }
 
@@ -5268,15 +5268,15 @@ sub fetch_mpi_queue {
         if ( defined $g->{error} ) {
             target_error( $vp, $g->{error} );
         } else {
-            target_error( $vp, "Failed to attach to process" );
+            target_error( $vp, 'Failed to attach to process' );
         }
         return;
     }
 
-    my $base = gdb_var_addr( $g, "MPIR_dll_name" );
+    my $base = gdb_var_addr( $g, 'MPIR_dll_name' );
     if ( !defined $base ) {
         target_error( $vp,
-            "Process does not appear to be using MPI (No MPIR_dll_name symbol)"
+            'Process does not appear to be using MPI (No MPIR_dll_name symbol)'
         );
     }
 
@@ -5300,10 +5300,10 @@ sub fetch_mpi_queue {
 sub fetch_mpi_queue_gdb {
     my ( $carg, $vp, $pid, $g ) = @_;
 
-    my $base = gdb_var_addr( $g, "MPIR_dll_name" );
+    my $base = gdb_var_addr( $g, 'MPIR_dll_name' );
     if ( !defined $base ) {
         target_error( $vp,
-            "Process does not appear to be using MPI (No MPIR_dll_name symbol)"
+            'Process does not appear to be using MPI (No MPIR_dll_name symbol)'
         );
     }
 
@@ -5348,7 +5348,7 @@ sub show_mpi_queue_all {
             if ( defined $gdb->{error} ) {
                 target_error( $vp, $gdb->{error} );
             } else {
-                target_error( $vp, "Failed to attach to process" );
+                target_error( $vp, 'Failed to attach to process' );
             }
         }
 
@@ -5393,7 +5393,7 @@ sub show_mpi_queue_for_deadlock_all {
             $proc->{gdb} = $gdb;
             push( @all, $proc );
         } else {
-            output $vp, "Failed to attach to to process";
+            output $vp, 'Failed to attach to to process';
         }
 
     }
@@ -5538,7 +5538,7 @@ sub go_deadlock_detect {
             }
             if ( $#inactive != -1 ) {
                 $ret .= $gstr
-                  . group_status_helper( "not in a call to the collectives",
+                  . group_status_helper( 'not in a call to the collectives',
                     0, $ad{$gid}{size}, @inactive );
                 $gstr = "";
             }
@@ -5548,14 +5548,14 @@ sub go_deadlock_detect {
     my $count = keys(%ad);
 
     if ( $count == 1 ) {
-        my $use_str = ( $i_count == 1 ) ? "" : " not";
+        my $use_str = ( $i_count == 1 ) ? "" : ' not';
         $ret .= "Total: $count group which is$use_str in use.\n";
     } else {
-        my $i_str = ( $i_count == 1 ) ? "is" : "are";
+        my $i_str = ( $i_count == 1 ) ? 'is' : 'are';
         $ret .= "Total: $count groups of which $i_count $i_str in use.\n";
     }
 
-    return "$ret";
+    return $ret;
 }
 
 sub deadlock_detect {
@@ -5608,7 +5608,7 @@ sub gdb_read_value {
 
     # Quote the request in case it contains spaces.
     my %t = gdb_n_send( $gdb, "-data-evaluate-expression \"$name\"" );
-    if ( $t{status} eq "done" ) {
+    if ( $t{status} eq 'done' ) {
         my $v = gdb_parse_reason( $t{reason} );
         return $v->{value};
     }
@@ -5648,10 +5648,10 @@ sub gdb_expand_vars {
 
 sub gdb_dump_frames {
     my ( $gdb, $detail ) = @_;
-    my %result = gdb_n_send( $gdb, "-stack-list-frames" );
-    my $data = gdb_parse_reason( $result{reason}, "frame" );
+    my %result = gdb_n_send( $gdb, '-stack-list-frames' );
+    my $data = gdb_parse_reason( $result{reason}, 'frame' );
     if ( not defined $data->{stack} ) {
-        return ( { error => $data->{msg} || "unknown error" } );
+        return ( { error => $data->{msg} || 'unknown error' } );
     }
     if ( defined $detail ) {
         foreach my $frame ( @{ $data->{stack} } ) {
@@ -5659,21 +5659,21 @@ sub gdb_dump_frames {
 
             my %r = gdb_n_send( $gdb,
                 "-stack-list-arguments 2 $frame->{level} $frame->{level}" );
-            my $args = gdb_parse_reason( $r{reason}, "name" );
+            my $args = gdb_parse_reason( $r{reason}, 'name' );
 
-            if ( defined $args->{"stack-args"}[0]{frame}{args} ) {
-                my @names = @{ $args->{"stack-args"}[0]{frame}{args} };
+            if ( defined $args->{'stack-args'}[0]{frame}{args} ) {
+                my @names = @{ $args->{'stack-args'}[0]{frame}{args} };
                 @{ $frame->{params} } = @names;
 
-                gdb_expand_vars( $gdb, $frame, "params" );
+                gdb_expand_vars( $gdb, $frame, 'params' );
             }
 
-            my %s = gdb_n_send( $gdb, "-stack-list-locals --simple-values" );
-            if ( $s{status} eq "done" ) {
-                my $args = gdb_parse_reason( $s{reason}, "name" );
+            my %s = gdb_n_send( $gdb, '-stack-list-locals --simple-values' );
+            if ( $s{status} eq 'done' ) {
+                my $args = gdb_parse_reason( $s{reason}, 'name' );
                 if ( defined $args->{locals} ) {
                     $frame->{locals} = $args->{locals};
-                    gdb_expand_vars( $gdb, $frame, "locals" );
+                    gdb_expand_vars( $gdb, $frame, 'locals' );
                 }
             }
         }
@@ -5684,23 +5684,23 @@ sub gdb_dump_frames {
 sub gdb_dump_frames_per_thread {
     my ( $gdb, $detail ) = @_;
     my @th = ();
-    my %result = gdb_n_send( $gdb, "-thread-list-ids" );
-    if ( $result{status} ne "done" ) {
-        return ("unknown error");
+    my %result = gdb_n_send( $gdb, '-thread-list-ids' );
+    if ( $result{status} ne 'done' ) {
+        return ('unknown error');
     }
-    my $data = gdb_parse_reason( $result{reason}, "thread-ids" );
-    if ( not defined $data->{"thread-ids"} ) {
-        return ( { error => $data->{msg} || "unknown error" } );
+    my $data = gdb_parse_reason( $result{reason}, 'thread-ids' );
+    if ( not defined $data->{'thread-ids'} ) {
+        return ( { error => $data->{msg} || 'unknown error' } );
     }
-    if ( $data->{"number-of-threads"} == 0 ) {
+    if ( $data->{'number-of-threads'} == 0 ) {
         my %t;
         $t{id} = 0;
         @{ $t{frames} } = gdb_dump_frames( $gdb, $detail );
         push( @th, \%t );
         return @th;
     }
-    foreach my $thread ( @{ $data->{"thread-ids"} } ) {
-        my $id = $thread->{"thread-id"};
+    foreach my $thread ( @{ $data->{'thread-ids'} } ) {
+        my $id = $thread->{'thread-id'};
         my %t;
         $t{id} = $id;
         gdb_send( $gdb, "-thread-select $id" );
@@ -5818,10 +5818,10 @@ sub stack_from_core {
                     }
                 }
             } else {
-                printf( ( $$frame{func} || "?" ) 
-                    . "() at "
-                      . ( $$frame{file} || "?" ) . ":"
-                      . ( $$frame{line} || "?" )
+                printf( ( $$frame{func} || '?' ) 
+                    . '() at '
+                      . ( $$frame{file} || '?' ) . ':'
+                      . ( $$frame{line} || '?' )
                       . "\n" );
             }
         }
@@ -5853,7 +5853,7 @@ sub run_ptrack_cmd {
 sub run_command {
     my ( $vp, $cmd ) = @_;
     debug $vp, "running $cmd";
-    open( my $CMDS, "$cmd|" ) || p_die $vp, "cant fork subcommand";
+    open( my $CMDS, "$cmd|" ) || p_die $vp, 'cant fork subcommand';
     while (<$CMDS>) {
         chomp $_;
         output $vp, $_;
@@ -5965,12 +5965,12 @@ sub show_task_dir {
     if ( $carg->{proc_shows_proc} ) {
         my $exe = readlink "$dir/exe";
         if ( defined $exe ) {
-            proc_output( $vp, "exe", $exe );
+            proc_output( $vp, 'exe', $exe );
         }
 
         show_task_file( $vp, "$dir/status" );
-        show_task_file( $vp, "$dir/wchan", "wchan" );
-        show_task_file( $vp, "$dir/stat", "stat" );
+        show_task_file( $vp, "$dir/wchan", 'wchan' );
+        show_task_file( $vp, "$dir/stat", 'stat' );
         if ( $carg->{proc_shows_stat} ) {
             show_task_stat_file( $vp, "$dir/stat" );
         }
@@ -6009,8 +6009,8 @@ sub show_task_dir {
         closedir($FDS);
         my @all_fddata;
         foreach my $fd (@fds) {
-            next if ( $fd eq "." );
-            next if ( $fd eq ".." );
+            next if ( $fd eq '.' );
+            next if ( $fd eq '..' );
             my $target = readlink "$dir/fd/$fd";
 
             my %fdhash;
@@ -6019,7 +6019,7 @@ sub show_task_dir {
 
             # New fdinfo data, it's verbose so only enable it
             # if requested by -O proc-shows-fds=full
-            if ( $carg->{proc_shows_fds} eq "full" ) {
+            if ( $carg->{proc_shows_fds} eq 'full' ) {
                 if ( -f "$dir/fdinfo/$fd" ) {
                     open( my $FDI, "$dir/fdinfo/$fd" );
                     my @fdi = (<$FDI>);
@@ -6044,7 +6044,7 @@ sub show_task_dir {
         }
     }
     if ( $carg->{proc_shows_maps} ) {
-        show_task_file( $vp, "$dir/maps", "maps" );
+        show_task_file( $vp, "$dir/maps", 'maps' );
     }
     return;
 }
@@ -6106,7 +6106,7 @@ my %proc_keys;
 
 sub proc_output {
     my ( $vp, $key, $value ) = @_;
-    if ( $confInner{mode} eq "proc_summary" ) {
+    if ( $confInner{mode} eq 'proc_summary' ) {
         if ( defined $proc_keys{ lc($key) } ) {
             target_key_pair( $vp, lc($key), $value );
         }
@@ -6158,7 +6158,7 @@ sub show_proc_all {
         # End critical path.
 
         $jiffies_start = add_and_divide_jiffies( $stat, $stat2 );
-        open( my $LFD, "/proc/loadavg" );
+        open( my $LFD, '/proc/loadavg' );
         $load_avg = <$LFD>;
         close $LFD;
     }
@@ -6207,29 +6207,29 @@ sub show_proc_all {
             my $vp = $proc->{vp};
 
             proc_output(
-                $vp, "pcpu",
+                $vp, 'pcpu',
                 pcpu_total(
                     $cpucount,           $elapsed,
                     $proc->{stat_start}, $proc->{stat_end}
                 )
             );
             proc_output(
-                $vp, "pucpu",
+                $vp, 'pucpu',
                 pcpu_user(
                     $cpucount,           $elapsed,
                     $proc->{stat_start}, $proc->{stat_end}
                 )
             );
             proc_output(
-                $vp, "pscpu",
+                $vp, 'pscpu',
                 pcpu_sys(
                     $cpucount,           $elapsed,
                     $proc->{stat_start}, $proc->{stat_end}
                 )
             );
-            proc_output( $vp, "load1",  $l1 );
-            proc_output( $vp, "load5",  $l15 );
-            proc_output( $vp, "load15", $l15 );
+            proc_output( $vp, 'load1',  $l1 );
+            proc_output( $vp, 'load5',  $l15 );
+            proc_output( $vp, 'load15', $l15 );
         }
     }
 
@@ -6240,7 +6240,7 @@ sub show_proc {
     my ( $carg, $vp, $pid ) = @_;
 
     if ( $carg->{proc_shows_proc} ) {
-        proc_output( $vp, "hostname", $confInner{hostname} );
+        proc_output( $vp, 'hostname', $confInner{hostname} );
     }
 
     if ( -d "/proc/$pid/task" and $carg->{proc_shows_proc} ) {
@@ -6252,12 +6252,12 @@ sub show_proc {
         my @tasks = readdir(DIR);
         closedir(DIR);
         foreach my $task (@tasks) {
-            next if ( $task eq "." );
-            next if ( $task eq ".." );
+            next if ( $task eq '.' );
+            next if ( $task eq '..' );
             show_task_dir( $carg, $vp, $pid, "/proc/$pid/task/$task" );
             $threads++;
         }
-        proc_output( $vp, "threads", $threads );
+        proc_output( $vp, 'threads', $threads );
     } else {
         show_task_dir( $carg, $vp, $pid, "/proc/$pid" );
     }
@@ -6278,7 +6278,7 @@ sub show_vars {
     my $header = sprintf("  $type:");
     output( $vp, $header );
     foreach my $arg ( @{ $frame->{$type} } ) {
-        my $value = ( defined $arg->{value} ? $arg->{value} : "??" );
+        my $value = ( defined $arg->{value} ? $arg->{value} : '??' );
         my $output =
           sprintf( "  %-$l{t}s %$l{n}s = $value", $arg->{type}, $arg->{name} );
         output( $vp, $output );
@@ -6309,7 +6309,7 @@ sub stack_trace_from_pids {
             if ( defined $gdb->{error} ) {
                 target_error( $vp, $gdb->{error} );
             } else {
-                target_error( $vp, "Failed to attach to process" );
+                target_error( $vp, 'Failed to attach to process' );
             }
         }
 
@@ -6339,7 +6339,7 @@ sub stack_trace_from_pids {
                     if ( defined $gdb->{error} ) {
                         target_error( $vp, $gdb->{error} );
                     } else {
-                        target_error( $vp, "Failed to attach to process" );
+                        target_error( $vp, 'Failed to attach to process' );
                     }
                 }
             } else {
@@ -6363,7 +6363,7 @@ sub stack_trace_from_pids {
                     $ok = 1;
                     $ok = 0
                       unless ( defined $frames[$#frames]{func}
-                        and $frames[$#frames]{func} eq "main" );
+                        and $frames[$#frames]{func} eq 'main' );
                 } else {
                     $ok = 0;
                 }
@@ -6373,7 +6373,7 @@ sub stack_trace_from_pids {
             and ( $tries < $carg->{gdb_retry_count} ) );
 
         if ( not defined $threads[0]{id} ) {
-            output( $vp, "Could not extract stack trace from application" );
+            output( $vp, 'Could not extract stack trace from application' );
             return;
         }
 
@@ -6398,15 +6398,15 @@ sub stack_trace_from_pids {
                 next unless exists $$frame{func};
 
                 output( $vp,
-                        ( $$frame{func} || "?" ) 
-                      . "() at "
-                      . ( $$frame{file} || "?" ) . ":"
-                      . ( $$frame{line} || "?" ) );
+                        ( $$frame{func} || '?' ) 
+                      . '() at '
+                      . ( $$frame{file} || '?' ) . ':'
+                      . ( $$frame{line} || '?' ) );
                 if ( $carg->{stack_shows_params} ) {
-                    show_vars( $vp, $frame, "params" );
+                    show_vars( $vp, $frame, 'params' );
                 }
                 if ( $carg->{stack_shows_locals} ) {
-                    show_vars( $vp, $frame, "locals" );
+                    show_vars( $vp, $frame, 'locals' );
                 }
 
             }
@@ -6424,8 +6424,8 @@ sub kill_proc {
 
 sub ping_rank {
     my ( $cargs, $vp, $pid ) = @_;
-    target_key_pair( $vp, "PING", "ACK" );
-    output( $vp, "ACK" );
+    target_key_pair( $vp, 'PING', 'ACK' );
+    output( $vp, 'ACK' );
     return;
 }
 
@@ -6472,8 +6472,8 @@ sub show_clever_full_stack {
                     }
                 }
                 my $a = join( ", ", @a );
-                my $file = $frame->{file} || "?";
-                my $line = $frame->{line} || "?";
+                my $file = $frame->{file} || '?';
+                my $line = $frame->{line} || '?';
                 output( $vp, "$frame->{func}($a) at $file:$line" );
 
                 my $show_locals = 0;
@@ -6510,7 +6510,7 @@ sub show_full_stacks {
         return;
     }
 
-    my ( $fh, $file ) = tempfile("/tmp/padb.XXXXXXXX");
+    my ( $fh, $file ) = tempfile('/tmp/padb.XXXXXXXX');
     print $fh "where full\n";
     print $fh "detach\n";
     close $fh;
@@ -6602,14 +6602,14 @@ sub mpi_watch_all {
 
         # Load the status now before we attach with GDB,
         # otherwise we'll just see it as "T" (Stopped).
-        my $m = find_from_status( $pid, "State" );
-        target_key_pair( $vp, "proc_state", $m );
-        if ( $m eq "R" ) {
-            $m = ",";
-        } elsif ( $m eq "S" ) {
-            $m = "-";
+        my $m = find_from_status( $pid, 'State' );
+        target_key_pair( $vp, 'proc_state', $m );
+        if ( $m eq 'R' ) {
+            $m = ',';
+        } elsif ( $m eq 'S' ) {
+            $m = '-';
         } else {
-            $m = "*";
+            $m = '*';
         }
         $proc->{state} = $m;
 
@@ -6620,7 +6620,7 @@ sub mpi_watch_all {
             if ( defined $gdb->{error} ) {
                 target_error( $vp, $gdb->{error} );
             } else {
-                target_error( $vp, "Failed to attach to process" );
+                target_error( $vp, 'Failed to attach to process' );
             }
         }
     }
@@ -6630,7 +6630,7 @@ sub mpi_watch_all {
         my $pid = $proc->{pid};
 
         if ( not defined $proc->{gdb} ) {
-            target_key_pair( $vp, "state", $proc->{state} );
+            target_key_pair( $vp, 'state', $proc->{state} );
             next;
         }
 
@@ -6640,13 +6640,13 @@ sub mpi_watch_all {
         my $sm   = 0;
         my $rm   = 0;
         my $um   = 0;
-        my $good = ".";
+        my $good = '.';
         my $fnmode;
 
         @mq = fetch_mpi_queue_gdb( $carg, $vp, $pid, $gdb );
 
         if ( $#mq == 0 ) {
-            $good = ",";
+            $good = ',';
         } else {
             foreach my $o (@mq) {
                 if ( $o =~ /Operation (\d)/ ) {
@@ -6660,20 +6660,20 @@ sub mpi_watch_all {
 
         my $mt = ( grep { $_ } ( $sm, $rm, $um ) );
         if ( $mt != 0 ) {
-            my $mode = "*";
+            my $mode = '*';
 
             if ($um) {
-                $mode = "u";
-                $mode = "U" if ( $mt != 1 );
+                $mode = 'u';
+                $mode = 'U' if ( $mt != 1 );
             } else {
                 if ( $mt == 1 ) {
-                    $mode = "s" if ($sm);
-                    $mode = "r" if ($rm);
+                    $mode = 's' if ($sm);
+                    $mode = 'r' if ($rm);
                 } else {
-                    $mode = "m";
+                    $mode = 'm';
                 }
             }
-            target_key_pair( $vp, "state", $mode );
+            target_key_pair( $vp, 'state', $mode );
             next;
         }
 
@@ -6691,13 +6691,13 @@ sub mpi_watch_all {
         }
 
         if ( defined $fnmode ) {
-            target_key_pair( $vp, "state", $fns->{names}{$fnmode} );
+            target_key_pair( $vp, 'state', $fns->{names}{$fnmode} );
             next;
 
         }
 
         # Fall through case.
-        target_key_pair( $vp, "state", $proc->{state} );
+        target_key_pair( $vp, 'state', $proc->{state} );
     }
 
     foreach my $proc ( @{$list} ) {
@@ -6736,7 +6736,7 @@ sub find_from_status {
 
 sub is_resmgr_process {
     my $pid  = shift;
-    my $name = find_from_status( $pid, "Name" );
+    my $name = find_from_status( $pid, 'Name' );
     my $mgrs = { 'rmsloader' => 1, 'slurmd' => 1, 'slurmstepd' => 1 };
     return 1 if ( defined $mgrs->{$name} );
     return;
@@ -6752,7 +6752,7 @@ sub slurm_find_pids {
     return if ( $? != 0 );
     foreach my $proc (@procs) {
         my ( $pid, $job, $step, $local, $global ) = split( " ", $proc );
-        next if ( $global eq "-" );
+        next if ( $global eq '-' );
         next unless ( $job eq $jobid );
         next unless ( $step == $confInner{slurm_job_step} );
         maybe_show_pid( $global, $pid );
@@ -6820,10 +6820,10 @@ sub rms_find_pids {
         # of the resource manager then skip over to the next process.
         next if ( not defined $vp and not is_parent_resmgr( $proc->{pid} ) );
 
-        my $found = "actual";
+        my $found = 'actual';
 
         if ( not defined $vp ) {
-            $found = "likely";
+            $found = 'likely';
 
             my %env = get_remote_env( $proc->{pid} );
 
@@ -6889,7 +6889,7 @@ sub reply_from_child {
 
     # If it's the first connection over this socket simply
     # foreward on the signon command.
-    if ( $req eq "Welcome" ) {
+    if ( $req eq 'Welcome' ) {
         $sd->{socket}->printf("$handle->{signon_cmd}\n");
         return;
     }
@@ -7007,7 +7007,7 @@ sub pid_to_name {
     if ( defined $exe ) {
         return basename($exe);
     } else {
-        return find_from_status( $pid, "Name" );
+        return find_from_status( $pid, 'Name' );
     }
     return;
 }
@@ -7017,7 +7017,7 @@ sub pid_to_name {
 # scripts and, if they have any children, look at the children instead.
 sub convert_pids_to_child_pids {
 
-    opendir( DIR, "/proc/" );
+    opendir( DIR, '/proc/' );
     my @pids = readdir(DIR);
     closedir(DIR);
 
@@ -7043,14 +7043,14 @@ sub convert_pids_to_child_pids {
         if ( defined $ipids->{$pid} ) {
             $rmpid = $pid;
         } else {
-            my $ppid = find_from_status( $pid, "PPid" );
+            my $ppid = find_from_status( $pid, 'PPid' );
 
             while ( defined $ppid and $ppid != 1 ) {
                 if ( defined $ipids->{$ppid} ) {
                     $rmpid = $ppid;
                     $ppid  = undef;
                 } else {
-                    $ppid = find_from_status( $ppid, "PPid" );
+                    $ppid = find_from_status( $ppid, 'PPid' );
                 }
             }
         }
@@ -7095,7 +7095,7 @@ sub convert_pids_to_child_pids {
 sub inner_find_pids {
     my ( $netdata, $cmd ) = @_;
 
-    if ( $confInner{rmgr} eq "orte" ) {
+    if ( $confInner{rmgr} eq 'orte' ) {
         $confInner{orte_data} = $cmd->{orte_data};
     }
 
@@ -7109,10 +7109,10 @@ sub inner_find_pids {
         my $pid   = $proc->{pid};
         my $vp    = $proc->{vp};
         my $name  = readlink("/proc/$pid/exe");
-        my $state = find_from_status( $pid, "State" );
-        target_key_pair( $vp, "found", "yes" );
-        target_key_pair( $vp, "name",  $name );
-        target_key_pair( $vp, "state", $state );
+        my $state = find_from_status( $pid, 'State' );
+        target_key_pair( $vp, 'found', 'yes' );
+        target_key_pair( $vp, 'name',  $name );
+        target_key_pair( $vp, 'state', $state );
     }
     return;
 }
@@ -7126,7 +7126,7 @@ sub inner_find_pids {
 sub command_from_parent {
     my ( $netdata, $cmd ) = @_;
 
-    if ( $cmd->{mode} eq "signon" ) {
+    if ( $cmd->{mode} eq 'signon' ) {
         $netdata->{signon_cmd} = my_encode($cmd);
 
         # Setup the environment.
@@ -7158,7 +7158,7 @@ sub command_from_parent {
             $cdata{socket}   = $socket;
             $cdata{hostname} = $chostname;
             $cdata{line_cb}  = \&reply_from_child;
-            $cdata{state}    = "init";
+            $cdata{state}    = 'init';
             $netdata->{sel}->add($socket);
             $netdata->{connections}{$socket} = \%cdata;
             push @{ $netdata->{child_sockets} }, $socket;
@@ -7176,7 +7176,7 @@ sub command_from_parent {
         }
     }
 
-    if ( $cmd->{mode} eq "exit" ) {
+    if ( $cmd->{mode} eq 'exit' ) {
         $netdata->{shutdown} = 1;
         return;
     }
@@ -7255,7 +7255,7 @@ sub command_from_outer {
             $cdata->{str}     = "";
             $s->printf("Welcome\n");
             $netdata->{parent} = $cdata;
-        } elsif ( $line eq "debug" ) {
+        } elsif ( $line eq 'debug' ) {
             my $r = Dumper($netdata);
             $s->printf($r);
             $s->flush();
@@ -7319,9 +7319,9 @@ sub inner_loop_for_comms {
             PeerAddr => $ohost,
             PeerPort => $oport,
             Proto    => 'tcp',
-        ) or confess("Failed to connect to outer");
+        ) or confess('Failed to connect to outer');
         my $secret = find_padb_secret();
-        die("No secret") if not defined $secret;
+        die('No secret') if not defined $secret;
         $os->print("Hello $secret $hostname $lport $key\n");
         $os->close();
     } else {
@@ -7346,7 +7346,7 @@ sub inner_loop_for_comms {
         while ( my @data = $sel->can_read(5) ) {
             foreach my $s (@data) {
                 if ( $s == $server ) {
-                    my $new = $server->accept() or confess("Failed accept");
+                    my $new = $server->accept() or confess('Failed accept');
                     $sel->add($new);
                     my $peer = getpeername($new);
                     my ( $port, $addr ) = unpack_sockaddr_in($peer);
@@ -7491,19 +7491,19 @@ sub common_main {
     # Sort out secondary and options_i so they are handled in the same way.
 
     $allfns{queue} = {
-        'arg_long'  => "message-queue",
+        'arg_long'  => 'message-queue',
         'qsnet'     => 1,
-        'arg_short' => "q",
+        'arg_short' => 'q',
         'handler'   => \&show_queue,
-        'help'      => "Show the message queues",
-        'options_i' => { "mpi_dll" => undef, }
+        'help'      => 'Show the message queues',
+        'options_i' => { 'mpi_dll' => undef, }
 
     };
 
     $allfns{kill} = {
         'handler'   => \&kill_proc,
         'arg_long'  => 'kill',
-        'help'      => "Deliver signal to processes",
+        'help'      => 'Deliver signal to processes',
         'secondary' => [
             {
                 'arg_long' => 'signal',
@@ -7517,20 +7517,20 @@ sub common_main {
         'handler_all' => \&show_mpi_queue_all,
         'arg_long'    => 'mpi-queue',
         'arg_short'   => 'Q',
-        'help'        => "Show MPI message queues",
-        'options_i'   => { "mpi_dll" => undef, }
+        'help'        => 'Show MPI message queues',
+        'options_i'   => { 'mpi_dll' => undef, }
     };
 
     $allfns{deadlock} = {
         'handler_all' => \&show_mpi_queue_for_deadlock_all,
         'arg_long'    => 'deadlock',
         'arg_short'   => 'j',
-        'help'        => "Run deadlock detection algorithm",
+        'help'        => 'Run deadlock detection algorithm',
         'out_handler' => \&deadlock_detect,
         'options_i'   => {
-            "mpi_dll"            => undef,
-            "show_group_members" => 0,
-            "show_all_groups"    => 0,
+            'mpi_dll'            => undef,
+            'show_group_members' => 0,
+            'show_all_groups'    => 0,
           }
 
     };
@@ -7538,12 +7538,12 @@ sub common_main {
     $allfns{pinfo} = {
         'handler_all' => \&show_proc_all,
         'arg_long'    => 'proc-info',
-        'help'        => "Show process information",
+        'help'        => 'Show process information',
         'options_i'   => {
-            "proc_shows_proc" => 1,
-            "proc_shows_fds"  => 1,
-            "proc_shows_maps" => 0,
-            "proc_shows_stat" => 0
+            'proc_shows_proc' => 1,
+            'proc_shows_fds'  => 1,
+            'proc_shows_maps' => 0,
+            'proc_shows_stat' => 0
           }
 
     };
@@ -7552,17 +7552,17 @@ sub common_main {
         'handler_all' => \&show_proc_all,
         'out_handler' => \&show_proc_format,
         'arg_long'    => 'proc-summary',
-        'help'        => "Show process information in top format",
+        'help'        => 'Show process information in top format',
         'options_i'   => {
-            "column_seperator"   => "  ",
-            "proc_shows_proc"    => 1,
-            "proc_shows_fds"     => 0,
-            "proc_shows_maps"    => 0,
-            "proc_shows_stat"    => 1,
-            "proc_sort_key"      => "vp",
-            "proc_show_header"   => 1,
-            "reverse_sort_order" => 0,
-            "nprocs_output"      => undef,
+            'column_seperator'   => '  ',
+            'proc_shows_proc'    => 1,
+            'proc_shows_fds'     => 0,
+            'proc_shows_maps'    => 0,
+            'proc_shows_stat'    => 1,
+            'proc_sort_key'      => 'vp',
+            'proc_show_header'   => 1,
+            'reverse_sort_order' => 0,
+            'nprocs_output'      => undef,
         },
         'secondary' => [
             {
@@ -7579,14 +7579,14 @@ sub common_main {
         'handler_all' => \&stack_trace_from_pids,
         'arg_long'    => 'stack-trace',
         'arg_short'   => 'x',
-        'help'        => "Show stack trace (see also -t)",
+        'help'        => 'Show stack trace (see also -t)',
         'options_i'   => {
-            "stack_shows_params" => 0,
-            "stack_shows_locals" => 0,
-            "gdb_retry_count"    => 3,
-            "stack_strip_above" =>
-"elan_waitWord,elan_pollWord,elan_deviceCheck,opal_condition_wait,opal_progress",
-            "stack_strip_below" => "main",
+            'stack_shows_params' => 0,
+            'stack_shows_locals' => 0,
+            'gdb_retry_count'    => 3,
+            'stack_strip_above' =>
+'elan_waitWord,elan_pollWord,elan_deviceCheck,opal_condition_wait,opal_progress',
+            'stack_strip_below' => 'main',
         },
         'secondary' => [
             {
@@ -7607,18 +7607,18 @@ sub common_main {
         'handler_all' => \&show_full_stacks,
         'arg_long'    => 'stack-trace-full',
         'arg_short'   => 'X',
-        'help'        => "Show long stack trace (with locals)",
+        'help'        => 'Show long stack trace (with locals)',
     };
 
     $allfns{mpi_watch} = {
         'handler_all'     => \&mpi_watch_all,
         'arg_long'        => 'mpi-watch',
-        'help'            => "Trace MPI programs",
+        'help'            => 'Trace MPI programs',
         'pre_out_handler' => \&pre_mpi_watch,
         'out_handler'     => \&show_mpi_watch,
         'options_i'       => {
-            "mpi_dll"        => undef,
-            "mpi_watch_file" => undef
+            'mpi_dll'        => undef,
+            'mpi_watch_file' => undef
         }
     };
 
@@ -7633,7 +7633,7 @@ sub common_main {
         'qsnet'     => 1,
         'arg_long'  => 'set-debug',
         'arg_short' => 'D',
-        'help'      => "Set debug flags (use --dflag=value)",
+        'help'      => 'Set debug flags (use --dflag=value)',
         'secondary' => [
             {
                 'arg_long' => 'dflag',
@@ -7656,13 +7656,13 @@ sub common_main {
         'qsnet'       => 1,
         'arg_long'    => 'statistics-total',
         'arg_short'   => 's',
-        'help'        => "Show the job-wide statistics.",
+        'help'        => 'Show the job-wide statistics.',
         'options_i'   => {
-            "stats_name"     => undef,
-            "stats_sort_key" => "vp",
-            "stats_reverse"  => 0,
-            "stats_short"    => 0,
-            "show_all_stats" => 0,
+            'stats_name'     => undef,
+            'stats_sort_key' => 'vp',
+            'stats_reverse'  => 0,
+            'stats_short'    => 0,
+            'show_all_stats' => 0,
         }
     };
     $allfns{qsnet_groups} = {
@@ -7671,10 +7671,10 @@ sub common_main {
         'qsnet'       => 1,
         'arg_long'    => 'group',
         'arg_short'   => 'g',
-        'help'        => "Show the state of collective operations (groups).",
+        'help'        => 'Show the state of collective operations (groups).',
         'options_i'   => {
-            "show_group_members" => 0,
-            "show_all_groups"    => 0,
+            'show_group_members' => 0,
+            'show_all_groups'    => 0,
         }
     };
 
@@ -7695,7 +7695,7 @@ sub common_main {
 
 common_main();
 
-if ( $#ARGV >= 0 and $ARGV[0] eq "--inner" ) {
+if ( $#ARGV >= 0 and $ARGV[0] eq '--inner' ) {
     shift @ARGV;
     inner_main();
 } else {
