@@ -6362,8 +6362,8 @@ sub stack_trace_from_pids {
 
                     $ok = 1;
                     $ok = 0
-                      unless ( defined $frames[$#frames]{func}
-                        and $frames[$#frames]{func} eq 'main' );
+                      unless ( defined $frames[-1]{func}
+                        and $frames[-1]{func} eq 'main' );
                 } else {
                     $ok = 0;
                 }
