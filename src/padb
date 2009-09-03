@@ -605,7 +605,8 @@ sub debug_log {
     printf( "DEBUG ($type): %3d: $str\n", $time, @params );
     return if $debugModes{$type} eq "basic";
     return unless defined $handle;
-    print Dumper $handle;
+    print Dumper($handle);
+    return;
 }
 
 # Valid debug modes, a full list is maintained here so using unexpected
@@ -957,7 +958,7 @@ sub parse_header {
     my @header;
 
     if ( $a[0] ne "ELAN STATS" or $a[1] ne "falcon" ) {
-        return undef;
+        return;
     }
 
     my $index;
@@ -1068,7 +1069,7 @@ sub parse_content {
 
     my @raw_data;
 
-    return undef if ( $#a < 5 );
+    return if ( $#a < 5 );
 
     for ( $index = 0 ; $index < 4 ; $index++ ) {
         $raw_data[$index] = _hex( $a[$index] );
@@ -1113,7 +1114,7 @@ sub parse_content {
                 my $typename = $stat_types[$type];
                 my $count = get_sub_stat_count( $inst{sysId}, $type, $header );
 
-                next if $count eq 0;
+                next if $count == 0;
                 my %type;
                 for ( my $idx = 0 ; $idx < $count ; $idx++ ) {
                     my %data;
@@ -1172,8 +1173,6 @@ sub parse_content {
 
 sub total {
     my ($data_structures_aref) = @_;
-    my %total;         #holds data structures keyed by name and id
-    my @keys_order;    #keep the order new names and ids were encountered
 
     # Make an initial total by just copying the first set of stats
     # carte blance.
@@ -1353,6 +1352,7 @@ $hash->{Counter}, $hash->{Tally}, $hash->{Bin}
         $~ = "WITHOUT_VP";
     }
     write STDOUT;
+    return;
 }
 
 sub display_hashes {
@@ -1471,7 +1471,7 @@ sub read_stats {
 
     my $header = parse_header( shift @data );
 
-    return undef unless $header;
+    return unless $header;
 
     my @out;
     foreach my $vp (@data) {
@@ -1544,6 +1544,7 @@ sub show_stats {
     if ($group) {
         print group_status($d);
     }
+    return;
 }
 
 ###############################################################################
@@ -1672,7 +1673,7 @@ sub group_status {
         {
             my @invalid;
             foreach my $ident ( sort keys %{ $ad{$gid}{'idents'} } ) {
-                if ( $ad{$gid}{'idents'}{$ident}{'valid'} eq 0 ) {
+                if ( $ad{$gid}{'idents'}{$ident}{'valid'} == 0 ) {
                     push @invalid, $ident;
                 }
             }
@@ -1807,19 +1808,21 @@ sub local_stats_from_job {
     }
 
     my @data;
-    open( PCMD, "edb -k $key --stats-raw 2>/dev/null|" )
+    open( my $PCMD, "edb -k $key --stats-raw 2>/dev/null|" )
       or confess "$prog: cant open file: $!\n";
     local $/ = "\n\n";
-    while (<PCMD>) {
+    while (<$PCMD>) {
         s/\n//g;
         push @data, $_;
     }
+    close $PCMD;
 
     my $s = read_stats(@data);
 
     # $stats_total = 1;
 
     show_stats($s);
+    return;
 }
 
 # Show stats for all jobs on this node.
@@ -1835,6 +1838,7 @@ sub local_stats {
         local_stats_from_job($job);
 
     }
+    return;
 }
 
 ###############################################################################
@@ -2128,7 +2132,7 @@ sub rms_setup_pcmd {
 
     if ( $res eq "" ) {
         printf("Job '$job' doesn't have a associated resource\n");
-        return undef;
+        return;
     }
 
     # Try to prevent zombie jobs, fairly rare but I have seen
@@ -2268,7 +2272,7 @@ sub slurm_job_to_ncpus {
     my $job   = shift;
     my $s     = "$job." . $conf{slurm_job_step};
     my @steps = `squeue -s $s -o "%i %A" 2>/dev/null`;
-    return undef if ( $? != 0 );
+    return if ( $? != 0 );
 
     # The %A option is new so ensure we have the TASKS output
     # before we believe what we see here...
@@ -2282,20 +2286,20 @@ sub slurm_job_to_ncpus {
         $have_tasks = 1     if ( $cpus eq "TASKS" );
     }
     return $tasks if $have_tasks;
-    return undef;
+    return;
 }
 
 # Query the nodecount for the "job" as that is what we shall be running on.
 sub slurm_job_to_nodecount {
     my $job  = shift;
     my @jobs = `squeue -o "%i %D" 2>/dev/null`;
-    return undef if ( $? != 0 );
+    return if ( $? != 0 );
 
     foreach my $step (@jobs) {
         my ( $left, $right ) = split( " ", $step );
         return $right if ( $left eq $job );
     }
-    return undef;
+    return;
 }
 
 # Query the node list for the "step" which isn't the same as the node list
@@ -2306,14 +2310,14 @@ sub slurm_job_to_nodelist {
     my $job   = shift;
     my $s     = "$job." . $conf{slurm_job_step};
     my @steps = `squeue -s $s -o "%i %N" 2>/dev/null`;
-    return undef if ( $? != 0 );
+    return if ( $? != 0 );
 
     foreach my $step (@steps) {
         my ( $left, $right ) = split( " ", $step );
         return $right if ( $left eq $s );
 
     }
-    return undef;
+    return;
 }
 
 sub slurm_job_is_running {
@@ -2431,9 +2435,9 @@ sub mpd_is_installed {
 }
 
 sub mpd_get_data {
-    open( MPD, "mpdlistjobs|" ) or return;
-    my @out = <MPD>;
-    close MPD;
+    open( my $MPD, "mpdlistjobs|" ) or return;
+    my @out = <$MPD>;
+    close $MPD;
     my %jobs;
     my $job;
     my $host;
@@ -2507,6 +2511,7 @@ sub mpd_setup_pcmd {
 
 sub mpd_cleanup_pcmd {
     unlink($mpd_dfile) if ( defined($mpd_dfile) );
+    return;
 }
 
 ###############################################################################
@@ -2543,9 +2548,9 @@ sub open_get_data {
 
     my $job;
 
-    open( OPEN, "ompi-ps|" ) or return;
-    my @out = <OPEN>;
-    close OPEN;
+    open( my $open, "ompi-ps|" ) or return;
+    my @out = <$open>;
+    close $open;
 
     # Handle being called multiple times, zero the hash every
     # time we are called.  Of course we could just return the
@@ -2586,6 +2591,7 @@ sub open_get_data {
         }
 
     }
+    return;
 }
 
 sub open_get_jobs {
@@ -2623,6 +2629,7 @@ sub open_setup_pcmd {
 
 sub open_cleanup_pcmd {
     unlink($open_dfile) if ( defined($open_dfile) );
+    return;
 }
 
 ###############################################################################
@@ -2643,9 +2650,9 @@ sub lsf_get_jobs {
 
     my @jobs;
 
-    open( LSF, "bjobs -r -u $user 2>/dev/null|" ) or return;
-    my @out = <LSF>;
-    close LSF;
+    open( my $LSF, "bjobs -r -u $user 2>/dev/null|" ) or return;
+    my @out = <$LSF>;
+    close $LSF;
     foreach my $l (@out) {
         my ( $job, $user, $stat, $queue, $from, $exec, $name, $time ) =
           split( " ", $l );
@@ -2673,11 +2680,12 @@ sub lsf_setup_pcmd {
 
     my ( $res, $ncpus ) = split( " ", $result );
 
-    open( QUERY,
+    open(
+        my $QUERY,
 "rmsquery \"select name from jobs where jobs.resource=\'$res\' and status = \'running\' order by name\"|"
     );
-    my @out = <QUERY>;
-    close QUERY;
+    my @out = <$QUERY>;
+    close $QUERY;
 
     my $rjob;
 
@@ -2707,6 +2715,7 @@ sub setup_rmgr {
     } else {
         $cinner{rmgr} = $conf{rmgr};
     }
+    return;
 }
 
 sub find_rmgr {
@@ -2749,6 +2758,7 @@ sub find_rmgr {
     }
 
     setup_rmgr( $ok[0] );
+    return;
 }
 
 # Find any active resource manager, that is --any or --all
@@ -2855,7 +2865,7 @@ sub job_to_key {
         return $rmgr{ $conf{rmgr} }{job_to_key}($job);
     }
 
-    return undef;
+    return;
 }
 
 sub setup_pcmd {
@@ -2868,6 +2878,7 @@ sub cleanup_pcmd {
     if ( defined( $rmgr{ $conf{rmgr} }{cleanup_pcmd} ) ) {
         $rmgr{ $conf{rmgr} }{cleanup_pcmd}();
     }
+    return;
 }
 
 ###############################################################################
@@ -2926,6 +2937,7 @@ sub strip_stack_traces {
             $lines->{$tag} = \@new;
         }
     }
+    return;
 }
 
 sub sort_proc_hashes {
@@ -2961,6 +2973,7 @@ EOF
         }
     }
     printf("$l\n");
+    return;
 }
 
 # Convert back from a set of values (with ranges) in a namespace to a array of
@@ -3006,6 +3019,7 @@ sub show_mpi_watch {
         $o .= $v;
     }
     print("$o\n");
+    return;
 }
 
 # Nicely format process information.
@@ -3102,6 +3116,7 @@ sub show_proc_format {
             return;
         }
     }
+    return;
 }
 
 # XXX: Now only called when loading things from file.
@@ -3152,6 +3167,7 @@ sub show_results {
             }
         }
     }
+    return;
 }
 
 ###############################################################################
@@ -3178,6 +3194,7 @@ sub process_line {
     } else {
         printf("malformed line: $line");
     }
+    return;
 }
 
 sub post_process_lines {
@@ -3187,6 +3204,7 @@ sub post_process_lines {
         $lines->{raw}{$tag} =
           thaw( decode_base64( join( "\n", @{ $lines->{base64}{$tag} } ) ) );
     }
+    return;
 }
 
 sub default_output_handler {
@@ -3253,6 +3271,7 @@ sub default_output_handler {
             }
         }
     }
+    return;
 }
 
 sub go_file {
@@ -3272,9 +3291,9 @@ sub go_file {
     #    return;
     #}
 
-    open( PCMD, "$file" ) or die "$prog: cant open file $file: $!\n";
-    my @data = <PCMD>;
-    close(PCMD);
+    open( my $PCMD, "$file" ) or die "$prog: cant open file $file: $!\n";
+    my @data = <$PCMD>;
+    close($PCMD);
 
     my %lines;    # A hash of arrays.
 
@@ -3283,6 +3302,7 @@ sub go_file {
     }
     post_process_lines( \%lines );
     show_results( \%lines, $mode, undef );
+    return;
 }
 
 sub rc_status {
@@ -3302,6 +3322,7 @@ sub maybe_clear_screen {
         printf( "%s", " \033[1;1H" );
         printf( "%s", "\033[2J" );
     }
+    return;
 }
 
 sub connect_to_child {
@@ -3442,6 +3463,7 @@ sub connect_to_children {
 
     $comm_data->{sockets}{ $cdata->{socket} } = $cdata;
     $comm_data->{sel}->add( $cdata->{socket} );
+    return;
 }
 
 sub issue_command_to_inner {
@@ -3450,6 +3472,7 @@ sub issue_command_to_inner {
     debug_log( "full_duplex", $cmd, "Sending command to inner, %d bytes",
         length($str) );
     $cdata->{socket}->print("$str\n");
+    return;
 }
 
 sub first_command {
@@ -3485,6 +3508,7 @@ sub push_command {
     $cmd{out_format} = $out_format if defined($out_format);
     $cmd{args}       = $args if defined($args);
     push @commands, \%cmd;
+    return;
 }
 
 sub next_command {
@@ -3554,6 +3578,7 @@ sub report_failed_signon {
         printf( "%$c{i}s : %s\n",
             $value, rng_convert_to_user( $data->{$value} ) );
     }
+    return;
 }
 
 sub check_signon {
@@ -3589,7 +3614,7 @@ sub check_signon {
         printf("Warning, remote process state differs across ranks\n");
         report_failed_signon( "state", \%{ $data->{target_data}{state} } );
     }
-
+    return;
 }
 
 my $header_shown = 0;
@@ -3603,6 +3628,7 @@ sub maybe_show_header {
         $allfns{$mode}{pre_out_handler}( $comm_data->{nprocesses} );
     }
     $header_shown = 1;
+    return;
 }
 
 sub format_target_data {
@@ -3710,6 +3736,7 @@ sub handle_signon {
     if ( $comm_data->{signons} == $comm_data->{nhosts} ) {
         connect_to_children($comm_data);
     }
+    return;
 }
 
 sub hello_from_inner {
@@ -3731,6 +3758,7 @@ sub hello_from_inner {
         $comm_data->{listen}->close();
 
     }
+    return;
 }
 
 sub inner_stdout_cb {
@@ -3746,11 +3774,13 @@ sub inner_stdout_cb {
         return;
     }
     print("inner: $line\n");
+    return;
 }
 
 sub inner_stderr_cb {
     my ( $comm_data, $cdata, $line ) = @_;
     print("einner: $line\n");
+    return;
 }
 
 sub eof_from_fd {
@@ -3761,6 +3791,7 @@ sub eof_from_fd {
     }
 
     #printf("Expected EOF from $cdata->{fd_desc} ($comm_data->{state})\n");
+    return;
 }
 
 sub handle_event_from_socket {
@@ -3780,6 +3811,7 @@ sub handle_event_from_socket {
         $cdata->{str} .= $data;
         extract_line( $comm_data, $cdata );
     }
+    return;
 }
 
 sub handle_event_from_port {
@@ -3792,6 +3824,7 @@ sub handle_event_from_port {
     $cdata{line_cb}             = \&hello_from_inner;
     $cdata{event_cb}            = \&handle_event_from_socket;
     $comm_data->{sockets}{$new} = \%cdata;
+    return;
 }
 
 ###############################################################################
@@ -3843,9 +3876,9 @@ sub handle_event_from_port {
 sub rng_convert_from_user {
     my ($range) = @_;
 
-    return undef unless defined $range;
-    return undef if $range eq "";
-    return undef if $range eq "[]";
+    return unless defined $range;
+    return if $range eq "";
+    return if $range eq "[]";
 
     my $newrange;
 
@@ -3896,7 +3929,7 @@ sub rng_shift {
     my ($rg) = @_;
 
     # Return undef if this range is empty.
-    return undef if ( $#{$rg} == -1 );
+    return if ( $#{$rg} == -1 );
 
     my $value = $rg->[0]->{l};
     if ( $rg->[0]->{l} == $rg->[0]->{u} ) {
@@ -4157,9 +4190,9 @@ sub find_padb_secret {
         exit(1);
     }
 
-    open( SFD, $file ) or return;
-    my @l = <SFD>;
-    close(SFD);
+    open( my $SFD, $file ) or return;
+    my @l = <$SFD>;
+    close($SFD);
     if ( $#l != 0 ) {
         return;
     }
@@ -4233,6 +4266,7 @@ sub cmdline_error {
 sub config_init {
     map { $ic_names{$_}++ } @inner_conf;
     map { $ic_names_cmd{$_}++ } @inner_conf_cmd;
+    return;
 }
 
 sub config_set_internal {
@@ -4253,6 +4287,7 @@ sub config_set_internal {
     if ( defined $ic_names_cmd{$key} ) {
         $cinner_cmd{$key} = $value;
     }
+    return;
 }
 
 sub config_set {
@@ -4265,15 +4300,16 @@ sub config_set {
     }
 
     config_set_internal( $key, $value );
+    return;
 }
 
 sub config_from_file {
     my $file = shift;
 
     printf("Loading config from \"$file\"\n") if ( $conf{verbose} );
-    open( CFILE, $file ) or return;
+    open( my $CFILE, $file ) or return;
 
-    while (<CFILE>) {
+    while (<$CFILE>) {
         if (/^([\w-]+)\s*\=\s*(.*)/) {
             my $key   = $1;
             my $value = $2;
@@ -4281,7 +4317,7 @@ sub config_from_file {
             config_set( $key, $value );
         }
     }
-    close(CFILE);
+    close($CFILE);
     return;
 }
 
@@ -4303,6 +4339,7 @@ sub config_from_env {
             config_set( $key, $ENV{$name} );
         }
     }
+    return;
 }
 
 sub config_help {
@@ -4344,6 +4381,7 @@ sub config_help {
             }
         }
     }
+    return;
 }
 
 sub outer_main {
@@ -4598,6 +4636,7 @@ sub outer_main {
         push_command( $mode, $of, $conf{mode_options}{$mode} );
         go_job($jobid);
     }
+    return;
 }
 
 ###############################################################################
@@ -4618,7 +4657,7 @@ sub debug {
     $confInner{verbose} or return;
     $vp = -1 unless defined $vp;
     print "$confInner{hostname}.$vp:$str\n";
-
+    return;
 }
 
 my %inner_output;
@@ -4632,7 +4671,7 @@ sub output {
     }
 
     push( @{ $inner_output{$vp} }, $str );
-
+    return;
 }
 
 # Report a single string error for a given target rank.
@@ -4643,7 +4682,7 @@ sub target_error {
 }
 
 # Report a single string error for a given target rank.
-sub target_key_pair ($$$) {
+sub target_key_pair {
     my ( $rank, $key, $value ) = @_;
 
     if ( defined $local_target_data{$key}{$value} ) {
@@ -4651,6 +4690,7 @@ sub target_key_pair ($$$) {
     } else {
         $local_target_data{$key}{$value} = rng_convert_from_user($rank);
     }
+    return;
 }
 
 sub p_die {
@@ -4739,6 +4779,7 @@ sub gdb_detach {
     $gdb->{attached} = 0;
 
     send_cont_signal( $gdb->{tracepid} );
+    return;
 }
 
 sub gdb_wait_for_prompt {
@@ -4829,6 +4870,7 @@ sub extract_value_square {
         # printf("$2 $indent\nleft  '$left'\nright '$right'\n\n\n\n");
     }
     printf("ident $indent\n");
+    return;
 }
 
 sub extract_value_soft {
@@ -4855,6 +4897,7 @@ sub extract_value_soft {
         # printf("$2 $indent\nleft  '$left'\nright '$right'\n\n\n\n");
     }
     printf("ident $indent\n");
+    return;
 }
 
 sub new_parse {
@@ -4945,7 +4988,6 @@ sub new_parse {
     }
 
     return ( $key, \%res, $leftover );
-
 }
 
 sub gdb_parse_reason {
@@ -5025,7 +5067,7 @@ sub gdb_strip_quotes {
 sub gdb_type_size {
     my ( $gdb, $type ) = @_;
     my %p = gdb_n_send( $gdb, "-data-evaluate-expression sizeof($type)" );
-    return undef unless ( $p{status} eq "done" );
+    return unless ( $p{status} eq "done" );
     return gdb_strip_value( $p{reason} );
 }
 
@@ -5033,14 +5075,14 @@ sub gdb_type_offset {
     my ( $gdb, $type, $field ) = @_;
     my %p =
       gdb_n_send( $gdb, "-data-evaluate-expression \"&(($type *)0)->$field\"" );
-    return undef unless ( $p{status} eq "done" );
+    return unless ( $p{status} eq "done" );
     return hex( gdb_strip_value( $p{reason} ) );
 }
 
 sub gdb_func_addr {
     my ( $gdb, $func ) = @_;
     my %p = gdb_n_send( $gdb, "-data-evaluate-expression $func" );
-    return undef unless ( $p{status} eq "done" );
+    return unless ( $p{status} eq "done" );
     my $value = gdb_strip_value( $p{reason} );
     my @a     = split( " ", $value );
     my $hex   = $a[-2];
@@ -5050,7 +5092,7 @@ sub gdb_func_addr {
 sub gdb_var_addr {
     my ( $gdb, $var ) = @_;
     my %p = gdb_n_send( $gdb, "-data-evaluate-expression &$var" );
-    return undef unless ( $p{status} eq "done" );
+    return unless ( $p{status} eq "done" );
     $p{reason} =~ /value=\"(.+)\"$/;    #"
     return $1;
 }
@@ -5067,7 +5109,7 @@ sub gdb_read_raw {
           gdb_n_send( $gdb, "-data-read-memory -o $offset $ptr x 1 1 $count" );
         $offset += $count;
 
-        return undef unless ( $p{status} eq "done" );
+        return unless ( $p{status} eq "done" );
         my $val = gdb_parse_reason( $p{reason}, "thread-ids" );
         push( @d, @{ $val->{memory}[0]{data} } );
 
@@ -5080,7 +5122,7 @@ sub gdb_string {
     my $offset = 0;
     my $str    = "";
     my @s      = gdb_read_raw( $gdb, $strp, 128 );
-    return undef if ( not defined( $s[0] ) );
+    return if ( not defined( $s[0] ) );
     foreach my $d (@s) {
         my $v = hex($d);
         return $str if ( $v == 0 );
@@ -5194,10 +5236,10 @@ sub launch_h {
 
         # No interaction was had with minfo, abort with nothing.
         target_error( $vp, "Error running $confInner{minfo}: No contact" );
-        return undef;
+        return;
     }
 
-    if ( $? ne 0 ) {
+    if ( $? != 0 ) {
 
         # Bad exit code but we did talk to it so run with what we have.
         target_error( $vp,
@@ -5215,6 +5257,7 @@ sub launch_h {
 sub send_cont_signal {
     my $pid = shift;
     kill( "CONT", $pid );
+    return;
 }
 
 sub fetch_mpi_queue {
@@ -5284,6 +5327,7 @@ sub show_mpi_queue {
     foreach my $o (@mq) {
         output( $vp, $o );
     }
+    return;
 }
 
 sub show_mpi_queue_all {
@@ -5556,6 +5600,7 @@ sub deadlock_detect {
 
     my $r = go_deadlock_detect( $carg, \%coll_data );
     print $r;
+    return;
 }
 
 sub gdb_read_value {
@@ -5598,6 +5643,7 @@ sub gdb_expand_vars {
             $arg->{value} = $value;
         }
     }
+    return;
 }
 
 sub gdb_dump_frames {
@@ -5782,6 +5828,7 @@ sub stack_from_core {
     }
 
     gdb_quit($gdb);
+    return;
 }
 
 sub run_ptrack_cmd {
@@ -5791,28 +5838,29 @@ sub run_ptrack_cmd {
     my $lines = 0;
 
     send_cont_signal($pid);
-    open( CMD, "$cmd 2>/dev/null|" )
+    open( my $CMD, "$cmd 2>/dev/null|" )
       || p_die( $vp, "cant start command $cmd" );
-    while (<CMD>) {
+    while (<$CMD>) {
         chomp $_;
         output $vp, $_;
         $lines++;
     }
     send_cont_signal($pid);
-    close CMD;
+    close $CMD;
     return $lines;
 }
 
 sub run_command {
     my ( $vp, $cmd ) = @_;
     debug $vp, "running $cmd";
-    open( CMDS, "$cmd|" ) || p_die $vp, "cant fork subcommand";
-    while (<CMDS>) {
+    open( my $CMDS, "$cmd|" ) || p_die $vp, "cant fork subcommand";
+    while (<$CMDS>) {
         chomp $_;
         output $vp, $_;
     }
-    close CMDS;
+    close $CMDS;
     debug $vp, "Finished $cmd";
+    return;
 }
 
 sub get_remote_env {
@@ -5821,15 +5869,15 @@ sub get_remote_env {
     my %env;
 
     local $/ = "\0";
-    open( FD, "/proc/$pid/environ" ) or return undef;
-    while (<FD>) {
+    open( my $FD, "/proc/$pid/environ" ) or return;
+    while (<$FD>) {
         chomp;
         my @f   = split "=";
         my $key = $f[0];
         shift @f;
         $env{$key} = join( "=", @f );
     }
-    close FD;
+    close $FD;
     return %env;
 }
 
@@ -5838,22 +5886,18 @@ sub get_remote_env {
 sub load_rms_procs {
     my $jobId = shift;
 
-    if ( not open PIDFILE, "/proc/rms/programs/$jobId/pids" ) {
-
-        # This is actually perfectly legitimate, it's because you
-        # can do for example allocate -N4 prun -N2 <app>.  Because
-        # of the way prun -T works (across a resource) not having
-        # a pids file isn't always a bad thing.
-        #
-        # Of course it could mean that whatever jobs were supposed
-        # to be running on this node aren't.
-        debug undef, "Cannot open /proc/rms/programs/$jobId/pids";
-        return;
-    }
+    # This is actually perfectly legitimate, it's because you
+    # can do for example allocate -N4 prun -N2 <app>.  Because
+    # of the way prun -T works (across a resource) not having
+    # a pids file isn't always a bad thing.
+    #
+    # Of course it could mean that whatever jobs were supposed
+    # to be running on this node aren't.
+    open( my $PIDFILE, "/proc/rms/programs/$jobId/pids" ) or return;
 
     my @procs;
 
-    while (<PIDFILE>) {
+    while (<$PIDFILE>) {
         my ( $pid, $vp ) = split(' ');
         my %process;
         $process{pid} = $pid;
@@ -5867,16 +5911,16 @@ sub load_rms_procs {
         }
         push @procs, \%process;
     }
-    close(PIDFILE);
+    close($PIDFILE);
     return @procs;
 }
 
 sub show_task_file {
     my ( $vp, $file, $prefix ) = @_;
     return unless ( -f $file );
-    open( FD, "$file" ) or return;
-    my @all = <FD>;
-    close FD;
+    open( my $FD, "$file" ) or return;
+    my @all = <$FD>;
+    close $FD;
     foreach my $l (@all) {
         chomp $l;
         if ( defined $prefix ) {
@@ -5887,6 +5931,7 @@ sub show_task_file {
             proc_output( $vp, $key, $value );
         }
     }
+    return;
 }
 
 sub show_task_stat_file {
@@ -5899,9 +5944,9 @@ sub show_task_stat_file {
       nswap cnswap exit_signal processor rt_ptiority policy
       delayacct_blkio_ticks guest_time cguest_time);
     return unless ( -f $file );
-    open( FD, "$file" ) or return;
-    my @all = <FD>;
-    close FD;
+    open( my $FD, "$file" ) or return;
+    my @all = <$FD>;
+    close $FD;
 
     foreach my $l (@all) {
         chomp $l;
@@ -5911,6 +5956,7 @@ sub show_task_stat_file {
         }
 
     }
+    return;
 }
 
 sub show_task_dir {
@@ -5930,9 +5976,9 @@ sub show_task_dir {
         }
 
         if ( -f "$dir/maps" ) {
-            open( MAP, "$dir/maps" );
-            my @map = (<MAP>);
-            close(MAP);
+            open( my $MAP, "$dir/maps" );
+            my @map = (<$MAP>);
+            close($MAP);
             my %totals;
             foreach my $rgn (@map) {
                 my ( $area, $perm, $offset, $time, $inode, $file ) =
@@ -5958,9 +6004,9 @@ sub show_task_dir {
     }
 
     if ( $carg->{proc_shows_fds} ) {
-        opendir( FDS, "$dir/fd" );
-        my @fds = readdir(FDS);
-        closedir(FDS);
+        opendir( my $FDS, "$dir/fd" );
+        my @fds = readdir($FDS);
+        closedir($FDS);
         my @all_fddata;
         foreach my $fd (@fds) {
             next if ( $fd eq "." );
@@ -5975,9 +6021,9 @@ sub show_task_dir {
             # if requested by -O proc-shows-fds=full
             if ( $carg->{proc_shows_fds} eq "full" ) {
                 if ( -f "$dir/fdinfo/$fd" ) {
-                    open( FDI, "$dir/fdinfo/$fd" );
-                    my @fdi = (<FDI>);
-                    close FDI;
+                    open( my $FDI, "$dir/fdinfo/$fd" );
+                    my @fdi = (<$FDI>);
+                    close $FDI;
                     foreach my $fdi (@fdi) {
                         chomp($fdi);
                         my ( $key, $value ) = split( ":", $fdi );
@@ -6000,6 +6046,7 @@ sub show_task_dir {
     if ( $carg->{proc_shows_maps} ) {
         show_task_file( $vp, "$dir/maps", "maps" );
     }
+    return;
 }
 
 # Convert the first line of /proc/stat to elapsed jiffies.
@@ -6066,6 +6113,7 @@ sub proc_output {
     } else {
         output( $vp, "$key: $value" );
     }
+    return;
 }
 
 sub show_proc_all {
@@ -6085,16 +6133,17 @@ sub show_proc_all {
 
     my $jiffies_start;
     my $load_avg;
+    my $SFD;
     if ( $carg->{proc_shows_proc} ) {
         foreach my $proc ( @{$list} ) {
             my $pid = $proc->{pid};
             open( $proc->{handle}, "/proc/$pid/stat" );
         }
 
-        open( SFD, "/proc/stat\n" );
+        open( $SFD, "/proc/stat\n" );
 
         # Begin critical path.
-        my $stat = <SFD>;
+        my $stat = <$SFD>;
 
         foreach my $proc ( @{$list} ) {
             my $pid = $proc->{pid};
@@ -6103,15 +6152,15 @@ sub show_proc_all {
             seek( $proc->{handle}, 0, 0 );
         }
 
-        seek( SFD, 0, 0 );
-        my $stat2 = <SFD>;
+        seek( $SFD, 0, 0 );
+        my $stat2 = <$SFD>;
 
         # End critical path.
 
         $jiffies_start = add_and_divide_jiffies( $stat, $stat2 );
-        open( LFD, "/proc/loadavg" );
-        $load_avg = <LFD>;
-        close LFD;
+        open( my $LFD, "/proc/loadavg" );
+        $load_avg = <$LFD>;
+        close $LFD;
     }
 
     foreach my $proc ( @{$list} ) {
@@ -6123,10 +6172,10 @@ sub show_proc_all {
     if ( $carg->{proc_shows_proc} ) {
         sleep(1);
 
-        seek( SFD, 0, 0 );
+        seek( $SFD, 0, 0 );
 
         # Begin critical path.
-        my $stat = <SFD>;
+        my $stat = <$SFD>;
 
         foreach my $proc ( @{$list} ) {
             my $pid = $proc->{pid};
@@ -6135,18 +6184,18 @@ sub show_proc_all {
             close( $proc->{handle} );
         }
 
-        seek( SFD, 0, 0 );
-        my $stat2 = <SFD>;
+        seek( $SFD, 0, 0 );
+        my $stat2 = <$SFD>;
 
         # End critical path.
 
         my $cpucount = 0;
-        while (<SFD>) {
+        while (<$SFD>) {
             if ( $_ =~ /^cpu\d/ ) {
                 $cpucount++;
             }
         }
-        close(SFD);
+        close($SFD);
 
         my $jiffies_end = add_and_divide_jiffies( $stat, $stat2 );
 
@@ -6212,6 +6261,7 @@ sub show_proc {
     } else {
         show_task_dir( $carg, $vp, $pid, "/proc/$pid" );
     }
+    return;
 }
 
 sub show_vars {
@@ -6233,6 +6283,7 @@ sub show_vars {
           sprintf( "  %-$l{t}s %$l{n}s = $value", $arg->{type}, $arg->{name} );
         output( $vp, $output );
     }
+    return;
 }
 
 # Try and be clever here, attach to each and every process on this node first,
@@ -6438,11 +6489,13 @@ sub show_clever_full_stack {
             }
         }
     }
+    return;
 }
 
 sub show_full_stack {
     my ( $vp, $pid, $file ) = @_;
     run_ptrack_cmd( $vp, $pid, "gdb -batch -x $file -p $pid" );
+    return;
 }
 
 sub show_full_stacks {
@@ -6474,6 +6527,7 @@ sub set_debug {
     my ( $carg, $vp, $pid ) = @_;
     run_command( $vp,
         "edb --key $confInner{key} --debug=$carg->{dflag} --target-vp=$vp" );
+    return;
 }
 
 my $mpi_watch_data = <<EOF;
@@ -6498,9 +6552,9 @@ sub mpi_watch_load {
     if ( defined $carg->{mpi_watch_file} ) {
         my %fns;
         my $f = $carg->{mpi_watch_file};
-        open( MW, $f ) or return;
-        my @d = (<MW>);
-        close(MW);
+        open( my $MW, $f ) or return;
+        my @d = (<$MW>);
+        close($MW);
 
         foreach my $mode (@d) {
             chomp $mode;
@@ -6652,7 +6706,7 @@ sub mpi_watch_all {
             gdb_quit( $proc->{gdb} );
         }
     }
-
+    return;
 }
 
 sub maybe_show_pid {
@@ -6661,21 +6715,22 @@ sub maybe_show_pid {
     debug( $vp, "maybe_show_pid vp $vp, pid: $pid" );
 
     $confInner{rmpids}{$pid}{rank} = $vp;
+    return;
 }
 
 sub find_from_status {
     my $pid = shift;
     my $key = shift;
 
-    open( PCMD, "/proc/$pid/status" ) or return;
-    while (<PCMD>) {
+    open( my $PCMD, "/proc/$pid/status" ) or return;
+    while (<$PCMD>) {
         my $l = $_;
         if ( $l =~ /$key:\t+(\w+)/ ) {
-            close PCMD;
+            close $PCMD;
             return $1;
         }
     }
-    close PCMD;
+    close $PCMD;
     return;
 }
 
@@ -6684,6 +6739,7 @@ sub is_resmgr_process {
     my $name = find_from_status( $pid, "Name" );
     my $mgrs = { 'rmsloader' => 1, 'slurmd' => 1, 'slurmstepd' => 1 };
     return 1 if ( defined $mgrs->{$name} );
+    return;
 }
 
 # Report the pids as reported by slurm, don't worry about tracing children or
@@ -6693,7 +6749,7 @@ sub slurm_find_pids {
 
     my @procs =
       `scontrol listpids $jobid.$confInner{slurm_job_step} 2>/dev/null`;
-    return undef if ( $? != 0 );
+    return if ( $? != 0 );
     foreach my $proc (@procs) {
         my ( $pid, $job, $step, $local, $global ) = split( " ", $proc );
         next if ( $global eq "-" );
@@ -6701,6 +6757,7 @@ sub slurm_find_pids {
         next unless ( $step == $confInner{slurm_job_step} );
         maybe_show_pid( $global, $pid );
     }
+    return;
 }
 
 # Local processes per node, i.e. no resource manager support, we only
@@ -6709,6 +6766,7 @@ sub local_find_pids {
     my $pid = shift;
 
     maybe_show_pid( 0, $pid );
+    return;
 }
 
 sub mpd_find_pids {
@@ -6720,6 +6778,7 @@ sub mpd_find_pids {
     foreach my $pid ( keys %{$j} ) {
         maybe_show_pid( $j->{$pid}, $pid );
     }
+    return;
 }
 
 sub open_find_pids {
@@ -6730,6 +6789,7 @@ sub open_find_pids {
     foreach my $rank ( keys( %{ $confInner{orte_data}{$hostname} } ) ) {
         maybe_show_pid( $rank, $confInner{orte_data}{$hostname}{$rank} );
     }
+    return;
 }
 
 sub rms_find_pids {
@@ -6796,7 +6856,7 @@ sub rms_find_pids {
             }
         }
     }
-
+    return;
 }
 
 sub inner_show_stats {
@@ -6934,6 +6994,7 @@ sub reply_from_child {
     $handle->{all_replys}      = undef;
     $handle->{child_replys}    = 0;
     $handle->{target_responce} = undef;
+    return;
 }
 
 # Convert from a pid to a command name and do it in a safe manner to avoid
@@ -6948,6 +7009,7 @@ sub pid_to_name {
     } else {
         return find_from_status( $pid, "Name" );
     }
+    return;
 }
 
 # Take the resource manager list of pids and possibly convert these into
@@ -7025,7 +7087,7 @@ sub convert_pids_to_child_pids {
         push( @{ $confInner{all_pids} }, \%pd );
 
     }
-
+    return;
 }
 
 # Find and report pids as part of the signon protocol, we should
@@ -7052,6 +7114,7 @@ sub inner_find_pids {
         target_key_pair( $vp, "name",  $name );
         target_key_pair( $vp, "state", $state );
     }
+    return;
 }
 
 # Receive a command (perl reference) from our parent.
@@ -7175,6 +7238,7 @@ sub reply_to_parent {
 
     my $reply = my_encode($cmd);
     $netdata->{parent}->{socket}->print("$reply\n");
+    return;
 }
 
 # Process a single line of input onto a socket we are
@@ -7236,6 +7300,7 @@ sub command_from_outer {
             inner_cleanup_and_exit($netdata);
         }
     }
+    return;
 }
 
 # Loop forever in the inner process.
@@ -7304,7 +7369,7 @@ sub inner_loop_for_comms {
                 my $count = sysread( $s, $d, 65536 );
 
                 # Dead connection.
-                if ( not defined $d or $count eq 0 ) {
+                if ( not defined $d or $count == 0 ) {
 
                     # printf("null read from $sinfo->{desc}\n");
                     if ( eof($s) ) {
@@ -7332,7 +7397,7 @@ sub inner_loop_for_comms {
     }
     my $count = $sel->count();
     printf("Thats not supposed to happen count=($count)\n");
-
+    return;
 }
 
 sub inner_main {
@@ -7623,6 +7688,7 @@ sub common_main {
             }
         }
     }
+    return;
 }
 
 # Now run some actual code.
