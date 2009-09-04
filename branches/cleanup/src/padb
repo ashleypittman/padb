@@ -553,7 +553,7 @@ EOF
 #
 ###############################################################################
 
-my $user = getpwuid($<);
+my $user = getpwuid $<;
 my $rank_rng;
 
 my @target_groups;
@@ -592,7 +592,7 @@ my %secondary_args;
 # the string or call dumper on the ref as well.
 # Enable with --debug=type1,type2=all
 my %debugModes;
-my $start_time = time();
+my $start_time = time;
 
 sub debug_log {
     my ( $type, $handle, $str, @params ) = @_;
@@ -665,7 +665,7 @@ sub parse_args_outer {
             }
         }
         if ( defined $allfns{$arg}{options_i} ) {
-            foreach my $o ( keys( %{ $allfns{$arg}{options_i} } ) ) {
+            foreach my $o ( keys %{ $allfns{$arg}{options_i} } ) {
                 $conf{mode_options}{$arg}{$o} = $allfns{$arg}{options_i}{$o};
                 $conf{mode_options_reverse}{$o}{$arg} = 1;
             }
@@ -684,7 +684,7 @@ sub parse_args_outer {
             }
         }
         if ( $debugModes{all} ) {
-            foreach my $mode ( keys(%debugModes) ) {
+            foreach my $mode ( keys %debugModes ) {
                 if ( not defined $debugModes{$mode} ) {
                     $debugModes{$mode} = $debugModes{all};
                 }
@@ -916,11 +916,9 @@ sub show_bin {
             my @vals;
             for ( my $j = 0 ; $j < 32 ; $j++ ) {
                 if ( $d->{$bin}{raw}[$j] or $conf{show_all_stats} > 1 ) {
-                    push(
-                        @vals,
-                        sprintf( '%9s: %10d',
-                            $bin_names[$j], $d->{$bin}{raw}[$j] )
-                    );
+                    push @vals,
+                      sprintf( '%9s: %10d',
+                        $bin_names[$j], $d->{$bin}{raw}[$j] );
 
                     if ( $#vals == 2 ) {
                         $ret .= sprintf( "  %s\n", join( " ", @vals ) );
@@ -1315,7 +1313,7 @@ sub summarise_many {
     my $many = shift;
     my @ret;
     foreach my $single ( @{$many} ) {
-        push( @ret, summarise($single) );
+        push @ret, summarise($single);
     }
     return \@ret;
 }
@@ -1477,7 +1475,7 @@ sub read_stats {
     foreach my $vp (@data) {
         my $parsed = parse_content( $vp, $header );
         if ( defined $parsed ) {
-            push( @out, $parsed );
+            push @out, $parsed;
         }
     }
 
@@ -1511,7 +1509,7 @@ sub show_stats {
                 my $rng = rng_dup($rank_rng);
                 while ( defined( my $rank = rng_shift($rng) ) ) {
                     if ( defined $d->[$rank] ) {
-                        push( @ret, summarise( $d->[$rank] ) );
+                        push @ret, summarise( $d->[$rank] );
                     } else {
                         my $vps = $#{$d} + 1;
                         print "Invalid rank $rank (0 to $vps)\n";
@@ -1530,14 +1528,14 @@ sub show_stats {
             my $rng = rng_dup($rank_rng);
             while ( defined( my $rank = rng_shift($rng) ) ) {
                 if ( defined $d->[$rank] ) {
-                    print show_name $conf{stats_name}, $d->[$rank];
+                    print show_name( $conf{stats_name}, $d->[$rank] );
                 } else {
                     my $vps = $#{$d} + 1;
                     print "Invalid rank $rank (0 to $vps)\n";
                 }
             }
         } else {
-            print show_name $conf{stats_name}, total($d);
+            print show_name( $conf{stats_name}, total($d) );
         }
     }
 
@@ -1625,8 +1623,7 @@ sub group_status {
 
                 $ad{$gid}{idents}{$ident}{'statistics'}++;
 
-                foreach
-                  my $tally ( keys( %{ $this_group->{statistics}{Tally} } ) )
+                foreach my $tally ( keys %{ $this_group->{statistics}{Tally} } )
                 {
                     my $name = $this_group->{statistics}{Tally}{$tally}{'name'};
                     my $number =
@@ -1696,7 +1693,7 @@ sub group_status {
         {
             my @identical;
             foreach my $ident ( sort keys %{ $ad{$gid}{'idents'} } ) {
-                push( @identical, $ident )
+                push @identical, $ident
                   unless ( $ad{$gid}{'idents'}{$ident}{'statistics'} );
             }
             if ( $#identical != -1 ) {
@@ -1728,11 +1725,11 @@ sub group_status {
                         and $ad{$gid}{'idents'}{$ident}{'active'}{$s} )
                     {
                         my $number = $ad{$gid}{'idents'}{$ident}{'active'}{$s};
-                        push( @{ $active{$number} }, $ident );
+                        push @{ $active{$number} }, $ident;
                     } elsif ( $ad{$gid}{'idents'}{$ident}{'inactive'}{$s} ) {
                         my $number =
                           $ad{$gid}{'idents'}{$ident}{'inactive'}{$s};
-                        push( @{ $inactive{$number} }, $ident );
+                        push @{ $inactive{$number} }, $ident;
                     }
                 }
                 foreach my $number ( sort keys %active ) {
@@ -1757,7 +1754,7 @@ sub group_status {
                 if ( $ad{$gid}{'idents'}{$ident}{'statistics'}
                     and not defined $ad{$gid}{'idents'}{$ident}{'active'} )
                 {
-                    push( @inactive, $ident );
+                    push @inactive, $ident;
                 }
             }
             if ( $#inactive != -1 ) {
@@ -1769,7 +1766,7 @@ sub group_status {
         }
     }
 
-    my $count = keys(%ad);
+    my $count = keys %ad;
 
     if ( $count == 1 ) {
         my $use_str = ( $i_count == 1 ) ? "" : ' not';
@@ -1897,16 +1894,16 @@ sub go_p {
             if ( defined( $lines->{$tag2}[$level] )
                 and $line eq $lines->{$tag2}[$level] )
             {
-                push( @identical, $tag2 );
+                push @identical, $tag2;
                 delete( $lines->{$tag2}[$level] );
             } else {
-                push( @different, $tag2 );
+                push @different, $tag2;
             }
         }
     } else {
         foreach my $dtag (@tags) {
             if ( $dtag != $tag ) {
-                push( @different, $dtag );
+                push @different, $dtag;
             }
         }
 
@@ -2219,12 +2216,12 @@ sub rms_job_to_nhosts {
 
                     # square braces with range, eg 		    'machine[0-3]'
                     for ( $i = $1 ; $i <= $2 ; $i++ ) {
-                        push( @nodeList, $prefix . $i . $suffix );
+                        push @nodeList, $prefix . $i . $suffix;
                     }
                 } else {
 
                     # no range, just suffix
-                    push( @nodeList, $prefix . $1 . $suffix );
+                    push @nodeList, $prefix . $1 . $suffix;
                 }
             }
         } else {
@@ -2235,7 +2232,7 @@ sub rms_job_to_nhosts {
                 exit 1;
             }
 
-            push( @nodeList, $1 . $2 . $3 );
+            push @nodeList, $1 . $2 . $3;
         }
     }
 
@@ -2541,7 +2538,7 @@ my %open_jobs;
 sub open_get_data {
 
     # Simply return if called more than once.
-    if ( keys(%open_jobs) != 0 ) {
+    if ( keys %open_jobs != 0 ) {
         return;
 
     }
@@ -2978,7 +2975,7 @@ sub array_from_target_namespace {
     my ($r) = @_;
 
     my @all;
-    foreach my $value ( sort keys( %{$r} ) ) {
+    foreach my $value ( sort keys %{$r} ) {
         while ( defined( my $rank = rng_shift( $r->{$value} ) ) ) {
             $all[$rank] = $value;
         }
@@ -2991,8 +2988,8 @@ sub tree_from_namespace {
 
     my %res;
 
-    foreach my $namespace ( keys( %{$r} ) ) {
-        foreach my $value ( keys( %{ $r->{$namespace} } ) ) {
+    foreach my $namespace ( keys %{$r} ) {
+        foreach my $value ( keys %{ $r->{$namespace} } ) {
             while (
                 defined( my $rank = rng_shift( $r->{$namespace}{$value} ) ) )
             {
@@ -3058,7 +3055,7 @@ sub show_proc_format {
     foreach my $tag ( sort keys %$lines ) {
         my %hash;
         $hash{vp} = $tag;
-        foreach my $key ( keys( %{ $lines->{$tag} } ) ) {
+        foreach my $key ( keys %{ $lines->{$tag} } ) {
 
             my $value = $lines->{$tag}{$key};
             next unless defined $proc_format_lengths{$key} or $show_fields;
@@ -3071,7 +3068,7 @@ sub show_proc_format {
 
         }
         if ($show_fields) {
-            my @fields = sort keys(%hash);
+            my @fields = sort keys %hash;
             print "@fields\n";
             exit 0;
         }
@@ -3141,7 +3138,7 @@ sub show_results {
             foreach my $tag2 ( keys %$lines ) {
                 next if ( $tag2 eq $tag );
                 if ( cmp_list( \@{ $lines->{$tag} }, \@{ $lines->{$tag2} } ) ) {
-                    push( @identical, $tag2 );
+                    push @identical, $tag2;
                     delete( $lines->{$tag2} );
                 }
             }
@@ -3179,9 +3176,9 @@ sub process_line {
             my $key   = $2;
             my $value = $3;
             if ( $value =~ /raw\:([A-Za-z0-9\+\/\=]*)/ ) {
-                push( @{ $lines->{base64}{$key} }, $1 );
+                push @{ $lines->{base64}{$key} }, $1;
             } else {
-                push( @{ $lines->{lines}{$key} }, $value );
+                push @{ $lines->{lines}{$key} }, $value;
             }
         } else {
             print "debug $1.$2: $3\n";
@@ -3234,7 +3231,7 @@ sub default_output_handler {
             foreach my $tag2 ( keys %$lines ) {
                 next if ( $tag2 eq $tag );
                 if ( cmp_list( \@{ $lines->{$tag} }, \@{ $lines->{$tag2} } ) ) {
-                    push( @identical, $tag2 );
+                    push @identical, $tag2;
                     delete( $lines->{$tag2} );
                 }
             }
@@ -3255,8 +3252,8 @@ sub default_output_handler {
             }
         }
     } else {
-        my $nprocesses = keys( %{ $d->{target_output} } );
-        foreach my $process ( sortn( keys( %{ $d->{target_output} } ) ) ) {
+        my $nprocesses = keys %{ $d->{target_output} };
+        foreach my $process ( sortn( keys %{ $d->{target_output} } ) ) {
             foreach my $line ( @{ $d->{target_output}{$process} } ) {
                 if ( $nprocesses == 1 ) {
                     print "$line\n";
@@ -3378,7 +3375,7 @@ sub generate_comm_tree_ladder {
     my %comm_tree;
     foreach my $c (@b) {
         $comm_tree{$c}{parent} = $last;
-        push( @{ $comm_tree{$last}{children} }, $c );
+        push @{ $comm_tree{$last}{children} }, $c;
         $last = $c;
     }
 
@@ -3400,7 +3397,7 @@ sub generate_binary_tree {
     my $root = shift( @{$a} );
 
     my @joints;
-    push( @joints, $root );
+    push @joints, $root;
 
     $comm_tree{root}{children}[0] = $root;
 
@@ -3408,7 +3405,7 @@ sub generate_binary_tree {
         foreach my $joint (@joints) {
             my @children = splice( @{$a}, 0, $width );
             if ( $#children > -1 ) {
-                push( @leaves, @children );
+                push @leaves, @children;
                 @{ $comm_tree{$joint}{children} } = @children;
             }
         }
@@ -3435,7 +3432,7 @@ sub connect_to_children {
 
     debug_log( 'signon', undef, 'Received last signon, connecting to inner' );
 
-    @{ $comm_data->{host_ids} } = sortn( keys( %{ $comm_data->{remote} } ) );
+    @{ $comm_data->{host_ids} } = sortn( keys %{ $comm_data->{remote} } );
     $comm_data->{connection_tree} =
       generate_comm_tree( $comm_data->{host_ids} );
 
@@ -3552,7 +3549,7 @@ sub next_command {
 
     if ( $conf{verbose} and defined $req->{cargs} ) {
         print "Mode '$req->{mode}' mode specific flags:\n";
-        foreach my $arg ( sort keys( %{ $req->{cargs} } ) ) {
+        foreach my $arg ( sort keys %{ $req->{cargs} } ) {
             if ( defined $req->{cargs}{$arg} ) {
                 printf "%20s : '%s'\n", $arg, $req->{cargs}{$arg};
             } else {
@@ -3569,7 +3566,7 @@ sub report_failed_signon {
     my %c;
     $c{i} = length($key);
     print "$key : ranks\n";
-    foreach my $value ( sort keys( %{$data} ) ) {
+    foreach my $value ( sort keys %{$data} ) {
         printf "%$c{i}s : %s\n", $value, rng_convert_to_user( $data->{$value} );
     }
     return;
@@ -3599,12 +3596,12 @@ sub check_signon {
 
     return if ( $conf{check_signon} eq 'missing' );
 
-    if ( keys( %{ $data->{target_data}{name} } ) != 1 ) {
+    if ( keys %{ $data->{target_data}{name} } != 1 ) {
         print "Warning, remote process name differs across ranks\n";
         report_failed_signon( 'name', \%{ $data->{target_data}{name} } );
     }
 
-    if ( keys( %{ $data->{target_data}{state} } ) != 1 ) {
+    if ( keys %{ $data->{target_data}{state} } != 1 ) {
         print "Warning, remote process state differs across ranks\n";
         report_failed_signon( 'state', \%{ $data->{target_data}{state} } );
     }
@@ -3629,9 +3626,9 @@ sub format_target_data {
     my ($td) = @_;
 
     my $ret = "\n";
-    foreach my $name ( sort keys( %{$td} ) ) {
+    foreach my $name ( sort keys %{$td} ) {
         $ret .= "Namespace: \"$name\"\n";
-        foreach my $value ( sortn( keys( %{ $td->{$name} } ) ) ) {
+        foreach my $value ( sortn( keys %{ $td->{$name} } ) ) {
             $ret .= "    $value\t";
             $ret .= rng_convert_to_user( $td->{$name}{$value} ) . "\n";
         }
@@ -3697,7 +3694,7 @@ sub command_from_inner {
 
     if ( defined $d->{target_data}{error} ) {
         print "Warning: errors reported by some ranks\n========\n";
-        foreach my $error ( sort keys( %{ $d->{target_data}{error} } ) ) {
+        foreach my $error ( sort keys %{ $d->{target_data}{error} } ) {
             printf "%s: $error\n",
               rng_convert_to_user( $d->{target_data}{error}{$error} );
         }
@@ -3899,7 +3896,7 @@ sub rng_convert_from_user {
         } else {
             confess("Failed to recognise $part as range\n");
         }
-        push( @parts, \%part );
+        push @parts, \%part;
     }
     return \@parts;
 }
@@ -3910,9 +3907,9 @@ sub rng_convert_to_user {
     my @entries;
     foreach my $part ( @{$rg} ) {
         if ( $part->{l} == $part->{u} ) {
-            push( @entries, $part->{l} );
+            push @entries, $part->{l};
         } else {
-            push( @entries, "$part->{l}-$part->{u}" );
+            push @entries, "$part->{l}-$part->{u}";
         }
     }
     my $range = join( ",", @entries );
@@ -3938,13 +3935,13 @@ sub rng_add_value {
     my ( $rg, $value ) = @_;
 
     if ( ref( $rg->[0] ) eq "" ) {
-        push( @{$rg}, { 'l' => $value, 'u' => $value } );
+        push @{$rg}, { 'l' => $value, 'u' => $value };
         return;
     }
 
     # If it's after the last value then just add it.
     if ( $value > $rg->[-1]->{u} + 1 ) {
-        push( @{$rg}, { 'l' => $value, 'u' => $value } );
+        push @{$rg}, { 'l' => $value, 'u' => $value };
         return;
     }
 
@@ -4069,7 +4066,7 @@ sub go_parallel {
         $comm_data->{sockets}{$sl} = \%cdata;
     }
 
-    map { $cmd .= " --$_=\"$cinner_cmd{$_}\"" } keys(%cinner_cmd);
+    map { $cmd .= " --$_=\"$cinner_cmd{$_}\"" } keys %cinner_cmd;
 
     debug_log( 'show_cmd', undef, $cmd );
 
@@ -4265,7 +4262,7 @@ sub config_set_internal {
     if ( exists $conf{$key} ) {
         $conf{$key} = $value;
     } else {
-        foreach my $mode ( keys( %{ $conf{mode_options_reverse}{$key} } ) ) {
+        foreach my $mode ( keys %{ $conf{mode_options_reverse}{$key} } ) {
             $conf{mode_options}{$mode}{$key} = $value;
         }
     }
@@ -4314,7 +4311,7 @@ sub config_from_file {
 sub config_from_env {
     print "Loading config from environment\n" if ( $conf{verbose} );
 
-    foreach my $key ( keys(%conf) ) {
+    foreach my $key ( keys %conf ) {
         $key =~ s/\-/\_/g;
         my $name = 'PADB_' . uc($key);
         if ( defined $ENV{$name} ) {
@@ -4322,7 +4319,7 @@ sub config_from_env {
         }
     }
 
-    foreach my $key ( keys( %{ $conf{mode_options_reverse} } ) ) {
+    foreach my $key ( keys %{ $conf{mode_options_reverse} } ) {
         $key =~ s/\-/\_/g;
         my $name = 'PADB_' . uc($key);
         if ( defined $ENV{$name} ) {
@@ -4337,14 +4334,14 @@ sub config_help {
 
     my $max_len = 0;
 
-    foreach my $key ( keys(%conf) ) {
+    foreach my $key ( keys %conf ) {
         next if ( ref( $conf{$key} ) eq 'HASH' );
         if ( length $key > $max_len ) {
             $max_len = length $key;
         }
     }
 
-    foreach my $key ( sort keys(%conf) ) {
+    foreach my $key ( sort keys %conf ) {
         next if ( ref( $conf{$key} ) eq 'HASH' );
         my $name = $key;
         $name =~ s/\_/\-/g;
@@ -4355,9 +4352,9 @@ sub config_help {
         }
     }
 
-    foreach my $mode ( sort keys( %{ $conf{mode_options} } ) ) {
+    foreach my $mode ( sort keys %{ $conf{mode_options} } ) {
         print "\nOptions for mode '$allfns{$mode}{arg_long}'\n";
-        foreach my $key ( sort keys( %{ $conf{mode_options}{$mode} } ) ) {
+        foreach my $key ( sort keys %{ $conf{mode_options}{$mode} } ) {
             my $name = $key;
             $name =~ s/\_/\-/g;
             if ( defined $conf{mode_options}{$mode}{$key} ) {
@@ -4657,7 +4654,7 @@ sub output {
         carp('no output');
     }
 
-    push( @{ $inner_output{$vp} }, $str );
+    push @{ $inner_output{$vp} }, $str;
     return;
 }
 
@@ -5089,7 +5086,7 @@ sub gdb_read_raw {
 
         return unless ( $p{status} eq 'done' );
         my $val = gdb_parse_reason( $p{reason}, 'thread-ids' );
-        push( @d, @{ $val->{memory}[0]{data} } );
+        push @d, @{ $val->{memory}[0]{data} };
 
     } while ( $offset < $size );
     return @d[ 0 .. $size - 1 ];
@@ -5199,11 +5196,11 @@ sub launch_h {
                 debug( $vp, "Failed dll request $r\n" );
             }
         } else {
-            push( @mq, $r );
+            push @mq, $r;
         }
     }
 
-    my $sc = keys(%stats);
+    my $sc = keys %stats;
 
     waitpid( $h->{hpid}, 0 );
     close( $h->{rdr} );
@@ -5321,7 +5318,7 @@ sub show_mpi_queue_all {
         my $gdb = gdb_start();
         if ( gdb_attach( $gdb, $pid ) ) {
             $proc->{gdb} = $gdb;
-            push( @all, $proc );
+            push @all, $proc;
         } else {
             if ( defined $gdb->{error} ) {
                 target_error( $vp, $gdb->{error} );
@@ -5369,7 +5366,7 @@ sub show_mpi_queue_for_deadlock_all {
         my $gdb = gdb_start();
         if ( gdb_attach( $gdb, $pid ) ) {
             $proc->{gdb} = $gdb;
-            push( @all, $proc );
+            push @all, $proc;
         } else {
             output $vp, 'Failed to attach to to process';
         }
@@ -5410,9 +5407,9 @@ sub go_deadlock_detect {
         }
     }
 
-    foreach my $process ( keys( %{$cd} ) ) {
+    foreach my $process ( keys %{$cd} ) {
         my $rd = $cd->{$process};
-        foreach my $g ( keys( %{$rd} ) ) {
+        foreach my $g ( keys %{$rd} ) {
             my $gd  = $rd->{$g};
             my $gid = $gd->{id};
 
@@ -5432,7 +5429,7 @@ sub go_deadlock_detect {
             }
             $ad{$gid}{size} = $gd->{size};
             $ad{$gid}{name} = $gd->{name};
-            foreach my $coll ( keys( %{ $gd->{coll} } ) ) {
+            foreach my $coll ( keys %{ $gd->{coll} } ) {
                 my $count = $gd->{coll}{$coll}{count};
                 if ( defined $gd->{coll}{$coll}{active} ) {
                     $ad{$gid}{active}{$coll}++;
@@ -5482,11 +5479,11 @@ sub go_deadlock_detect {
                         and $ad{$gid}{'idents'}{$ident}{'active'}{$s} )
                     {
                         my $number = $ad{$gid}{'idents'}{$ident}{'active'}{$s};
-                        push( @{ $active{$number} }, $ident );
+                        push @{ $active{$number} }, $ident;
                     } elsif ( $ad{$gid}{'idents'}{$ident}{'inactive'}{$s} ) {
                         my $number =
                           $ad{$gid}{'idents'}{$ident}{'inactive'}{$s};
-                        push( @{ $inactive{$number} }, $ident );
+                        push @{ $inactive{$number} }, $ident;
                     }
                 }
                 foreach my $number ( sort keys %active ) {
@@ -5511,7 +5508,7 @@ sub go_deadlock_detect {
             my @inactive;
             foreach my $ident ( sort keys %{ $ad{$gid}{'idents'} } ) {
                 if ( not defined $ad{$gid}{'idents'}{$ident}{'active'} ) {
-                    push( @inactive, $ident );
+                    push @inactive, $ident;
                 }
             }
             if ( $#inactive != -1 ) {
@@ -5523,7 +5520,7 @@ sub go_deadlock_detect {
         }
     }
 
-    my $count = keys(%ad);
+    my $count = keys %ad;
 
     if ( $count == 1 ) {
         my $use_str = ( $i_count == 1 ) ? "" : ' not';
@@ -5551,7 +5548,7 @@ sub deadlock_detect {
     }
 
     my %coll_data;
-    foreach my $rank ( keys( %{$data} ) ) {
+    foreach my $rank ( keys %{$data} ) {
         my $r = $data->{$rank};
         my %lid;
         foreach my $line ( @{$r} ) {
@@ -5674,7 +5671,7 @@ sub gdb_dump_frames_per_thread {
         my %t;
         $t{id} = 0;
         @{ $t{frames} } = gdb_dump_frames( $gdb, $detail );
-        push( @th, \%t );
+        push @th, \%t;
         return @th;
     }
     foreach my $thread ( @{ $data->{'thread-ids'} } ) {
@@ -5683,7 +5680,7 @@ sub gdb_dump_frames_per_thread {
         $t{id} = $id;
         gdb_send( $gdb, "-thread-select $id" );
         @{ $t{frames} } = gdb_dump_frames( $gdb, $detail );
-        push( @th, \%t );
+        push @th, \%t;
     }
     return @th;
 }
@@ -5776,9 +5773,9 @@ sub stack_from_core {
                 my @a;
                 foreach my $arg ( @{ $frame->{params} } ) {
                     if ( defined $frame->{vals}{$arg} ) {
-                        push( @a, "$arg = $frame->{vals}{$arg}" );
+                        push @a, "$arg = $frame->{vals}{$arg}";
                     } else {
-                        push( @a, "$arg = ??" );
+                        push @a, "$arg = ??";
                     }
                 }
                 my $a = join( ", ", @a );
@@ -6010,7 +6007,7 @@ sub show_task_dir {
                     }
                 }
             }
-            push( @all_fddata, \%fdhash );
+            push @all_fddata, \%fdhash;
         }
         foreach my $fd (@all_fddata) {
             if ( defined $fd->{pos} ) {
@@ -6282,7 +6279,7 @@ sub stack_trace_from_pids {
         my $gdb = gdb_start();
         if ( gdb_attach( $gdb, $pid ) ) {
             $proc->{gdb} = $gdb;
-            push( @all, $proc );
+            push @all, $proc;
         } else {
             if ( defined $gdb->{error} ) {
                 target_error( $vp, $gdb->{error} );
@@ -6444,9 +6441,9 @@ sub show_clever_full_stack {
                 my @a;
                 foreach my $arg ( @{ $frame->{params} } ) {
                     if ( defined $frame->{vals}{$arg} ) {
-                        push( @a, "$arg = $frame->{vals}{$arg}" );
+                        push @a, "$arg = $frame->{vals}{$arg}";
                     } else {
-                        push( @a, "$arg = ??" );
+                        push @a, "$arg = ??";
                     }
                 }
                 my $a = join( ", ", @a );
@@ -6764,7 +6761,7 @@ sub open_find_pids {
 
     my $hostname = $confInner{hostname};
 
-    foreach my $rank ( keys( %{ $confInner{orte_data}{$hostname} } ) ) {
+    foreach my $rank ( keys %{ $confInner{orte_data}{$hostname} } ) {
         maybe_show_pid( $rank, $confInner{orte_data}{$hostname}{$rank} );
     }
     return;
@@ -6820,7 +6817,7 @@ sub rms_find_pids {
 
         debug( $vp, "Found $found vp $vp, pid: $proc->{pid}" );
 
-        push( @{ $vps{$vp}{$found} }, $proc->{pid} );
+        push @{ $vps{$vp}{$found} }, $proc->{pid};
     }
 
     foreach my $vp ( keys %vps ) {
@@ -6878,8 +6875,8 @@ sub reply_from_child {
     $handle->{child_replys}++;
 
     # Combine the host responces.
-    foreach my $status ( keys( %{ $r->{host_responce} } ) ) {
-        foreach my $host ( keys( %{ $r->{host_responce}{$status} } ) ) {
+    foreach my $status ( keys %{ $r->{host_responce} } ) {
+        foreach my $host ( keys %{ $r->{host_responce}{$status} } ) {
             $handle->{all_replys}->{host_responce}{$status}{$host} =
               $r->{host_responce}{$status}{$host};
         }
@@ -6887,7 +6884,7 @@ sub reply_from_child {
 
     # Combine the target process responces.
     if ( exists $r->{target_responce} ) {
-        foreach my $tp ( keys( %{ $r->{target_responce} } ) ) {
+        foreach my $tp ( keys %{ $r->{target_responce} } ) {
             $handle->{all_replys}->{target_responce}{$tp} =
               $r->{target_responce}{$tp};
         }
@@ -6895,7 +6892,7 @@ sub reply_from_child {
 
     # Combine the target process responces from child.
     if ( exists $r->{target_output} ) {
-        foreach my $tp ( keys( %{ $r->{target_output} } ) ) {
+        foreach my $tp ( keys %{ $r->{target_output} } ) {
             $handle->{all_replys}->{target_output}{$tp} =
               $r->{target_output}{$tp};
         }
@@ -6903,14 +6900,14 @@ sub reply_from_child {
 
     # Copy the target local responces.
     if ( exists $handle->{target_responce} ) {
-        foreach my $tp ( keys( %{ $handle->{target_responce} } ) ) {
+        foreach my $tp ( keys %{ $handle->{target_responce} } ) {
             $handle->{all_replys}->{target_responce}{$tp} =
               $handle->{target_responce}{$tp};
         }
     }
 
     # Save any output we've got from this node.
-    foreach my $key ( keys(%inner_output) ) {
+    foreach my $key ( keys %inner_output ) {
         $handle->{all_replys}->{target_output}{$key} = $inner_output{$key};
     }
 
@@ -6919,8 +6916,8 @@ sub reply_from_child {
     # Copy the network target errors into responce.
     if ( exists $r->{target_data} ) {
         if ( exists $handle->{all_replys}->{target_data} ) {
-            foreach my $key ( keys( %{ $r->{target_data} } ) ) {
-                foreach my $value ( keys( %{ $r->{target_data}{$key} } ) ) {
+            foreach my $key ( keys %{ $r->{target_data} } ) {
+                foreach my $value ( keys %{ $r->{target_data}{$key} } ) {
                     if (
                         defined $handle->{all_replys}
                         ->{target_data}{$key}{$value} )
@@ -6941,8 +6938,8 @@ sub reply_from_child {
     }
 
     # Merge in local target responces.
-    foreach my $key ( keys(%local_target_data) ) {
-        foreach my $value ( keys( %{ $local_target_data{$key} } ) ) {
+    foreach my $key ( keys %local_target_data ) {
+        foreach my $value ( keys %{ $local_target_data{$key} } ) {
             if ( defined $handle->{all_replys}->{target_data}{$key}{$value} ) {
                 rng_merge( $handle->{all_replys}->{target_data}{$key}{$value},
                     $local_target_data{$key}{$value} );
@@ -7036,14 +7033,14 @@ sub convert_pids_to_child_pids {
         next unless defined $rmpid;
 
         if ( defined( $scripts{ pid_to_name($pid) } ) ) {
-            push( @{ $ipids->{$rmpid}{scripts} }, $pid );
+            push @{ $ipids->{$rmpid}{scripts} }, $pid;
         } else {
-            push( @{ $ipids->{$rmpid}{notscripts} }, $pid );
+            push @{ $ipids->{$rmpid}{notscripts} }, $pid;
         }
     }
 
     # Now chose what pid to target.
-    foreach my $key ( keys( %{$ipids} ) ) {
+    foreach my $key ( keys %{$ipids} ) {
         my $ip = $ipids->{$key};
 
         my $newpid;
@@ -7062,7 +7059,7 @@ sub convert_pids_to_child_pids {
         my %pd;
         $pd{pid} = $newpid;
         $pd{vp}  = $ip->{rank};
-        push( @{ $confInner{all_pids} }, \%pd );
+        push @{ $confInner{all_pids} }, \%pd;
 
     }
     return;
@@ -7108,7 +7105,7 @@ sub command_from_parent {
         $netdata->{signon_cmd} = my_encode($cmd);
 
         # Setup the environment.
-        foreach my $key ( keys( %{ $cmd->{cinner} } ) ) {
+        foreach my $key ( keys %{ $cmd->{cinner} } ) {
             $confInner{$key} = $cmd->{cinner}{$key};
         }
 
@@ -7259,7 +7256,7 @@ sub command_from_outer {
         }
 
         # Save any output we've got from this node.
-        foreach my $key ( keys(%inner_output) ) {
+        foreach my $key ( keys %inner_output ) {
             $res->{target_output}{$key} = $inner_output{$key};
         }
 
