@@ -5996,7 +5996,7 @@ sub show_task_dir {
                     my @fdi = (<$FDI>);
                     close $FDI;
                     foreach my $fdi (@fdi) {
-                        chomp($fdi);
+                        chomp $fdi;
                         my ( $key, $value ) = split( ":", $fdi );
                         $value =~ s/\t//g;
                         $fdhash{$key} = $value;
