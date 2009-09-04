@@ -575,7 +575,7 @@ my $exe_name;
 
 my $input_file;
 my $compress;
-my $compress_C;
+my $compress_c;
 my $tree;
 
 my @config_options;
@@ -638,7 +638,7 @@ sub parse_args_outer {
         'any|A'               => \$any,
         'version|V'           => \&show_version,
         'compress|c'          => \$compress,
-        'compress-long|C'     => \$compress_C,
+        'compress-long|C'     => \$compress_c,
         'tree|t'              => \$tree,
         'input-file|file|i=s' => \$input_file,
         'config-option|O=s'   => \@config_options,
@@ -1085,23 +1085,23 @@ sub parse_content {
     $process_details{localid} = $raw_data[2];
     $process_details{nlocal}  = $raw_data[3];
 
-    my $instBase = 4;
+    my $instbase = 4;
 
-    while ( $instBase != 0 ) {
-        my $sysId = _hex( $raw_data[$instBase] );
-        my $sysname = get_sub_name( $sysId, $header );
+    while ( $instbase != 0 ) {
+        my $sysid = _hex( $raw_data[$instbase] );
+        my $sysname = get_sub_name( $sysid, $header );
 
         my %inst;
 
-        $inst{sysId}      = _hex( $raw_data[$instBase] );
-        $inst{name}       = get_sub_name( $sysId, $header );
-        $inst{id}         = _hex $raw_data[ $instBase + 1 ];
-        $inst{handle}     = $raw_data[ $instBase + 2 ];
-        $inst{stats}      = _hex $raw_data[ $instBase + 6 ];
-        $inst{rail}       = find_rail $raw_data[ $instBase + 4 ];
-        $inst{next}       = _hex $raw_data[ $instBase + 5 ];
-        $inst{valid}      = _hex $raw_data[ $instBase + 3 ];
-        $inst{debugFlags} = $raw_data[ $instBase + 7 ];
+        $inst{sysid}      = _hex( $raw_data[$instbase] );
+        $inst{name}       = get_sub_name( $sysid, $header );
+        $inst{id}         = _hex $raw_data[ $instbase + 1 ];
+        $inst{handle}     = $raw_data[ $instbase + 2 ];
+        $inst{stats}      = _hex $raw_data[ $instbase + 6 ];
+        $inst{rail}       = find_rail $raw_data[ $instbase + 4 ];
+        $inst{next}       = _hex $raw_data[ $instbase + 5 ];
+        $inst{valid}      = _hex $raw_data[ $instbase + 3 ];
+        $inst{debugFlags} = $raw_data[ $instbase + 7 ];
 
         if ( $inst{stats} ) {
             my %stats;
@@ -1110,7 +1110,7 @@ sub parse_content {
 
             for ( my $type = 0 ; $type < $#stat_types + 1 ; $type++ ) {
                 my $typename = $stat_types[$type];
-                my $count = get_sub_stat_count( $inst{sysId}, $type, $header );
+                my $count = get_sub_stat_count( $inst{sysid}, $type, $header );
 
                 next if $count == 0;
                 my %type;
@@ -1127,7 +1127,7 @@ sub parse_content {
                         $offset++;
                     }
                     $data{name} =
-                      get_sub_stat_name( $inst{sysId}, $type, $idx, $header );
+                      get_sub_stat_name( $inst{sysid}, $type, $idx, $header );
                     $data{raw} = \@raw;
 
                     $type{ $data{name} } = \%data;
@@ -1139,11 +1139,11 @@ sub parse_content {
             $process_details{complete} = 0;
         }
 
-        $instBase = $inst{next};
+        $instbase = $inst{next};
 
         delete $inst{stats};
         delete $inst{next};
-        delete $inst{sysId};
+        delete $inst{sysid};
         delete $inst{debugFlags} if ( !$inst{debugFlags} );
 
         $process_details{subsystems}{ $inst{name} }{ $inst{id} } = \%inst;
@@ -1909,10 +1909,10 @@ sub go_p {
 
     # Move $endlevel on as far as we can...
     if ( $#identical >= 0 ) {
-        my $nextIdentical;
+        my $nextidentical;
         do {
-            $nextIdentical = 0;
-            my $nextFound = 0;
+            $nextidentical = 0;
+            my $nextfound = 0;
             $endlevel++;
             if ( defined $lines->{$tag}[$endlevel] ) {
                 foreach my $tag2 (@identical) {
@@ -1920,14 +1920,14 @@ sub go_p {
                         and $lines->{$tag}[$endlevel] eq
                         $lines->{$tag2}[$endlevel] )
                     {
-                        $nextFound++;
+                        $nextfound++;
                     }
                 }
             }
-            if ( ( $#identical + 1 ) == $nextFound ) {
-                $nextIdentical = 1;
+            if ( ( $#identical + 1 ) == $nextfound ) {
+                $nextidentical = 1;
             }
-        } while $nextIdentical;
+        } while $nextidentical;
         $endlevel--;
     } else {
         $endlevel = ( $#{ $lines->{$tag} } );
@@ -2190,16 +2190,16 @@ sub rms_job_to_ncpus {
 
 sub rms_job_to_nhosts {
     my $job      = shift;
-    my $nodeSpec = `rmsquery "select hostnames from jobs where name=\'$job\'"`;
+    my $nodespec = `rmsquery "select hostnames from jobs where name=\'$job\'"`;
 
-    chomp $nodeSpec;
+    chomp $nodespec;
     my $i;
-    my @nodeList;
+    my @nodelist;
     my $prefix;
     my $suffix;
 
     # deal with multiple entries
-    foreach ( split( " ", $nodeSpec ) ) {
+    foreach ( split( " ", $nodespec ) ) {
         if (m/([^\[]+)\[([0-9-,]+)\]([^\[]*)/) {
             $prefix = $1;
             $suffix = $3;
@@ -2214,12 +2214,12 @@ sub rms_job_to_nhosts {
 
                     # square braces with range, eg 		    'machine[0-3]'
                     for ( $i = $1 ; $i <= $2 ; $i++ ) {
-                        push @nodeList, $prefix . $i . $suffix;
+                        push @nodelist, $prefix . $i . $suffix;
                     }
                 } else {
 
                     # no range, just suffix
-                    push @nodeList, $prefix . $1 . $suffix;
+                    push @nodelist, $prefix . $1 . $suffix;
                 }
             }
         } else {
@@ -2230,11 +2230,11 @@ sub rms_job_to_nhosts {
                 exit 1;
             }
 
-            push @nodeList, $1 . $2 . $3;
+            push @nodelist, $1 . $2 . $3;
         }
     }
 
-    return $#nodeList + 1;
+    return $#nodelist + 1;
 }
 
 sub rms_res_to_partition {
@@ -3147,7 +3147,7 @@ sub show_results {
                 print("$data\n");
             }
         }
-    } elsif ($compress_C) {
+    } elsif ($compress_c) {
         foreach my $tag ( sort { $a <=> $b } ( keys %$lines ) ) {
             print("----------------\n");
             print("$tag\n");
@@ -4533,7 +4533,7 @@ sub outer_main {
         );
     }
 
-    my $style_count = ( grep { $_ } ( $compress, $compress_C, $tree ) );
+    my $style_count = ( grep { $_ } ( $compress, $compress_c, $tree ) );
     if ( $style_count > 1 ) {
         cmdline_error(
 "$prog: Error: only specify one of --compress, --compress-long or --tree\n"
@@ -4614,7 +4614,7 @@ sub outer_main {
         my $of;
         $of = 'tree'       if $tree;
         $of = 'compress'   if $compress;
-        $of = 'compress_c' if $compress_C;
+        $of = 'compress_c' if $compress_c;
         push_command( $mode, $of, $conf{mode_options}{$mode} );
         go_job($jobid);
     }
@@ -5855,7 +5855,7 @@ sub get_remote_env {
 # Load the data about a given RMS job id,
 # return a array of hashes
 sub load_rms_procs {
-    my $jobId = shift;
+    my $job = shift;
 
     # This is actually perfectly legitimate, it's because you
     # can do for example allocate -N4 prun -N2 <app>.  Because
@@ -5864,7 +5864,7 @@ sub load_rms_procs {
     #
     # Of course it could mean that whatever jobs were supposed
     # to be running on this node aren't.
-    open( my $PIDFILE, "/proc/rms/programs/$jobId/pids" ) or return;
+    open( my $PIDFILE, "/proc/rms/programs/$job/pids" ) or return;
 
     my @procs;
 
