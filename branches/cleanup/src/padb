@@ -381,7 +381,7 @@ $conf{verbose} = 0;
 $conf{check_signon} = 'all';
 
 # Output options.
-$conf{interval}            = 10;
+$conf{interval}            = '10';
 $conf{watch_clears_screen} = 1;
 $conf{scripts}             = 'bash,sh,dash,ash,perl,xterm';
 $conf{lsf_job_offset}      = 1;
@@ -395,8 +395,8 @@ $conf{inner_callback}      = 0;
 #$conf{"show-all-groups"}     = 0;
 
 # Tuning options.
-$conf{prun_timeout}     = 120;
-$conf{prun_exittimeout} = 120;
+$conf{prun_timeout}     = '120';
+$conf{prun_exittimeout} = '120';
 $conf{rmgr}             = undef;
 
 $conf{slurm_job_step} = 0;
@@ -410,7 +410,7 @@ $conf{minfo} = find_minfo();
 # Option to define a list of ports used by padb.
 $conf{port_range} = undef;
 
-$conf{tree_width} = 4;
+$conf{tree_width} = '4';
 
 my $norc       = 0;
 my $configfile = '/etc/padb.conf';
