@@ -512,7 +512,7 @@ sub usage {
 
     my $extra = "";
     $extra .= "Modes of operation\n";
-    foreach my $arg ( sort( keys %allfns ) ) {
+    foreach my $arg ( sort keys %allfns ) {
         next unless ( defined $allfns{$arg}{help} );
         next if ( defined $allfns{$arg}{qsnet} );
         if ( defined $allfns{$arg}{arg_short} ) {
@@ -526,7 +526,7 @@ sub usage {
     }
 
     $extra .= "\nQsNet specific modes\n";
-    foreach my $arg ( sort( keys %allfns ) ) {
+    foreach my $arg ( sort keys %allfns ) {
         next unless ( defined $allfns{$arg}{help} );
         next unless ( defined $allfns{$arg}{qsnet} );
         if ( defined $allfns{$arg}{arg_short} ) {
@@ -598,7 +598,7 @@ sub debug_log {
     my ( $type, $handle, $str, @params ) = @_;
     if ( not exists $debugModes{$type} ) {
         print "Unknown debug mode: $type\n";
-        exit(1);
+        exit 1;
     }
     return unless $debugModes{$type};
     my $time = time() - $start_time;
@@ -672,7 +672,7 @@ sub parse_args_outer {
         }
     }
 
-    GetOptions(%optionhash) or exit(1);
+    GetOptions(%optionhash) or exit 1;
 
     if ( defined $debugflag ) {
         foreach my $f ( split( ",", $debugflag ) ) {
@@ -1735,14 +1735,14 @@ sub group_status {
                         push( @{ $inactive{$number} }, $ident );
                     }
                 }
-                foreach my $number ( sort ( keys %active ) ) {
+                foreach my $number ( sort keys %active ) {
                     $ret .= $gstr
                       . group_status_helper( "in call $number to $s",
                         0, $ad{$gid}{size}, @{ $active{$number} } );
                     $gstr = "";
 
                 }
-                foreach my $number ( sort ( keys %inactive ) ) {
+                foreach my $number ( sort keys %inactive ) {
                     $ret .= group_status_helper( "completed call $number to $s",
                         1, $ad{$gid}{size}, @{ $inactive{$number} } );
                 }
@@ -1992,7 +1992,7 @@ sub _show_tree {
     my ( $ref, $parent, $indent ) = @_;
 
     my $ret = "";
-    my @peers = sort ( { $a->{vps}[0] <=> $b->{vps}[0] } ( @{$ref} ) );
+    my @peers = sort { $a->{vps}[0] <=> $b->{vps}[0] } ( @{$ref} );
 
     foreach my $peer (@peers) {
 
@@ -2212,7 +2212,7 @@ sub rms_job_to_nhosts {
             foreach ( split( ",", $2 ) ) {
                 if ( !m/([0-9]+)-?([0-9]+)?/ ) {
                     print "malformed nodespec '$_'\n";
-                    exit(1);
+                    exit 1;
                 }
 
                 if ( defined($2) ) {
@@ -2232,7 +2232,7 @@ sub rms_job_to_nhosts {
             # no square braces, just node name, eg 'machine0'
             if ( !m/([^\[]+)([0-9]+)([^\[]*)/ ) {
                 print "malformed nodespec '$_'\n";
-                exit(1);
+                exit 1;
             }
 
             push( @nodeList, $1 . $2 . $3 );
@@ -2726,7 +2726,7 @@ sub find_rmgr {
     if ( defined $conf{rmgr} ) {
         if ( not defined $rmgr{ $conf{rmgr} } ) {
             print "Error, resource manager \"$conf{rmgr}\" not supported\n";
-            exit(1);
+            exit 1;
         }
 
         if ( defined $rmgr{ $conf{rmgr} }{is_installed}
@@ -2740,7 +2740,7 @@ sub find_rmgr {
     }
 
     my @ok;
-    foreach my $res ( sort( keys %rmgr ) ) {
+    foreach my $res ( sort keys %rmgr ) {
         next unless defined $rmgr{$res}{is_installed};
         if ( $rmgr{$res}{is_installed}() ) {
             push @ok, $res;
@@ -2752,7 +2752,7 @@ sub find_rmgr {
         push @ok, 'local-fd';
         push @ok, 'local';
         print "@ok\n";
-        exit(1);
+        exit 1;
     }
 
     setup_rmgr( $ok[0] );
@@ -2772,7 +2772,7 @@ sub find_any_rmgr {
     if ( defined $conf{rmgr} ) {
         if ( not defined $rmgr{ $conf{rmgr} } ) {
             print "Error, resource manager \"$conf{rmgr}\" not supported\n";
-            exit(1);
+            exit 1;
         }
 
         if ( defined $rmgr{ $conf{rmgr} }{is_installed}
@@ -2786,7 +2786,7 @@ sub find_any_rmgr {
     }
 
     my @installed;
-    foreach my $res ( sort( keys %rmgr ) ) {
+    foreach my $res ( sort keys %rmgr ) {
         next unless defined $rmgr{$res}{is_installed};
         if ( $rmgr{$res}{is_installed}() ) {
             push @installed, $res;
@@ -2807,7 +2807,7 @@ sub find_any_rmgr {
         push @installed, 'local-fd';
         push @installed, 'local';
         print "@installed\n";
-        exit(1);
+        exit 1;
     }
 
     my @active;
@@ -2831,7 +2831,7 @@ sub find_any_rmgr {
     push @installed, 'local-fd';
     push @installed, 'local';
     print "@installed\n";
-    exit(1);
+    exit 1;
 }
 
 sub get_all_jobids {
@@ -2978,7 +2978,7 @@ sub array_from_target_namespace {
     my ($r) = @_;
 
     my @all;
-    foreach my $value ( sort( keys( %{$r} ) ) ) {
+    foreach my $value ( sort keys( %{$r} ) ) {
         while ( defined( my $rank = rng_shift( $r->{$value} ) ) ) {
             $all[$rank] = $value;
         }
@@ -3055,7 +3055,7 @@ sub show_proc_format {
     my @all;
 
     my $lines = tree_from_namespace( $nlines->{target_data} );
-    foreach my $tag ( sort ( keys %$lines ) ) {
+    foreach my $tag ( sort keys %$lines ) {
         my %hash;
         $hash{vp} = $tag;
         foreach my $key ( keys( %{ $lines->{$tag} } ) ) {
@@ -3071,9 +3071,9 @@ sub show_proc_format {
 
         }
         if ($show_fields) {
-            my @fields = sort ( keys(%hash) );
+            my @fields = sort keys(%hash);
             print "@fields\n";
-            exit(0);
+            exit 0;
         }
         push @all, \%hash;
     }
@@ -3552,7 +3552,7 @@ sub next_command {
 
     if ( $conf{verbose} and defined $req->{cargs} ) {
         print "Mode '$req->{mode}' mode specific flags:\n";
-        foreach my $arg ( sort( keys( %{ $req->{cargs} } ) ) ) {
+        foreach my $arg ( sort keys( %{ $req->{cargs} } ) ) {
             if ( defined $req->{cargs}{$arg} ) {
                 printf "%20s : '%s'\n", $arg, $req->{cargs}{$arg};
             } else {
@@ -3569,7 +3569,7 @@ sub report_failed_signon {
     my %c;
     $c{i} = length($key);
     print "$key : ranks\n";
-    foreach my $value ( sort( keys( %{$data} ) ) ) {
+    foreach my $value ( sort keys( %{$data} ) ) {
         printf "%$c{i}s : %s\n", $value, rng_convert_to_user( $data->{$value} );
     }
     return;
@@ -3629,7 +3629,7 @@ sub format_target_data {
     my ($td) = @_;
 
     my $ret = "\n";
-    foreach my $name ( sort( keys( %{$td} ) ) ) {
+    foreach my $name ( sort keys( %{$td} ) ) {
         $ret .= "Namespace: \"$name\"\n";
         foreach my $value ( sortn( keys( %{ $td->{$name} } ) ) ) {
             $ret .= "    $value\t";
@@ -3697,7 +3697,7 @@ sub command_from_inner {
 
     if ( defined $d->{target_data}{error} ) {
         print "Warning: errors reported by some ranks\n========\n";
-        foreach my $error ( sort( keys( %{ $d->{target_data}{error} } ) ) ) {
+        foreach my $error ( sort keys( %{ $d->{target_data}{error} } ) ) {
             printf "%s: $error\n",
               rng_convert_to_user( $d->{target_data}{error}{$error} );
         }
@@ -4124,7 +4124,7 @@ sub go_parallel {
                     $cdata->{event_cb}( $comm_data, $h );
                 } else {
                     print "Responce from unknown fd $h\n";
-                    exit(1);
+                    exit 1;
                 }
             }
         }
@@ -4178,7 +4178,7 @@ sub find_padb_secret {
     # Check that the file is mode 100600 (Octal)
     if ( $mode != 33152 ) {
         print "Wrong permissions on secret file, should be 0600 ($file)\n";
-        exit(1);
+        exit 1;
     }
 
     open( my $SFD, $file ) or return;
@@ -4206,7 +4206,7 @@ sub go_job {
 
         if ( not defined $secret ) {
             print "Error: Could not load secret file on this node\n";
-            exit(1);
+            exit 1;
         }
 
     }
@@ -4251,7 +4251,7 @@ sub go_job {
 sub cmdline_error {
     my $str = shift;
     print STDERR $str;
-    exit(1);
+    exit 1;
 }
 
 sub config_init {
@@ -4344,7 +4344,7 @@ sub config_help {
         }
     }
 
-    foreach my $key ( sort( keys(%conf) ) ) {
+    foreach my $key ( sort keys(%conf) ) {
         next if ( ref( $conf{$key} ) eq 'HASH' );
         my $name = $key;
         $name =~ s/\_/\-/g;
@@ -4355,9 +4355,9 @@ sub config_help {
         }
     }
 
-    foreach my $mode ( sort( keys( %{ $conf{mode_options} } ) ) ) {
+    foreach my $mode ( sort keys( %{ $conf{mode_options} } ) ) {
         print "\nOptions for mode '$allfns{$mode}{arg_long}'\n";
-        foreach my $key ( sort( keys( %{ $conf{mode_options}{$mode} } ) ) ) {
+        foreach my $key ( sort keys( %{ $conf{mode_options}{$mode} } ) ) {
             my $name = $key;
             $name =~ s/\_/\-/g;
             if ( defined $conf{mode_options}{$mode}{$key} ) {
@@ -4412,7 +4412,7 @@ sub outer_main {
             print(
 "$prog: -OscriptDir deprecated, use -Oedb=/path/to/edb instead\n"
             );
-            exit(1);
+            exit 1;
         }
 
         if (    !exists $conf{$key}
@@ -4420,18 +4420,18 @@ sub outer_main {
         {
             print "Error, unknown config option '$name'\n";
             config_help();
-            exit(1);
+            exit 1;
         }
         if ( !defined $val ) {
             print "Error, config option '$name' requires value\n";
             config_help();
-            exit(1);
+            exit 1;
         }
         config_set( $key, $val );
     }
 
     if ($list_rmgrs) {
-        foreach my $res ( sort( keys %rmgr ) ) {
+        foreach my $res ( sort keys %rmgr ) {
             my $working = 'yes';
 
             if ( defined $rmgr{$res}{is_installed}
@@ -4454,25 +4454,25 @@ sub outer_main {
                 print "$r: not active\n";
             }
         }
-        exit(0);
+        exit 0;
     }
 
     if ($core_stack) {
         if ( not defined $core_name or not defined $exe_name ) {
             print
               "Usage $0 --core-stack --core=<corefile> --exe=<executable>\n";
-            exit(1);
+            exit 1;
         }
         if ( not -f $exe_name ) {
             print "Error: executable file '$exe_name' does not exist!\n";
-            exit(1);
+            exit 1;
         }
         if ( not -f $core_name ) {
             print "Error: core file '$core_name' does not exist!\n";
-            exit(1);
+            exit 1;
         }
         stack_from_core( $exe_name, $core_name );
-        exit(0);
+        exit 0;
     }
 
     if ($full_report) {
@@ -4482,7 +4482,7 @@ sub outer_main {
         if ( not job_is_running($full_report) ) {
             print STDERR
 "Job $full_report is not active, use --show-jobs to see active jobs\n";
-            exit(1);
+            exit 1;
         }
 
         print "padb version $version\n";
@@ -4496,14 +4496,14 @@ sub outer_main {
         push_command( 'stack', 'tree', \%c );
 
         go_job($full_report);
-        exit(0);
+        exit 0;
     }
 
     if ($show_jobs) {
         find_rmgr();
         my @jobids = get_all_jobids($user);
         print("@jobids\n");
-        exit(0);
+        exit 0;
     }
 
     if ($local_stats) {
@@ -4517,7 +4517,7 @@ sub outer_main {
         } else {
             local_stats();
         }
-        exit(0);
+        exit 0;
     }
 
     if ( $all or $any ) {
@@ -4574,7 +4574,7 @@ sub outer_main {
             $m = $mode;
         }
         go_file( $input_file, $m );
-        exit(0);
+        exit 0;
     }
 
     my @jobids;
@@ -4608,7 +4608,7 @@ sub outer_main {
 
     if ( $#jobids > 0 and $watch ) {
         print "Cannot use --watch with more than one job\n";
-        exit(1);
+        exit 1;
     }
 
     foreach my $jobid (@jobids) {
@@ -4684,7 +4684,7 @@ sub p_die {
     my ( $vp, $str ) = @_;
     $confInner{verbose}++;
     debug( $vp, "$str, '$@'" );
-    exit(1);
+    exit 1;
 }
 
 sub is_parent_resmgr {
@@ -5489,14 +5489,14 @@ sub go_deadlock_detect {
                         push( @{ $inactive{$number} }, $ident );
                     }
                 }
-                foreach my $number ( sort ( keys %active ) ) {
+                foreach my $number ( sort keys %active ) {
                     $ret .= $gstr
                       . group_status_helper( "in call $number to $s",
                         0, $ad{$gid}{size}, @{ $active{$number} } );
                     $gstr = "";
 
                 }
-                foreach my $number ( sort ( keys %inactive ) ) {
+                foreach my $number ( sort keys %inactive ) {
                     $ret .= group_status_helper( "completed call $number to $s",
                         1, $ad{$gid}{size}, @{ $inactive{$number} } );
                 }
@@ -7049,14 +7049,14 @@ sub convert_pids_to_child_pids {
         my $newpid;
 
         if ( defined( $ip->{scripts} ) ) {
-            my @ppids = sort( @{ $ip->{scripts} } );
+            my @ppids = sort @{ $ip->{scripts} };
             $newpid = $ppids[0];
         }
 
         # If there are any pids which aren't scripts then target the
         # first one.
         if ( defined( $ip->{notscripts} ) ) {
-            my @ppids = sort( @{ $ip->{notscripts} } );
+            my @ppids = sort @{ $ip->{notscripts} };
             $newpid = $ppids[0];
         }
         my %pd;
@@ -7204,7 +7204,7 @@ sub inner_cleanup_and_exit {
         $h->flush();
         $h->close();
     }
-    exit(0);
+    exit 0;
 }
 
 # Send a reply to our parent, put a status of "ok" on for this
@@ -7369,7 +7369,7 @@ sub inner_loop_for_comms {
        # Should probably handle this better, if the outer or tree never signons
        # for whatever reason silently die as it's probably the best thing do to.
         if ( ( $sel->count() == 1 ) and ( ( $time - $stime ) > 30 ) ) {
-            exit(0);
+            exit 0;
         }
     }
     my $count = $sel->count();
@@ -7410,7 +7410,7 @@ sub inner_main {
     $confInner{myld} = $ENV{LD_LIBRARY_PATH};
 
     inner_loop_for_comms( $confInner{outer} );
-    exit(0);
+    exit 0;
 
 }
 
@@ -7679,4 +7679,4 @@ if ( $#ARGV >= 0 and $ARGV[0] eq '--inner' ) {
     outer_main();
 }
 
-exit(0);
+exit 0;
