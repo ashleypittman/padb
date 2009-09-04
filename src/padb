@@ -755,10 +755,10 @@ sub _hex {
 sub sum_attr {
     my ( $current, $sum_so_far ) = @_;
 
-    if ( defined $sum_so_far->{'raw'}[0]
-        and $sum_so_far->{'raw'}[0] != $current->{'raw'}[0] )
+    if ( defined $sum_so_far->{raw}[0]
+        and $sum_so_far->{raw}[0] != $current->{raw}[0] )
     {
-        $sum_so_far->{'raw'}[0] = undef;
+        $sum_so_far->{raw}[0] = undef;
     }
 
     return $sum_so_far;
@@ -768,26 +768,26 @@ sub sum_bin {
     my ( $current, $sum_so_far ) = @_;
 
     for ( my $j = 0 ; $j < 32 ; $j++ ) {
-        $sum_so_far->{'raw'}[$j] += $current->{'raw'}[$j];
+        $sum_so_far->{raw}[$j] += $current->{raw}[$j];
     }
 
     #check min
     if (
-        ( $sum_so_far->{'raw'}[32] == -1 )
-        or (    ( $current->{'raw'}[32] != -1 )
-            and ( $current->{'raw'}[32] < $sum_so_far->{'raw'}[32] ) )
+        ( $sum_so_far->{raw}[32] == -1 )
+        or (    ( $current->{raw}[32] != -1 )
+            and ( $current->{raw}[32] < $sum_so_far->{raw}[32] ) )
       )
     {
-        $sum_so_far->{'raw'}[32] = $current->{'raw'}[32];
+        $sum_so_far->{raw}[32] = $current->{raw}[32];
     }
 
     #check max
-    if ( $current->{'raw'}[33] > $sum_so_far->{'raw'}[33] ) {
-        $sum_so_far->{'raw'}[33] = $current->{'raw'}[33];
+    if ( $current->{raw}[33] > $sum_so_far->{raw}[33] ) {
+        $sum_so_far->{raw}[33] = $current->{raw}[33];
     }
 
     #total
-    $sum_so_far->{'raw'}[34] += $current->{'raw'}[34];
+    $sum_so_far->{raw}[34] += $current->{raw}[34];
 
     return $sum_so_far;
 }
@@ -795,7 +795,7 @@ sub sum_bin {
 sub sum_counter {
     my ( $current, $sum_so_far ) = @_;
 
-    $sum_so_far->{'raw'}[0] += $current->{'raw'}[0];
+    $sum_so_far->{raw}[0] += $current->{raw}[0];
     return $sum_so_far;
 }
 
@@ -803,7 +803,7 @@ sub sum_tally {
     my ( $current, $sum_so_far ) = @_;
 
     for ( my $j = 0 ; $j < 3 ; $j++ ) {
-        $sum_so_far->{'raw'}[$j] += $current->{'raw'}[$j];
+        $sum_so_far->{raw}[$j] += $current->{raw}[$j];
     }
 
     return $sum_so_far;
@@ -1197,38 +1197,38 @@ sub total {
         }
 
         #add to each set of stats if it exists, else clone the new set
-        foreach my $name ( keys %{ $current_structure->{'subsystems'} } ) {
-            if ( $summed_structure->{'subsystems'}{$name} ) {
+        foreach my $name ( keys %{ $current_structure->{subsystems} } ) {
+            if ( $summed_structure->{subsystems}{$name} ) {
                 foreach
-                  my $id ( keys %{ $current_structure->{'subsystems'}{$name} } )
+                  my $id ( keys %{ $current_structure->{subsystems}{$name} } )
                 {
-                    if ( $summed_structure->{'subsystems'}{$name}{$id} ) {
+                    if ( $summed_structure->{subsystems}{$name}{$id} ) {
 
                         next
                           unless (
-                            defined $current_structure->{'subsystems'}{$name}
-                            {$id}{'statistics'} );
+                            defined $current_structure->{subsystems}{$name}{$id}
+                            {statistics} );
 
                         if (
-                            not( $summed_structure->{'subsystems'}{$name}{$id}
-                                {'statistics'} )
+                            not( $summed_structure->{subsystems}{$name}{$id}
+                                {statistics} )
                           )
                         {
 
-                            $summed_structure->{'subsystems'}{$name}{$id}
-                              {'statistics'} = dclone(
-                                $current_structure->{'subsystems'}{$name}{$id}
-                                  {'statistics'} );
+                            $summed_structure->{subsystems}{$name}{$id}
+                              {statistics} = dclone(
+                                $current_structure->{subsystems}{$name}{$id}
+                                  {statistics} );
                             next;
                         }
 
                         my %current_stat =
-                          %{ $current_structure->{'subsystems'}{$name}{$id}
-                              {'statistics'} };
+                          %{ $current_structure->{subsystems}{$name}{$id}
+                              {statistics} };
 
                         my %summed_stat =
-                          %{ $summed_structure->{'subsystems'}{$name}{$id}
-                              {'statistics'} };
+                          %{ $summed_structure->{subsystems}{$name}{$id}
+                              {statistics} };
 
                         #add to each type of stats if it exists, else copy
                         #the new set
@@ -1262,8 +1262,8 @@ sub total {
                             }
                         }
                     } else {
-                        $summed_structure->{'subsystems'}{$name}{$id} = dclone(
-                            $current_structure->{'subsystems'}{$name}{$id} );
+                        $summed_structure->{subsystems}{$name}{$id} = dclone(
+                            $current_structure->{subsystems}{$name}{$id} );
                     }
                 }
             } else {
@@ -1285,24 +1285,23 @@ sub summarise {
         'Counter' => 0,
         'Tally'   => 0
     );
-    if ( defined $datastructure->{'vp'} ) {
-        $ret{'vp'} = $datastructure->{'vp'};
+    if ( defined $datastructure->{vp} ) {
+        $ret{vp} = $datastructure->{vp};
     }
-    foreach my $subsystem ( keys %{ $datastructure->{'subsystems'} } ) {
-        foreach my $id ( keys %{ $datastructure->{'subsystems'}{$subsystem} } )
-        {
+    foreach my $subsystem ( keys %{ $datastructure->{subsystems} } ) {
+        foreach my $id ( keys %{ $datastructure->{subsystems}{$subsystem} } ) {
             my $statistics =
-              $datastructure->{'subsystems'}{$subsystem}{$id}{'statistics'};
-            foreach my $bin ( keys %{ $statistics->{'Bin'} } ) {
+              $datastructure->{subsystems}{$subsystem}{$id}{statistics};
+            foreach my $bin ( keys %{ $statistics->{Bin} } ) {
 
                 #Bin has a total value so just add that
-                $ret{'Bin'} += $statistics->{'Bin'}{$bin}{'raw'}[34];
+                $ret{Bin} += $statistics->{Bin}{$bin}{raw}[34];
             }
-            foreach my $counter ( keys %{ $statistics->{'Counter'} } ) {
-                $ret{'Counter'} += $statistics->{'Counter'}{$counter}{'raw'}[0];
+            foreach my $counter ( keys %{ $statistics->{Counter} } ) {
+                $ret{Counter} += $statistics->{Counter}{$counter}{raw}[0];
             }
-            foreach my $tally ( keys %{ $statistics->{'Tally'} } ) {
-                $ret{'Tally'} += $statistics->{'Tally'}{$tally}{'raw'}[0];
+            foreach my $tally ( keys %{ $statistics->{Tally} } ) {
+                $ret{Tally} += $statistics->{Tally}{$tally}{raw}[0];
             }
         }
     }
@@ -1596,7 +1595,7 @@ sub group_status {
     foreach my $dataset ( @{$data_structures_aref} ) {
 
         # Loop over each group within the process.
-        foreach my $gid ( keys %{ $dataset->{'subsystems'}{'Group'} } ) {
+        foreach my $gid ( keys %{ $dataset->{subsystems}{Group} } ) {
 
             if ( $#target_groups != -1 ) {
                 next unless defined $tg{$gid};
@@ -1604,11 +1603,11 @@ sub group_status {
 
             my $str;
 
-            my $this_group = $dataset->{'subsystems'}{'Group'}{$gid};
+            my $this_group = $dataset->{subsystems}{Group}{$gid};
 
             my $ident = $dataset->{vp};
 
-            if ( $this_group->{'statistics'} ) {
+            if ( $this_group->{statistics} ) {
 
                 # XXX: Why is this first test here,
                 if (    $this_group->{statistics}{Attribute}
@@ -1621,24 +1620,24 @@ sub group_status {
                       if ( $conf{show_group_members} );
                 }
 
-                $ad{$gid}{idents}{$ident}{'statistics'}++;
+                $ad{$gid}{idents}{$ident}{statistics}++;
 
                 foreach my $tally ( keys %{ $this_group->{statistics}{Tally} } )
                 {
-                    my $name = $this_group->{statistics}{Tally}{$tally}{'name'};
+                    my $name = $this_group->{statistics}{Tally}{$tally}{name};
                     my $number =
-                      $this_group->{statistics}{Tally}{$tally}{'raw'}[0];
+                      $this_group->{statistics}{Tally}{$tally}{raw}[0];
                     my $active =
-                      $this_group->{statistics}{Tally}{$tally}{'raw'}[1];
+                      $this_group->{statistics}{Tally}{$tally}{raw}[1];
                     if ( $active != 0 ) {
-                        $ad{$gid}{'active'}{$name}++;
-                        $ad{$gid}{idents}{$ident}{'active'}{$name} = $number;
+                        $ad{$gid}{active}{$name}++;
+                        $ad{$gid}{idents}{$ident}{active}{$name} = $number;
                     } else {
-                        $ad{$gid}{idents}{$ident}{'inactive'}{$name} = $number;
+                        $ad{$gid}{idents}{$ident}{inactive}{$name} = $number;
                     }
                 }
             }
-            $ad{$gid}{idents}{$ident}{'valid'} = $this_group->{'valid'};
+            $ad{$gid}{idents}{$ident}{valid} = $this_group->{valid};
         }
     }
 
@@ -1669,8 +1668,8 @@ sub group_status {
         my $gone;
         {
             my @invalid;
-            foreach my $ident ( sort keys %{ $ad{$gid}{'idents'} } ) {
-                if ( $ad{$gid}{'idents'}{$ident}{'valid'} == 0 ) {
+            foreach my $ident ( sort keys %{ $ad{$gid}{idents} } ) {
+                if ( $ad{$gid}{idents}{$ident}{valid} == 0 ) {
                     push @invalid, $ident;
                 }
             }
@@ -1692,9 +1691,9 @@ sub group_status {
         # Find and report groups which don't have statistics
         {
             my @identical;
-            foreach my $ident ( sort keys %{ $ad{$gid}{'idents'} } ) {
+            foreach my $ident ( sort keys %{ $ad{$gid}{idents} } ) {
                 push @identical, $ident
-                  unless ( $ad{$gid}{'idents'}{$ident}{'statistics'} );
+                  unless ( $ad{$gid}{idents}{$ident}{statistics} );
             }
             if ( $#identical != -1 ) {
                 $missing_self++;
@@ -1712,23 +1711,22 @@ sub group_status {
             }
         }
 
-        if ( $ad{$gid}{'active'} ) {
+        if ( $ad{$gid}{active} ) {
             $i_count++;
 
             # For all collective calls which we are interested in
-            foreach my $s ( keys %{ $ad{$gid}{'active'} } ) {
+            foreach my $s ( keys %{ $ad{$gid}{active} } ) {
                 my %active;
                 my %inactive;
 
-                foreach my $ident ( keys %{ $ad{$gid}{'idents'} } ) {
-                    if ( defined $ad{$gid}{'idents'}{$ident}{'active'}
-                        and $ad{$gid}{'idents'}{$ident}{'active'}{$s} )
+                foreach my $ident ( keys %{ $ad{$gid}{idents} } ) {
+                    if ( defined $ad{$gid}{idents}{$ident}{active}
+                        and $ad{$gid}{idents}{$ident}{active}{$s} )
                     {
-                        my $number = $ad{$gid}{'idents'}{$ident}{'active'}{$s};
+                        my $number = $ad{$gid}{idents}{$ident}{active}{$s};
                         push @{ $active{$number} }, $ident;
-                    } elsif ( $ad{$gid}{'idents'}{$ident}{'inactive'}{$s} ) {
-                        my $number =
-                          $ad{$gid}{'idents'}{$ident}{'inactive'}{$s};
+                    } elsif ( $ad{$gid}{idents}{$ident}{inactive}{$s} ) {
+                        my $number = $ad{$gid}{idents}{$ident}{inactive}{$s};
                         push @{ $inactive{$number} }, $ident;
                     }
                 }
@@ -1750,9 +1748,9 @@ sub group_status {
 
         {
             my @inactive;
-            foreach my $ident ( sort keys %{ $ad{$gid}{'idents'} } ) {
-                if ( $ad{$gid}{'idents'}{$ident}{'statistics'}
-                    and not defined $ad{$gid}{'idents'}{$ident}{'active'} )
+            foreach my $ident ( sort keys %{ $ad{$gid}{idents} } ) {
+                if ( $ad{$gid}{idents}{$ident}{statistics}
+                    and not defined $ad{$gid}{idents}{$ident}{active} )
                 {
                     push @inactive, $ident;
                 }
@@ -3301,9 +3299,9 @@ sub rc_status {
     my $status = shift;
     my %rc;
 
-    $rc{'rc'}     = $status >> 8;
-    $rc{'core'}   = ( $status & 128 ) >> 7;
-    $rc{'signal'} = $status & 127;
+    $rc{rc}     = $status >> 8;
+    $rc{core}   = ( $status & 128 ) >> 7;
+    $rc{signal} = $status & 127;
 
     return %rc;
 }
@@ -5433,10 +5431,9 @@ sub go_deadlock_detect {
                 my $count = $gd->{coll}{$coll}{count};
                 if ( defined $gd->{coll}{$coll}{active} ) {
                     $ad{$gid}{active}{$coll}++;
-                    $ad{$gid}{idents}{ $gd->{rank} }{'active'}{$coll} = $count;
+                    $ad{$gid}{idents}{ $gd->{rank} }{active}{$coll} = $count;
                 } else {
-                    $ad{$gid}{idents}{ $gd->{rank} }{'inactive'}{$coll} =
-                      $count;
+                    $ad{$gid}{idents}{ $gd->{rank} }{inactive}{$coll} = $count;
                 }
             }
         }
@@ -5466,23 +5463,22 @@ sub go_deadlock_detect {
             }
         }
 
-        if ( $ad{$gid}{'active'} ) {
+        if ( $ad{$gid}{active} ) {
             $i_count++;
 
             # For all collective calls which we are interested in
-            foreach my $s ( keys %{ $ad{$gid}{'active'} } ) {
+            foreach my $s ( keys %{ $ad{$gid}{active} } ) {
                 my %active;
                 my %inactive;
 
-                foreach my $ident ( keys %{ $ad{$gid}{'idents'} } ) {
-                    if ( defined $ad{$gid}{'idents'}{$ident}{'active'}
-                        and $ad{$gid}{'idents'}{$ident}{'active'}{$s} )
+                foreach my $ident ( keys %{ $ad{$gid}{idents} } ) {
+                    if ( defined $ad{$gid}{idents}{$ident}{active}
+                        and $ad{$gid}{idents}{$ident}{active}{$s} )
                     {
-                        my $number = $ad{$gid}{'idents'}{$ident}{'active'}{$s};
+                        my $number = $ad{$gid}{idents}{$ident}{active}{$s};
                         push @{ $active{$number} }, $ident;
-                    } elsif ( $ad{$gid}{'idents'}{$ident}{'inactive'}{$s} ) {
-                        my $number =
-                          $ad{$gid}{'idents'}{$ident}{'inactive'}{$s};
+                    } elsif ( $ad{$gid}{idents}{$ident}{inactive}{$s} ) {
+                        my $number = $ad{$gid}{idents}{$ident}{inactive}{$s};
                         push @{ $inactive{$number} }, $ident;
                     }
                 }
@@ -5506,8 +5502,8 @@ sub go_deadlock_detect {
 
         {
             my @inactive;
-            foreach my $ident ( sort keys %{ $ad{$gid}{'idents'} } ) {
-                if ( not defined $ad{$gid}{'idents'}{$ident}{'active'} ) {
+            foreach my $ident ( sort keys %{ $ad{$gid}{idents} } ) {
+                if ( not defined $ad{$gid}{idents}{$ident}{active} ) {
                     push @inactive, $ident;
                 }
             }
