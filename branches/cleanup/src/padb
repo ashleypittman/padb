@@ -437,9 +437,9 @@ sub find_minfo {
 ###############################################################################
 
 sub show_version {
-    printf("$prog version $version\n\n");
-    printf("Written by Ashley Pittman\n");
-    printf("http://padb.pittman.org.uk\n");
+    printf "$prog version $version\n\n";
+    printf "Written by Ashley Pittman\n";
+    printf "http://padb.pittman.org.uk\n";
     exit 0;
 }
 
@@ -597,12 +597,12 @@ my $start_time = time();
 sub debug_log {
     my ( $type, $handle, $str, @params ) = @_;
     if ( not exists $debugModes{$type} ) {
-        printf("Unknown debug mode: $type\n");
+        printf "Unknown debug mode: $type\n";
         exit(1);
     }
     return unless $debugModes{$type};
     my $time = time() - $start_time;
-    printf( "DEBUG ($type): %3d: $str\n", $time, @params );
+    printf "DEBUG ($type): %3d: $str\n", $time, @params;
     return if $debugModes{$type} eq 'basic';
     return unless defined $handle;
     print Dumper($handle);
@@ -680,7 +680,7 @@ sub parse_args_outer {
             if ( exists $debugModes{$name} ) {
                 $debugModes{$name} = defined($v) ? $v : 'basic';
             } else {
-                printf("Attempt to set unknown debug flag \"$name\".\n");
+                printf "Attempt to set unknown debug flag \"$name\".\n";
             }
         }
         if ( $debugModes{all} ) {
@@ -1798,12 +1798,12 @@ sub group_status {
 sub local_stats_from_job {
     my $job = shift;
 
-    printf("Showing local job $job\n");
+    printf "Showing local job $job\n";
 
     my $key = rms_job_to_key($job);
 
     if ( not defined $key ) {
-        printf("Cannot find key for local job $job\n");
+        printf "Cannot find key for local job $job\n";
         return;
     }
 
@@ -2131,7 +2131,7 @@ sub rms_setup_pcmd {
     my $nhosts = rms_job_to_nhosts($job);
 
     if ( $res eq "" ) {
-        printf("Job '$job' doesn't have a associated resource\n");
+        printf "Job '$job' doesn't have a associated resource\n";
         return;
     }
 
@@ -2188,7 +2188,7 @@ sub rms_job_to_ncpus {
         $ncpus += $n[$idx] * $c[$idx];
     }
 
-    printf("extracted $ncpus from $cpus and $nodes\n") if $conf{verbose} > 1;
+    printf "extracted $ncpus from $cpus and $nodes\n" if $conf{verbose} > 1;
 
     return $ncpus;
 }
@@ -2725,16 +2725,15 @@ sub find_rmgr {
 
     if ( defined $conf{rmgr} ) {
         if ( not defined $rmgr{ $conf{rmgr} } ) {
-            printf("Error, resource manager \"$conf{rmgr}\" not supported\n");
+            printf "Error, resource manager \"$conf{rmgr}\" not supported\n";
             exit(1);
         }
 
         if ( defined $rmgr{ $conf{rmgr} }{is_installed}
             and not $rmgr{ $conf{rmgr} }{is_installed}() )
         {
-            printf(
-"Warning: Selected resource manager $conf{rmgr} does not appear to be installed\n"
-            );
+            printf
+"Warning: Selected resource manager $conf{rmgr} does not appear to be installed\n";
         }
         setup_rmgr( $conf{rmgr} );
         return;
@@ -2748,12 +2747,11 @@ sub find_rmgr {
         }
     }
     if ( $#ok != 0 ) {
-        printf(
-"Error, multiple resource managers detected, use -Ormgr=<resource manager>\n"
-        );
+        printf
+"Error, multiple resource managers detected, use -Ormgr=<resource manager>\n";
         push @ok, 'local-fd';
         push @ok, 'local';
-        printf("@ok\n");
+        print "@ok\n";
         exit(1);
     }
 
@@ -2773,16 +2771,15 @@ sub find_any_rmgr {
 
     if ( defined $conf{rmgr} ) {
         if ( not defined $rmgr{ $conf{rmgr} } ) {
-            printf("Error, resource manager \"$conf{rmgr}\" not supported\n");
+            printf "Error, resource manager \"$conf{rmgr}\" not supported\n";
             exit(1);
         }
 
         if ( defined $rmgr{ $conf{rmgr} }{is_installed}
             and not $rmgr{ $conf{rmgr} }{is_installed}() )
         {
-            printf(
-"Warning: Selected resource manager $conf{rmgr} does not appear to be installed\n"
-            );
+            printf
+"Warning: Selected resource manager $conf{rmgr} does not appear to be installed\n";
         }
         setup_rmgr( $conf{rmgr} );
         return;
@@ -2805,12 +2802,11 @@ sub find_any_rmgr {
 
     # No resource managers are installed, bad.
     if ( $#installed == -1 ) {
-        printf(
-"Error, multiple resource managers detected, use -Ormgr=<resource manager>\n"
-        );
+        printf
+"Error, multiple resource managers detected, use -Ormgr=<resource manager>\n";
         push @installed, 'local-fd';
         push @installed, 'local';
-        printf("@installed\n");
+        printf "@installed\n";
         exit(1);
     }
 
@@ -2830,12 +2826,11 @@ sub find_any_rmgr {
 
     # Multiple resource managers are installed and have jobs,
     # bouce back to the user to specify which one they want.
-    printf(
-"Error, multiple active resource managers detected, use -Ormgr=<resource manager>\n"
-    );
+    printf
+"Error, multiple active resource managers detected, use -Ormgr=<resource manager>\n";
     push @installed, 'local-fd';
     push @installed, 'local';
-    printf("@installed\n");
+    printf "@installed\n";
     exit(1);
 }
 
@@ -2927,9 +2922,9 @@ sub strip_stack_traces {
             my $start =
               ( $cargs->{strip_below_main} and $main_idx ) ? $main_idx : 0;
 
-            printf( 'Stripping 0..'
-                  . $#{ $lines->{$tag} }
-                  . " to $start..$end for $tag\n" )
+            printf 'Stripping 0..'
+              . $#{ $lines->{$tag} }
+              . " to $start..$end for $tag\n"
               if $conf{verbose} > 1;
 
             my @new = @{ $lines->{$tag} };
@@ -2972,7 +2967,7 @@ EOF
             $l .= '.';
         }
     }
-    printf("$l\n");
+    printf "$l\n";
     return;
 }
 
@@ -3151,7 +3146,7 @@ sub show_results {
                 }
             }
             print("----------------\n");
-            printf( "%s\n", join( ",", compress( @identical, $tag ) ) );
+            printf "%s\n", join( ",", compress( @identical, $tag ) );
             print("----------------\n");
             foreach my $data ( @{ $lines->{$tag} } ) {
                 print("$data\n");
@@ -3189,10 +3184,10 @@ sub process_line {
                 push( @{ $lines->{lines}{$key} }, $value );
             }
         } else {
-            printf("debug $1.$2: $3\n");
+            printf "debug $1.$2: $3\n";
         }
     } else {
-        printf("malformed line: $line");
+        printf "malformed line: $line";
     }
     return;
 }
@@ -3244,7 +3239,7 @@ sub default_output_handler {
                 }
             }
             print("----------------\n");
-            printf( "%s\n", join( ",", compress( @identical, $tag ) ) );
+            printf "%s\n", join( ",", compress( @identical, $tag ) );
             print("----------------\n");
             foreach my $data ( @{ $lines->{$tag} } ) {
                 print("$data\n");
@@ -3319,8 +3314,8 @@ sub rc_status {
 sub maybe_clear_screen {
     return unless $watch;
     if ( $conf{watch_clears_screen} ) {
-        printf( "%s", " \033[1;1H" );
-        printf( "%s", "\033[2J" );
+        printf "%s", " \033[1;1H";
+        printf "%s", "\033[2J";
     }
     return;
 }
@@ -3556,12 +3551,12 @@ sub next_command {
     }
 
     if ( $conf{verbose} and defined $req->{cargs} ) {
-        printf("Mode '$req->{mode}' mode specific flags:\n");
+        printf "Mode '$req->{mode}' mode specific flags:\n";
         foreach my $arg ( sort( keys( %{ $req->{cargs} } ) ) ) {
             if ( defined $req->{cargs}{$arg} ) {
-                printf( "%20s : '%s'\n", $arg, $req->{cargs}{$arg} );
+                printf "%20s : '%s'\n", $arg, $req->{cargs}{$arg};
             } else {
-                printf( "%20s : undef\n", $arg );
+                printf "%20s : undef\n", $arg;
             }
         }
     }
@@ -3573,10 +3568,9 @@ sub report_failed_signon {
     my ( $key, $data ) = @_;
     my %c;
     $c{i} = length($key);
-    printf("$key : ranks\n");
+    printf "$key : ranks\n";
     foreach my $value ( sort( keys( %{$data} ) ) ) {
-        printf( "%$c{i}s : %s\n",
-            $value, rng_convert_to_user( $data->{$value} ) );
+        printf "%$c{i}s : %s\n", $value, rng_convert_to_user( $data->{$value} );
     }
     return;
 }
@@ -3599,19 +3593,19 @@ sub check_signon {
     }
 
     if ( not rng_empty($rng) ) {
-        printf( "Warning, failed to locate ranks %s\n",
-            rng_convert_to_user($rng) );
+        printf "Warning, failed to locate ranks %s\n",
+          rng_convert_to_user($rng);
     }
 
     return if ( $conf{check_signon} eq 'missing' );
 
     if ( keys( %{ $data->{target_data}{name} } ) != 1 ) {
-        printf("Warning, remote process name differs across ranks\n");
+        printf "Warning, remote process name differs across ranks\n";
         report_failed_signon( 'name', \%{ $data->{target_data}{name} } );
     }
 
     if ( keys( %{ $data->{target_data}{state} } ) != 1 ) {
-        printf("Warning, remote process state differs across ranks\n");
+        printf "Warning, remote process state differs across ranks\n";
         report_failed_signon( 'state', \%{ $data->{target_data}{state} } );
     }
     return;
@@ -3702,12 +3696,12 @@ sub command_from_inner {
     my $mode = $comm_data->{current_req}->{mode};
 
     if ( defined $d->{target_data}{error} ) {
-        printf("Warning: errors reported by some ranks\n========\n");
+        printf "Warning: errors reported by some ranks\n========\n";
         foreach my $error ( sort( keys( %{ $d->{target_data}{error} } ) ) ) {
-            printf( "%s: $error\n",
-                rng_convert_to_user( $d->{target_data}{error}{$error} ) );
+            printf "%s: $error\n",
+              rng_convert_to_user( $d->{target_data}{error}{$error} );
         }
-        printf("========\n");
+        printf "========\n";
     }
 
     if ( defined( $allfns{$mode}{out_handler} ) ) {
@@ -3745,7 +3739,7 @@ sub hello_from_inner {
     # Children connect back with "Hello $outerkey $hostname $port $innernkey";
     my @words = split( " ", $line );
     if ( $#words != 4 or $words[0] ne 'Hello' or $words[1] ne $secret ) {
-        printf("Bad signon $line\n");
+        printf "Bad signon $line\n";
         return 0;
     }
 
@@ -3787,7 +3781,7 @@ sub eof_from_fd {
     my ( $comm_data, $cdata ) = @_;
 
     if ( $comm_data->{state} ne 'shutdown' ) {
-        printf("Unexpected EOF from $cdata->{fd_desc} ($comm_data->{state})\n");
+        printf "Unexpected EOF from $cdata->{fd_desc} ($comm_data->{state})\n";
     }
 
     #printf("Expected EOF from $cdata->{fd_desc} ($comm_data->{state})\n");
@@ -4129,7 +4123,7 @@ sub go_parallel {
                     my $cdata = $comm_data->{sockets}{$h};
                     $cdata->{event_cb}( $comm_data, $h );
                 } else {
-                    printf("Responce from unknown fd $h\n");
+                    printf "Responce from unknown fd $h\n";
                     exit(1);
                 }
             }
@@ -4138,7 +4132,6 @@ sub go_parallel {
         my $count = $sel->count();
         if ( $count > 0 ) {
 
-            #printf("Still here, time:$t2 comm_count:$count\n");
             if ( $comm_data->{signons} != $comm_data->{nhosts} ) {
                 my $missing = $comm_data->{nhosts} - $comm_data->{signons};
                 print("Waiting for signon from $missing hosts.\n");
@@ -4150,21 +4143,19 @@ sub go_parallel {
     my $res = $?;
 
     if ( $comm_data->{state} ne 'shutdown' ) {
-        printf(
-"Unexpected exit from parallel command (state=$comm_data->{state})\n"
-        );
+        printf
+          "Unexpected exit from parallel command (state=$comm_data->{state})\n";
     }
-    printf("result from parallel command is $res (state=$comm_data->{state})\n")
+    printf "result from parallel command is $res (state=$comm_data->{state})\n"
       if ( $conf{verbose} );
 
     if ( $res != 0 ) {
         my %status = rc_status($res);
         if ( job_is_running($jobid) ) {
-            printf(
-                "Bad exit code from parallel command (exit_code=$status{rc})\n"
-            );
+            printf
+              "Bad exit code from parallel command (exit_code=$status{rc})\n";
         } else {
-            printf("Job $jobid is no longer active\n");
+            printf "Job $jobid is no longer active\n";
             return 1;
         }
     }
@@ -4176,7 +4167,7 @@ sub find_padb_secret {
 
     my $file = "$ENV{HOME}/.padb-secret";
     if ( !-f $file ) {
-        printf("No secret file ($file)\n");
+        printf "No secret file ($file)\n";
         return;
     }
     my (
@@ -4186,7 +4177,7 @@ sub find_padb_secret {
 
     # Check that the file is mode 100600 (Octal)
     if ( $mode != 33152 ) {
-        printf("Wrong permissions on secret file, should be 0600 ($file)\n");
+        printf "Wrong permissions on secret file, should be 0600 ($file)\n";
         exit(1);
     }
 
@@ -4214,7 +4205,7 @@ sub go_job {
         $secret = find_padb_secret();
 
         if ( not defined $secret ) {
-            printf("Error: Could not load secret file on this node\n");
+            printf "Error: Could not load secret file on this node\n";
             exit(1);
         }
 
@@ -4239,8 +4230,8 @@ sub go_job {
     $cmd .= " $0 --inner";
 
     if ( not defined $hosts ) {
-        printf("Full duplex mode needs to know the host count\n");
-        printf("Which is doesn't for this resource manager: $conf{rmgr}\n");
+        printf "Full duplex mode needs to know the host count\n";
+        printf "Which is doesn't for this resource manager: $conf{rmgr}\n";
         return 1;
     }
     my $errors = go_parallel( $jobid, $cmd, $ncpus, $hosts );
@@ -4292,11 +4283,10 @@ sub config_set_internal {
 
 sub config_set {
     my ( $key, $value ) = @_;
-    printf("Setting '$key' to '$value'\n") if ( $conf{verbose} );
+    printf "Setting '$key' to '$value'\n" if ( $conf{verbose} );
 
     if ( !exists $conf{$key} and !exists $conf{mode_options_reverse}{$key} ) {
-        printf( STDERR
-              "Warning, unknown config option '$key' value '$value'.\n" );
+        printf STDERR "Warning, unknown config option '$key' value '$value'.\n";
     }
 
     config_set_internal( $key, $value );
@@ -4306,7 +4296,7 @@ sub config_set {
 sub config_from_file {
     my $file = shift;
 
-    printf("Loading config from \"$file\"\n") if ( $conf{verbose} );
+    printf "Loading config from \"$file\"\n" if ( $conf{verbose} );
     open( my $CFILE, $file ) or return;
 
     while (<$CFILE>) {
@@ -4322,7 +4312,7 @@ sub config_from_file {
 }
 
 sub config_from_env {
-    printf("Loading config from environment\n") if ( $conf{verbose} );
+    printf "Loading config from environment\n" if ( $conf{verbose} );
 
     foreach my $key ( keys(%conf) ) {
         $key =~ s/\-/\_/g;
@@ -4343,7 +4333,7 @@ sub config_from_env {
 }
 
 sub config_help {
-    printf("Current options are:\n");
+    printf "Current options are:\n";
 
     my $max_len = 0;
 
@@ -4359,25 +4349,23 @@ sub config_help {
         my $name = $key;
         $name =~ s/\_/\-/g;
         if ( defined $conf{$key} ) {
-            printf( " %$max_len" . "s = '$conf{$key}'\n", $name );
+            printf " %$max_len" . "s = '$conf{$key}'\n", $name;
         } else {
-            printf( " %$max_len" . "s = unset\n", $name );
+            printf " %$max_len" . "s = unset\n", $name;
         }
     }
 
     foreach my $mode ( sort( keys( %{ $conf{mode_options} } ) ) ) {
-        printf("\nOptions for mode '$allfns{$mode}{arg_long}'\n");
+        printf "\nOptions for mode '$allfns{$mode}{arg_long}'\n";
         foreach my $key ( sort( keys( %{ $conf{mode_options}{$mode} } ) ) ) {
             my $name = $key;
             $name =~ s/\_/\-/g;
             if ( defined $conf{mode_options}{$mode}{$key} ) {
-                printf(
-                    " %$max_len" . "s = '$conf{mode_options}{$mode}{$key}'\n",
-                    $name
-                );
+                printf
+                  " %$max_len" . "s = '$conf{mode_options}{$mode}{$key}'\n",
+                  $name;
             } else {
-                printf( " %$max_len" . "s = undef\n", $name );
-
+                printf " %$max_len" . "s = undef\n", $name;
             }
         }
     }
@@ -4403,7 +4391,7 @@ sub outer_main {
 
     config_from_env();
 
-    printf("Loading config from command line\n") if ( $conf{verbose} );
+    printf "Loading config from command line\n" if ( $conf{verbose} );
 
     #
     # Once again there is a 'bugette' here, you cant pass the
@@ -4430,12 +4418,12 @@ sub outer_main {
         if (    !exists $conf{$key}
             and !exists $conf{mode_options_reverse}{$key} )
         {
-            printf("Error, unknown config option '$name'\n");
+            printf "Error, unknown config option '$name'\n";
             config_help();
             exit(1);
         }
         if ( !defined $val ) {
-            printf("Error, config option '$name' requires value\n");
+            printf "Error, config option '$name' requires value\n";
             config_help();
             exit(1);
         }
@@ -4454,16 +4442,16 @@ sub outer_main {
             my $r = $res;
 
             if ( $working eq 'yes' ) {
-                printf("$r: ");
+                printf "$r: ";
                 my @jobs = $rmgr{$res}{get_active_jobs}($user);
                 if ( $#jobs > -1 ) {
                     my $j = join( " ", sortn(@jobs) );
-                    printf("jobs($j)\n");
+                    printf "jobs($j)\n";
                 } else {
-                    printf("No active jobs\n");
+                    printf "No active jobs\n";
                 }
             } else {
-                printf("$r: not active\n");
+                printf "$r: not active\n";
             }
         }
         exit(0);
@@ -4471,16 +4459,16 @@ sub outer_main {
 
     if ($core_stack) {
         if ( not defined $core_name or not defined $exe_name ) {
-            printf(
-                "Usage $0 --core-stack --core=<corefile> --exe=<executable>\n");
+            printf
+              "Usage $0 --core-stack --core=<corefile> --exe=<executable>\n";
             exit(1);
         }
         if ( not -f $exe_name ) {
-            printf("Error: executable file '$exe_name' does not exist!\n");
+            printf "Error: executable file '$exe_name' does not exist!\n";
             exit(1);
         }
         if ( not -f $core_name ) {
-            printf("Error: core file '$core_name' does not exist!\n");
+            printf "Error: core file '$core_name' does not exist!\n";
             exit(1);
         }
         stack_from_core( $exe_name, $core_name );
@@ -4492,14 +4480,13 @@ sub outer_main {
         find_rmgr();
 
         if ( not job_is_running($full_report) ) {
-            printf( STDERR
-"Job $full_report is not active, use --show-jobs to see active jobs\n"
-            );
+            printf STDERR
+"Job $full_report is not active, use --show-jobs to see active jobs\n";
             exit(1);
         }
 
-        printf("padb version $version\n");
-        printf("full job report for job $full_report\n\n");
+        printf "padb version $version\n";
+        printf "full job report for job $full_report\n\n";
 
         push_command( 'mqueue', 'compress' );
 
@@ -4597,14 +4584,14 @@ sub outer_main {
         find_any_rmgr();
 
         @jobids = get_all_jobids($user);
-        printf( "Active jobs (%d) are @jobids\n", $#jobids + 1 )
+        printf "Active jobs (%d) are @jobids\n", $#jobids + 1
           if $conf{verbose};
         if ( $#jobids == -1 ) {
-            printf("No active jobs could be found for user '$user'\n");
+            printf "No active jobs could be found for user '$user'\n";
             exit 1;
         }
         if ( $any && $#jobids != 0 ) {
-            printf("More than 1 active job (@jobids) for user '$user'\n");
+            printf "More than 1 active job (@jobids) for user '$user'\n";
             exit 1;
         }
     } else {
@@ -4614,13 +4601,13 @@ sub outer_main {
             if ( job_is_running($jobid) ) {
                 push @jobids, $jobid;
             } else {
-                printf( STDERR "Job $jobid is not active\n" );
+                printf STDERR "Job $jobid is not active\n";
             }
         }
     }
 
     if ( $#jobids > 0 and $watch ) {
-        printf("Cannot use --watch with more than one job\n");
+        printf "Cannot use --watch with more than one job\n";
         exit(1);
     }
 
@@ -4867,9 +4854,8 @@ sub extract_value_square {
             }
         }
 
-        # printf("$2 $indent\nleft  '$left'\nright '$right'\n\n\n\n");
     }
-    printf("ident $indent\n");
+    printf "ident $indent\n";
     return;
 }
 
@@ -4894,17 +4880,14 @@ sub extract_value_soft {
             }
         }
 
-        # printf("$2 $indent\nleft  '$left'\nright '$right'\n\n\n\n");
     }
-    printf("ident $indent\n");
+    printf "ident $indent\n";
     return;
 }
 
 sub new_parse {
     my $str      = shift;
     my $collapse = shift;
-
-    # printf("Parsing\t\t\t\t\t\t$str\n");
 
     my %res;
     my $key;
@@ -4919,7 +4902,6 @@ sub new_parse {
     }
     my $leftover;
 
-    # printf("Got key/value pair! $key\n");
     my $type = substr( $value, 0, 1 );
     if ( $type eq "[" ) {
         if ( $value eq "[]" ) {
@@ -4928,8 +4910,6 @@ sub new_parse {
         }
         my ( $l, $r ) = extract_value_square($value);
         $leftover = $r;
-
-        # printf("Got value\n$l\n$r\n");
 
         my @b;
         while ( $l ne "" ) {
@@ -4955,8 +4935,6 @@ sub new_parse {
     } elsif ( $type eq "{" ) {
         my ( $l, $r ) = extract_value_soft($value);
         $leftover = $r;
-
-        # printf("Got value\n$l\n$r\n");
 
         my @all;
         while ( $l ne "" ) {
@@ -5173,7 +5151,7 @@ sub handle_query {
             $res = $image;
         }
     } else {
-        printf("Unhandled query $query\n");
+        printf "Unhandled query $query\n";
     }
     if ( defined $res ) {
         return "ok $res";
@@ -5783,12 +5761,12 @@ sub stack_from_core {
     foreach my $thread ( sort { $a->{id} <=> $b->{id} } @threads ) {
         my @frames = @{ $thread->{frames} };
 
-        printf("ThreadId: $thread->{id}\n") if ( $#threads != 0 );
+        printf "ThreadId: $thread->{id}\n" if ( $#threads != 0 );
 
         for ( my $i = $#frames ; $i >= 0 ; $i-- ) {
             my $frame = $frames[$i];
 
-            printf("ERROR: $$frame{error}\n")
+            printf "ERROR: $$frame{error}\n"
               if exists $$frame{error};
 
             next unless exists $$frame{level};
@@ -5806,7 +5784,7 @@ sub stack_from_core {
                 my $a = join( ", ", @a );
                 my $file = $frame->{file} || "?";
                 my $line = $frame->{line} || "?";
-                printf("$frame->{func}($a) at $file:$line\n");
+                printf "$frame->{func}($a) at $file:$line\n";
 
                 if ( $conf{stack_shows_locals} ) {
                     foreach my $arg ( @{ $frame->{locals} } ) {
@@ -7264,7 +7242,7 @@ sub command_from_outer {
             $cdata->{dead} = 1;
             print("debug\n");
         } else {
-            printf("Closing connection from $cdata->{desc} (Bad signon)\n");
+            printf "Closing connection from $cdata->{desc} (Bad signon)\n";
             $netdata->{sel}->remove($s);
             $s->close();
             $cdata->{dead} = 1;
@@ -7371,7 +7349,6 @@ sub inner_loop_for_comms {
                 # Dead connection.
                 if ( not defined $d or $count == 0 ) {
 
-                    # printf("null read from $sinfo->{desc}\n");
                     if ( eof($s) ) {
                         $sel->remove($s);
                         $s->close();
@@ -7396,7 +7373,7 @@ sub inner_loop_for_comms {
         }
     }
     my $count = $sel->count();
-    printf("Thats not supposed to happen count=($count)\n");
+    printf "Thats not supposed to happen count=($count)\n";
     return;
 }
 
