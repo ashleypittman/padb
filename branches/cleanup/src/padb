@@ -701,7 +701,7 @@ sub parse_args_outer {
     }
 
     if (@ranks) {
-        $rank_rng = rng_convert_from_user( shift(@ranks) );
+        $rank_rng = rng_convert_from_user( shift @ranks );
 
         foreach my $rank (@ranks) {
             rng_merge( $rank_rng, rng_convert_from_user($rank) );
@@ -3005,7 +3005,7 @@ sub show_mpi_watch {
     my @all = array_from_target_namespace( $lines->{target_data}{state} );
 
     my $o = "";
-    while ( defined( my $v = shift(@all) ) ) {
+    while ( defined( my $v = shift @all ) ) {
         $o .= $v;
     }
     print("$o\n");
@@ -3392,7 +3392,7 @@ sub generate_binary_tree {
 
     my @leaves;
 
-    my $root = shift( @{$a} );
+    my $root = shift @{$a};
 
     my @joints;
     push @joints, $root;
@@ -3515,7 +3515,7 @@ sub next_command {
     if ($watch) {
         $cmd = $commands[0];
     } else {
-        $cmd = shift(@commands);
+        $cmd = shift @commands;
     }
 
     my $req;
@@ -3922,7 +3922,7 @@ sub rng_shift {
 
     my $value = $rg->[0]->{l};
     if ( $rg->[0]->{l} == $rg->[0]->{u} ) {
-        shift( @{$rg} );
+        shift @{$rg};
     } else {
         $rg->[0]->{l}++;
     }
@@ -3997,8 +3997,8 @@ sub rng_dup {
 sub rng_create_from_array {
     my (@r) = @_;
 
-    my $rng = rng_convert_from_user( shift(@r) );
-    while ( defined( my $v = shift(@r) ) ) {
+    my $rng = rng_convert_from_user( shift @r );
+    while ( defined( my $v = shift @r ) ) {
         rng_add_value( $rng, $v );
     }
     return $rng;
@@ -6029,7 +6029,7 @@ sub string_to_jiffies {
     my $jiffies = 0;
 
     # Remove the "cpu" prefix.
-    shift(@usecc);
+    shift @usecc;
     foreach my $usecv (@usecc) {
         $jiffies += $usecv;
     }
