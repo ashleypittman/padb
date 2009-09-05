@@ -539,7 +539,8 @@ sub usage {
             $allfns{$arg}{help} );
     }
 
-    $usage =~ s!XXXX!$extra!;
+    $usage =~ s{XXXX}
+               {$extra}xms;
 
     print {*STDERR} <<EOF;
 $usage
