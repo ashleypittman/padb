@@ -621,6 +621,22 @@ $debugModes{rmgr}        = undef;
 $debugModes{ctree}       = undef;
 $debugModes{tdata}       = undef;
 
+sub slurp_file {
+    my ($file) = @_;
+    open( my $FD, '<', $file ) or return;
+    my @contents = <$FD>;
+    close($FD);
+    return @contents;
+}
+
+sub slurp_cmd {
+    my ($cmd) = @_;
+    open( my $CFD, '-|', $cmd ) or return;
+    my @out = <$CFD>;
+    close $CFD;
+    return @out;
+}
+
 sub slurp_dir {
     my ($dir) = @_;
     opendir( my $DIR, $dir ) or return;
@@ -2420,9 +2436,7 @@ sub mpd_is_installed {
 }
 
 sub mpd_get_data {
-    open( my $MPD, "mpdlistjobs|" ) or return;
-    my @out = <$MPD>;
-    close $MPD;
+    my @out = slurp_cmd('mpdlistjobs');
     my %jobs;
     my $job;
     my $host;
@@ -2533,9 +2547,7 @@ sub open_get_data {
 
     my $job;
 
-    open( my $open, "ompi-ps|" ) or return;
-    my @out = <$open>;
-    close $open;
+    my @out = slurp_cmd('ompi-ps');
 
     # Handle being called multiple times, zero the hash every
     # time we are called.  Of course we could just return the
@@ -4159,9 +4171,7 @@ sub find_padb_secret {
         exit 1;
     }
 
-    open( my $SFD, $file ) or return;
-    my @l = <$SFD>;
-    close($SFD);
+    my @l = slurp_file($file);
     if ( $#l != 0 ) {
         return;
     }
@@ -4275,17 +4285,16 @@ sub config_from_file {
     my $file = shift;
 
     print "Loading config from \"$file\"\n" if ( $conf{verbose} );
-    open( my $CFILE, $file ) or return;
 
-    while (<$CFILE>) {
-        if (/^([\w-]+)\s*\=\s*(.*)/) {
+    foreach my $line ( slurp_file($file) ) {
+        if ( $line =~ /^([\w-]+)\s*\=\s*(.*)/ ) {
             my $key   = $1;
             my $value = $2;
             $key =~ s/\-/\_/g;
             config_set( $key, $value );
         }
     }
-    close($CFILE);
+
     return;
 }
 
@@ -5872,9 +5881,7 @@ sub load_rms_procs {
 sub show_task_file {
     my ( $vp, $file, $prefix ) = @_;
     return unless ( -f $file );
-    open( my $FD, "$file" ) or return;
-    my @all = <$FD>;
-    close $FD;
+    my @all = slurp_file($file);
     foreach my $l (@all) {
         chomp $l;
         if ( defined $prefix ) {
@@ -5898,11 +5905,8 @@ sub show_task_stat_file {
       nswap cnswap exit_signal processor rt_ptiority policy
       delayacct_blkio_ticks guest_time cguest_time);
     return unless ( -f $file );
-    open( my $FD, "$file" ) or return;
-    my @all = <$FD>;
-    close $FD;
 
-    foreach my $l (@all) {
+    foreach my $l ( slurp_file($file) ) {
         chomp $l;
         my @stats = split( / /, $l );
         for ( my $i = 0 ; $i <= $#stats ; $i++ ) {
@@ -5930,11 +5934,8 @@ sub show_task_dir {
         }
 
         if ( -f "$dir/maps" ) {
-            open( my $MAP, "$dir/maps" );
-            my @map = (<$MAP>);
-            close($MAP);
             my %totals;
-            foreach my $rgn (@map) {
+            foreach my $rgn ( slurp_file("$dir/maps") ) {
                 my ( $area, $perm, $offset, $time, $inode, $file ) =
                   split( " ", $rgn );
                 if ( $file =~ '/dev/elan4/sdram(\d+)' ) {
@@ -5973,9 +5974,7 @@ sub show_task_dir {
             # if requested by -O proc-shows-fds=full
             if ( $carg->{proc_shows_fds} eq 'full' ) {
                 if ( -f "$dir/fdinfo/$fd" ) {
-                    open( my $FDI, "$dir/fdinfo/$fd" );
-                    my @fdi = (<$FDI>);
-                    close $FDI;
+                    my @fdi = slurp_file("$dir/fdinfo/$fd");
                     foreach my $fdi (@fdi) {
                         chomp $fdi;
                         my ( $key, $value ) = split( ":", $fdi );
@@ -6501,10 +6500,8 @@ sub mpi_watch_load {
 
     if ( defined $carg->{mpi_watch_file} ) {
         my %fns;
-        my $f = $carg->{mpi_watch_file};
-        open( my $MW, $f ) or return;
-        my @d = (<$MW>);
-        close($MW);
+
+        my @d = slurp_file( $carg->{mpi_watch_file} );
 
         foreach my $mode (@d) {
             chomp $mode;
@@ -6672,15 +6669,11 @@ sub find_from_status {
     my $pid = shift;
     my $key = shift;
 
-    open( my $PCMD, "/proc/$pid/status" ) or return;
-    while (<$PCMD>) {
-        my $l = $_;
+    foreach my $l ( slurp_file("/proc/$pid/status") ) {
         if ( $l =~ /$key:\t+(\w+)/ ) {
-            close $PCMD;
             return $1;
         }
     }
-    close $PCMD;
     return;
 }
 
