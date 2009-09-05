@@ -1965,7 +1965,9 @@ sub go_p {
         my %this;
         $this{txt} = $lines->{$tag}[$l];
         @{ $this{vps} } = ( $tag, @identical );
-        $this{vpspec} = compress( @identical, $tag );
+
+        $this{vpspec} =
+          rng_convert_to_user( rng_create_from_array( @{ $this{vps} } ) );
 
         if ( defined $prev ) {
             push @{ $prev->{children} }, \%this;
@@ -3890,15 +3892,8 @@ sub rng_convert_from_user {
 sub rng_convert_to_user {
     my ($rg) = @_;
 
-    my @entries;
-    foreach my $part ( @{$rg} ) {
-        if ( $part->{l} == $part->{u} ) {
-            push @entries, $part->{l};
-        } else {
-            push @entries, "$part->{l}-$part->{u}";
-        }
-    }
-    my $range = join( ",", @entries );
+    my $range = join q{,},
+      map { $_->{l} == $_->{u} ? $_->{l} : $_->{l} . q{-} . $_->{u} } @{$rg};
     return "[$range]";
 }
 
