@@ -621,6 +621,29 @@ $debugModes{rmgr}        = undef;
 $debugModes{ctree}       = undef;
 $debugModes{tdata}       = undef;
 
+sub slurp_dir {
+    my ($dir) = @_;
+    opendir( my $DIR, $dir ) or return;
+    my @files = readdir($DIR);
+    closedir($DIR);
+    return @files;
+}
+
+sub get_process_list {
+    my ($user) = @_;
+    my $uid = getpwnam($user);
+    return unless defined $uid;
+    my @pids = slurp_dir('/proc');
+    my @userpids;
+    foreach my $pid (@pids) {
+        next unless ( $pid =~ m{\A\d+\z}xms );
+        my ( undef, undef, undef, undef, $owner ) = stat("/proc/$pid");
+        next unless $owner == $uid;
+        push @userpids, $pid;
+    }
+    return @userpids;
+}
+
 sub parse_args_outer {
 
     Getopt::Long::Configure('bundling');
@@ -1822,9 +1845,7 @@ sub local_stats_from_job {
 
 # Show stats for all jobs on this node.
 sub local_stats {
-    opendir( DH, '/proc/rms/programs' );
-    my @files = readdir(DH);
-    closedir(DH);
+    my @files = slurp_dir('/proc/rms/programs');
 
     foreach my $job (@files) {
         next if ( $job eq '..' );
@@ -2337,52 +2358,19 @@ sub slurm_setup_pcmd {
 
 sub local_get_jobs {
     my $user = shift;
-    opendir( DIR, '/proc/' );
-    my @pids = readdir(DIR);
-    closedir(DIR);
-    my @jobs;
-    my $tuid = getpwnam($user);
-    return unless defined $tuid;
-
-    foreach my $pid (@pids) {
-        next unless ( $pid =~ /^\d+$/ );
-
-        my (
-            $dev,  $ino,   $mode,  $nlink, $uid,     $gid, $rdev,
-            $size, $atime, $mtime, $ctime, $blksize, $blocks
-        ) = stat("/proc/$pid");
-
-        next unless ( $uid eq $tuid );
-
-        push @jobs, $pid;
-    }
-
-    return @jobs;
+    return get_process_list($user);
 }
 
 sub local_fd_get_jobs_real {
     my $user = shift;
     my $file = shift;
-    opendir( DIR, '/proc/' );
-    my @pids = readdir(DIR);
-    closedir(DIR);
+
+    my @pids = get_process_list($user);
+
     my @jobs;
-    my $tuid = getpwnam($user);
-    return unless defined $tuid;
 
     foreach my $pid (@pids) {
-        next unless ( $pid =~ /^\d+$/ );
-
-        my (
-            $dev,  $ino,   $mode,  $nlink, $uid,     $gid, $rdev,
-            $size, $atime, $mtime, $ctime, $blksize, $blocks
-        ) = stat("/proc/$pid");
-
-        next unless ( $uid eq $tuid );
-
-        opendir( DIR, "/proc/$pid/fd" );
-        my @fds = readdir(DIR);
-        closedir(DIR);
+        my @fds = slurp_dir("/proc/$pid/fd");
         foreach my $fd (@fds) {
             my $target = readlink("/proc/$pid/fd/$fd");
             next unless $target;
@@ -5975,9 +5963,7 @@ sub show_task_dir {
     }
 
     if ( $carg->{proc_shows_fds} ) {
-        opendir( my $FDS, "$dir/fd" );
-        my @fds = readdir($FDS);
-        closedir($FDS);
+        my @fds = slurp_dir("$dir/fd");
         my @all_fddata;
         foreach my $fd (@fds) {
             next if ( $fd eq '.' );
@@ -6219,9 +6205,7 @@ sub show_proc {
         my $threads = 0;
 
         # 2.6 kernel. (ntpl)
-        opendir( DIR, "/proc/$pid/task" );
-        my @tasks = readdir(DIR);
-        closedir(DIR);
+        my @tasks = slurp_dir("/proc/$pid/task");
         foreach my $task (@tasks) {
             next if ( $task eq '.' );
             next if ( $task eq '..' );
@@ -6987,12 +6971,7 @@ sub pid_to_name {
 # more interesting pids, in particular look for pids which appear to be
 # scripts and, if they have any children, look at the children instead.
 sub convert_pids_to_child_pids {
-
-    opendir( DIR, '/proc/' );
-    my @pids = readdir(DIR);
-    closedir(DIR);
-
-    my $uid = $<;
+    my @pids = get_process_list( getpwuid $< );
 
     my %scripts;
     map { $scripts{$_}++ } split( ",", $confInner{scripts} );
@@ -7000,13 +6979,6 @@ sub convert_pids_to_child_pids {
     my $ipids = $confInner{rmpids};
 
     foreach my $pid (@pids) {
-
-        # Ignore entries that aren't numeric.
-        next unless ( $pid =~ /^\d+$/ );
-
-        # Ignore processes with the wrong ownership.
-        my ( undef, undef, undef, undef, $owner ) = stat("/proc/$pid");
-        next unless $owner == $uid;
 
         # The resource manager pid this pid is associated with.
         my $rmpid;
