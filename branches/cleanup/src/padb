@@ -541,7 +541,7 @@ sub usage {
 
     $usage =~ s!XXXX!$extra!;
 
-    print STDERR <<EOF;
+    print {*STDERR} <<EOF;
 $usage
 EOF
     exit 1;
@@ -2495,7 +2495,7 @@ sub mpd_setup_pcmd {
 
     my ( $fh, $fn ) = tempfile('/tmp/padb.XXXXXXXX');
     foreach my $host (@hosts) {
-        print $fh "$host:1\n";
+        print {$fh} "$host:1\n";
     }
     close $fh;
 
@@ -2611,7 +2611,7 @@ sub open_setup_pcmd {
     my ( $fh, $fn ) = tempfile('/tmp/padb.XXXXXXXX');
 
     foreach my $host (@hosts) {
-        print $fh "$host\n";
+        print {$fh} "$host\n";
     }
     close $fh;
 
@@ -3129,8 +3129,8 @@ sub show_results {
     #}
 
     if ($tree) {
-        print show_tree go_p( 0, $lines,
-            ( sort { $a <=> $b } ( keys %$lines ) ) );
+        print show_tree(
+            go_p( 0, $lines, ( sort { $a <=> $b } ( keys %$lines ) ) ) );
     } elsif ($compress) {
         foreach my $tag ( sort { $a <=> $b } ( keys %$lines ) ) {
             next if ( !defined( $lines->{$tag} ) );
@@ -3220,8 +3220,8 @@ sub default_output_handler {
     }
 
     if ( $output eq 'tree' ) {
-        print show_tree go_p( 0, $lines,
-            ( sort { $a <=> $b } ( keys %$lines ) ) );
+        print show_tree(
+            go_p( 0, $lines, ( sort { $a <=> $b } ( keys %$lines ) ) ) );
 
     } elsif ( $output eq 'compress' ) {
 
@@ -4238,7 +4238,7 @@ sub go_job {
 
 sub cmdline_error {
     my $str = shift;
-    print STDERR $str;
+    print {*STDERR} $str;
     exit 1;
 }
 
@@ -4274,7 +4274,8 @@ sub config_set {
     print "Setting '$key' to '$value'\n" if ( $conf{verbose} );
 
     if ( !exists $conf{$key} and !exists $conf{mode_options_reverse}{$key} ) {
-        print STDERR "Warning, unknown config option '$key' value '$value'.\n";
+        print {*STDERR}
+          "Warning, unknown config option '$key' value '$value'.\n";
     }
 
     config_set_internal( $key, $value );
@@ -4364,7 +4365,7 @@ sub outer_main {
     my $mode = parse_args_outer();
 
     if ( getpwnam($user) eq "" ) {
-        print STDERR "$prog: Error: no such user as '$user'\n";
+        print {*STDERR} "$prog: Error: no such user as '$user'\n";
         exit 1;
     }
 
@@ -4467,7 +4468,7 @@ sub outer_main {
         find_rmgr();
 
         if ( not job_is_running($full_report) ) {
-            print STDERR
+            print {*STDERR}
 "Job $full_report is not active, use --show-jobs to see active jobs\n";
             exit 1;
         }
@@ -4588,7 +4589,7 @@ sub outer_main {
             if ( job_is_running($jobid) ) {
                 push @jobids, $jobid;
             } else {
-                print STDERR "Job $jobid is not active\n";
+                print {*STDERR} "Job $jobid is not active\n";
             }
         }
     }
@@ -4770,7 +4771,7 @@ sub gdb_n_send {
     my ( $gdb, $cmd ) = @_;
     gdb_wait_for_prompt($gdb);
     my $handle = $gdb->{wtr};
-    print $handle "$cmd\n";
+    print {$handle} "$cmd\n";
     my %r = gdb_n_next_result($gdb);
     $r{cmd} = $cmd;
     return %r;
@@ -5177,7 +5178,7 @@ sub launch_h {
         if ( $r =~ /^req:/ ) {
             my $res = handle_query( $gdb, $vp, $r, \%stats );
             if ( defined $res ) {
-                print $out "$res\n";
+                print {$out} "$res\n";
             }
 
             # Some things *do* fail here, symbol lookups
@@ -5730,7 +5731,7 @@ sub stack_from_core {
     # Send a invalid command so the wait_for_prompt in dump_frames... can work.
     # Should probably do this in gdb_start() and return the output somehow.
     my $handle = $gdb->{wtr};
-    print $handle "\n";
+    print {$handle} "\n";
 
     print "\n";
 
@@ -6460,8 +6461,8 @@ sub show_full_stacks {
     }
 
     my ( $fh, $file ) = tempfile('/tmp/padb.XXXXXXXX');
-    print $fh "where full\n";
-    print $fh "detach\n";
+    print {$fh} "where full\n";
+    print {$fh} "detach\n";
     close $fh;
 
     foreach my $proc ( @{$list} ) {
@@ -7193,7 +7194,7 @@ sub command_from_outer {
             $netdata->{sel}->remove($s);
             $s->close();
             $cdata->{dead} = 1;
-            print("debug\n");
+            print "debug\n";
         } else {
             print "Closing connection from $cdata->{desc} (Bad signon)\n";
             $netdata->{sel}->remove($s);
@@ -7259,7 +7260,7 @@ sub inner_loop_for_comms {
 
     # For now just print the signon code to stdout and let the outer pick it up.
         my $signon_text = "connect $hostname $lport $key\n";
-        print($signon_text);
+        print $signon_text;
     }
 
     my $netdata;
