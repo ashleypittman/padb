@@ -288,70 +288,70 @@ my @inner_conf_cmd = qw(port_range outer);
 my %rmgr;
 
 $rmgr{rms} = {
-    'is_installed'    => \&rms_is_installed,
-    'get_active_jobs' => \&rms_get_jobs,
-    'job_is_running'  => \&rms_job_is_running,
-    'job_to_key'      => \&rms_job_to_key,
-    'setup_pcmd'      => \&rms_setup_pcmd,
-    'find_pids'       => \&rms_find_pids,
+    is_installed    => \&rms_is_installed,
+    get_active_jobs => \&rms_get_jobs,
+    job_is_running  => \&rms_job_is_running,
+    job_to_key      => \&rms_job_to_key,
+    setup_pcmd      => \&rms_setup_pcmd,
+    find_pids       => \&rms_find_pids,
 };
 
 $rmgr{mpd} = {
-    'is_installed'           => \&mpd_is_installed,
-    'get_active_jobs'        => \&mpd_get_jobs,
-    'setup_pcmd'             => \&mpd_setup_pcmd,
-    'cleanup_pcmd'           => \&mpd_cleanup_pcmd,
-    'find_pids'              => \&mpd_find_pids,
-    'require_inner_callback' => 1,
+    is_installed           => \&mpd_is_installed,
+    get_active_jobs        => \&mpd_get_jobs,
+    setup_pcmd             => \&mpd_setup_pcmd,
+    cleanup_pcmd           => \&mpd_cleanup_pcmd,
+    find_pids              => \&mpd_find_pids,
+    require_inner_callback => 1,
 };
 
 $rmgr{orte} = {
-    'is_installed'    => \&open_is_installed,
-    'get_active_jobs' => \&open_get_jobs,
-    'setup_pcmd'      => \&open_setup_pcmd,
-    'cleanup_pcmd'    => \&open_cleanup_pcmd,
-    'find_pids'       => \&open_find_pids,
+    is_installed    => \&open_is_installed,
+    get_active_jobs => \&open_get_jobs,
+    setup_pcmd      => \&open_setup_pcmd,
+    cleanup_pcmd    => \&open_cleanup_pcmd,
+    find_pids       => \&open_find_pids,
 };
 
 $rmgr{'lsf-rms'} = {
-    'is_installed'    => \&lsf_is_installed,
-    'get_active_jobs' => \&lsf_get_jobs,
-    'setup_pcmd'      => \&lsf_setup_pcmd,
-    'inner_rmgr'      => 'rms',
+    is_installed    => \&lsf_is_installed,
+    get_active_jobs => \&lsf_get_jobs,
+    setup_pcmd      => \&lsf_setup_pcmd,
+    inner_rmgr      => 'rms',
 };
 
 $rmgr{slurm} = {
-    'is_installed'           => \&slurm_is_installed,
-    'get_active_jobs'        => \&slurm_get_jobs,
-    'job_is_running'         => \&slurm_job_is_running,
-    'setup_pcmd'             => \&slurm_setup_pcmd,
-    'find_pids'              => \&slurm_find_pids,
-    'require_inner_callback' => 1,
+    is_installed           => \&slurm_is_installed,
+    get_active_jobs        => \&slurm_get_jobs,
+    job_is_running         => \&slurm_job_is_running,
+    setup_pcmd             => \&slurm_setup_pcmd,
+    find_pids              => \&slurm_find_pids,
+    require_inner_callback => 1,
 };
 
 $rmgr{local} = {
-    'get_active_jobs'        => \&local_get_jobs,
-    'job_is_running'         => \&local_job_is_running,
-    'setup_pcmd'             => \&local_setup_pcmd,
-    'find_pids'              => \&local_find_pids,
-    'require_inner_callback' => 1,
+    get_active_jobs        => \&local_get_jobs,
+    job_is_running         => \&local_job_is_running,
+    setup_pcmd             => \&local_setup_pcmd,
+    find_pids              => \&local_find_pids,
+    require_inner_callback => 1,
 };
 
 $rmgr{'local-qsnet'} = {
-    'is_installed'           => \&local_q_is_installed,
-    'get_active_jobs'        => \&local_q_get_jobs,
-    'job_is_running'         => \&local_job_is_running,
-    'setup_pcmd'             => \&local_setup_pcmd,
-    'inner_rmgr'             => 'local',
-    'require_inner_callback' => 1,
+    is_installed           => \&local_q_is_installed,
+    get_active_jobs        => \&local_q_get_jobs,
+    job_is_running         => \&local_job_is_running,
+    setup_pcmd             => \&local_setup_pcmd,
+    inner_rmgr             => 'local',
+    require_inner_callback => 1,
 };
 
 $rmgr{'local-fd'} = {
-    'get_active_jobs'        => \&local_fd_get_jobs,
-    'job_is_running'         => \&local_job_is_running,
-    'setup_pcmd'             => \&local_setup_pcmd,
-    'inner_rmgr'             => 'local',
-    'require_inner_callback' => 1,
+    get_active_jobs        => \&local_fd_get_jobs,
+    job_is_running         => \&local_job_is_running,
+    setup_pcmd             => \&local_setup_pcmd,
+    inner_rmgr             => 'local',
+    require_inner_callback => 1,
 };
 
 ###############################################################################
@@ -1321,9 +1321,9 @@ sub summarise {
 
     my $datastructure = shift;
     my %ret           = (
-        'Bin'     => 0,
-        'Counter' => 0,
-        'Tally'   => 0
+        Bin     => 0,
+        Counter => 0,
+        Tally   => 0
     );
     if ( defined $datastructure->{vp} ) {
         $ret{vp} = $datastructure->{vp};
@@ -1360,9 +1360,9 @@ sub summarise_many {
 sub collapse_summaries {
     my $summaries = shift;
     my %ret       = (
-        'Bin'     => 0,
-        'Counter' => 0,
-        'Tally'   => 0
+        Bin     => 0,
+        Counter => 0,
+        Tally   => 0
     );
     foreach my $summary ( @{$summaries} ) {
         foreach my $key ( keys %ret ) {
@@ -3929,13 +3929,13 @@ sub rng_add_value {
     my ( $rg, $value ) = @_;
 
     if ( ref( $rg->[0] ) eq "" ) {
-        push @{$rg}, { 'l' => $value, 'u' => $value };
+        push @{$rg}, { l => $value, u => $value };
         return;
     }
 
     # If it's after the last value then just add it.
     if ( $value > $rg->[-1]->{u} + 1 ) {
-        push @{$rg}, { 'l' => $value, 'u' => $value };
+        push @{$rg}, { l => $value, u => $value };
         return;
     }
 
@@ -3950,7 +3950,7 @@ sub rng_add_value {
         } elsif ( $value < $part->{l} ) {
 
             # If it's before the current entry then insert it.
-            splice( @{$rg}, $idx, 0, { 'l' => $value, 'u' => $value } );
+            splice( @{$rg}, $idx, 0, { l => $value, u => $value } );
             return;
         } elsif ( $value == $part->{u} + 1 ) {
 
@@ -4481,7 +4481,7 @@ sub outer_main {
 
         push_command('deadlock');
 
-        my %c = ( 'strip_above_wait' => 0 );
+        my %c = ( strip_above_wait => 0 );
         push_command( 'stack', 'tree', \%c );
 
         go_job($full_report);
@@ -7423,84 +7423,84 @@ sub common_main {
     # Sort out secondary and options_i so they are handled in the same way.
 
     $allfns{queue} = {
-        'arg_long'  => 'message-queue',
-        'qsnet'     => 1,
-        'arg_short' => 'q',
-        'handler'   => \&show_queue,
-        'help'      => 'Show the message queues',
-        'options_i' => { 'mpi_dll' => undef, }
+        arg_long  => 'message-queue',
+        qsnet     => 1,
+        arg_short => 'q',
+        handler   => \&show_queue,
+        help      => 'Show the message queues',
+        options_i => { mpi_dll => undef, }
 
     };
 
     $allfns{kill} = {
-        'handler'   => \&kill_proc,
-        'arg_long'  => 'kill',
-        'help'      => 'Deliver signal to processes',
-        'secondary' => [
+        handler   => \&kill_proc,
+        arg_long  => 'kill',
+        help      => 'Deliver signal to processes',
+        secondary => [
             {
-                'arg_long' => 'signal',
-                'type'     => '=s',
-                'default'  => 'TERM'
+                arg_long => 'signal',
+                type     => '=s',
+                default  => 'TERM'
             }
         ]
     };
 
     $allfns{mqueue} = {
-        'handler_all' => \&show_mpi_queue_all,
-        'arg_long'    => 'mpi-queue',
-        'arg_short'   => 'Q',
-        'help'        => 'Show MPI message queues',
-        'options_i'   => { 'mpi_dll' => undef, }
+        handler_all => \&show_mpi_queue_all,
+        arg_long    => 'mpi-queue',
+        arg_short   => 'Q',
+        help        => 'Show MPI message queues',
+        options_i   => { mpi_dll => undef, }
     };
 
     $allfns{deadlock} = {
-        'handler_all' => \&show_mpi_queue_for_deadlock_all,
-        'arg_long'    => 'deadlock',
-        'arg_short'   => 'j',
-        'help'        => 'Run deadlock detection algorithm',
-        'out_handler' => \&deadlock_detect,
-        'options_i'   => {
-            'mpi_dll'            => undef,
-            'show_group_members' => 0,
-            'show_all_groups'    => 0,
+        handler_all => \&show_mpi_queue_for_deadlock_all,
+        arg_long    => 'deadlock',
+        arg_short   => 'j',
+        help        => 'Run deadlock detection algorithm',
+        out_handler => \&deadlock_detect,
+        options_i   => {
+            mpi_dll            => undef,
+            show_group_members => 0,
+            show_all_groups    => 0,
           }
 
     };
 
     $allfns{pinfo} = {
-        'handler_all' => \&show_proc_all,
-        'arg_long'    => 'proc-info',
-        'help'        => 'Show process information',
-        'options_i'   => {
-            'proc_shows_proc' => 1,
-            'proc_shows_fds'  => 1,
-            'proc_shows_maps' => 0,
-            'proc_shows_stat' => 0
+        handler_all => \&show_proc_all,
+        arg_long    => 'proc-info',
+        help        => 'Show process information',
+        options_i   => {
+            proc_shows_proc => 1,
+            proc_shows_fds  => 1,
+            proc_shows_maps => 0,
+            proc_shows_stat => 0
           }
 
     };
 
     $allfns{proc_summary} = {
-        'handler_all' => \&show_proc_all,
-        'out_handler' => \&show_proc_format,
-        'arg_long'    => 'proc-summary',
-        'help'        => 'Show process information in top format',
-        'options_i'   => {
-            'column_seperator'   => '  ',
-            'proc_shows_proc'    => 1,
-            'proc_shows_fds'     => 0,
-            'proc_shows_maps'    => 0,
-            'proc_shows_stat'    => 1,
-            'proc_sort_key'      => 'vp',
-            'proc_show_header'   => 1,
-            'reverse_sort_order' => 0,
-            'nprocs_output'      => undef,
+        handler_all => \&show_proc_all,
+        out_handler => \&show_proc_format,
+        arg_long    => 'proc-summary',
+        help        => 'Show process information in top format',
+        options_i   => {
+            column_seperator   => '  ',
+            proc_shows_proc    => 1,
+            proc_shows_fds     => 0,
+            proc_shows_maps    => 0,
+            proc_shows_stat    => 1,
+            proc_sort_key      => 'vp',
+            proc_show_header   => 1,
+            reverse_sort_order => 0,
+            nprocs_output      => undef,
         },
-        'secondary' => [
+        secondary => [
             {
-                'arg_long' => 'proc_format',
-                'type'     => '=s',
-                'default' =>
+                arg_long => 'proc_format',
+                type     => '=s',
+                default =>
 'vp=vpid,hostname,pid,vmsize,vmrss,stat.state=S,load1=uptime,pcpu=%cpu,stat.processor=lcore,name=command'
             }
           ]
@@ -7508,69 +7508,69 @@ sub common_main {
     };
 
     $allfns{stack} = {
-        'handler_all' => \&stack_trace_from_pids,
-        'arg_long'    => 'stack-trace',
-        'arg_short'   => 'x',
-        'help'        => 'Show stack trace (see also -t)',
-        'options_i'   => {
-            'stack_shows_params' => 0,
-            'stack_shows_locals' => 0,
-            'gdb_retry_count'    => 3,
-            'stack_strip_above' =>
+        handler_all => \&stack_trace_from_pids,
+        arg_long    => 'stack-trace',
+        arg_short   => 'x',
+        help        => 'Show stack trace (see also -t)',
+        options_i   => {
+            stack_shows_params => 0,
+            stack_shows_locals => 0,
+            gdb_retry_count    => 3,
+            stack_strip_above =>
 'elan_waitWord,elan_pollWord,elan_deviceCheck,opal_condition_wait,opal_progress',
-            'stack_strip_below' => 'main',
+            stack_strip_below => 'main',
         },
-        'secondary' => [
+        secondary => [
             {
-                'arg_long' => 'strip_below_main',
-                'type'     => '!',
-                'default'  => 1,
+                arg_long => 'strip_below_main',
+                type     => '!',
+                default  => 1,
             },
             {
-                'arg_long' => 'strip_above_wait',
-                'type'     => '!',
-                'default'  => 1,
+                arg_long => 'strip_above_wait',
+                type     => '!',
+                default  => 1,
             },
           ]
 
     };
 
     $allfns{stack_long} = {
-        'handler_all' => \&show_full_stacks,
-        'arg_long'    => 'stack-trace-full',
-        'arg_short'   => 'X',
-        'help'        => 'Show long stack trace (with locals)',
+        handler_all => \&show_full_stacks,
+        arg_long    => 'stack-trace-full',
+        arg_short   => 'X',
+        help        => 'Show long stack trace (with locals)',
     };
 
     $allfns{mpi_watch} = {
-        'handler_all'     => \&mpi_watch_all,
-        'arg_long'        => 'mpi-watch',
-        'help'            => 'Trace MPI programs',
-        'pre_out_handler' => \&pre_mpi_watch,
-        'out_handler'     => \&show_mpi_watch,
-        'options_i'       => {
-            'mpi_dll'        => undef,
-            'mpi_watch_file' => undef
+        handler_all     => \&mpi_watch_all,
+        arg_long        => 'mpi-watch',
+        help            => 'Trace MPI programs',
+        pre_out_handler => \&pre_mpi_watch,
+        out_handler     => \&show_mpi_watch,
+        options_i       => {
+            mpi_dll        => undef,
+            mpi_watch_file => undef
         }
     };
 
     $allfns{ping} = {
-        'handler'  => \&ping_rank,
-        'arg_long' => 'ping',
-        'help'     => "Internal ping",
+        handler  => \&ping_rank,
+        arg_long => 'ping',
+        help     => 'Internal ping',
     };
 
     $allfns{set_debug} = {
-        'handler'   => \&set_debug,
-        'qsnet'     => 1,
-        'arg_long'  => 'set-debug',
-        'arg_short' => 'D',
-        'help'      => 'Set debug flags (use --dflag=value)',
-        'secondary' => [
+        handler   => \&set_debug,
+        qsnet     => 1,
+        arg_long  => 'set-debug',
+        arg_short => 'D',
+        help      => 'Set debug flags (use --dflag=value)',
+        secondary => [
             {
-                'arg_long' => 'dflag',
-                'type'     => '=s',
-                'default'  => '0'
+                arg_long => 'dflag',
+                type     => '=s',
+                default  => '0'
             }
         ]
     };
@@ -7583,30 +7583,30 @@ sub common_main {
     # The shared memory key needs to be calculated.
     # Config options need to be read locally rather than globally
     $allfns{qsnet_stats} = {
-        'handler_all' => \&inner_show_stats,
-        'out_handler' => \&show_stats,
-        'qsnet'       => 1,
-        'arg_long'    => 'statistics-total',
-        'arg_short'   => 's',
-        'help'        => 'Show the job-wide statistics.',
-        'options_i'   => {
-            'stats_name'     => undef,
-            'stats_sort_key' => 'vp',
-            'stats_reverse'  => 0,
-            'stats_short'    => 0,
-            'show_all_stats' => 0,
+        handler_all => \&inner_show_stats,
+        out_handler => \&show_stats,
+        qsnet       => 1,
+        arg_long    => 'statistics-total',
+        arg_short   => 's',
+        help        => 'Show the job-wide statistics.',
+        options_i   => {
+            stats_name     => undef,
+            stats_sort_key => 'vp',
+            stats_reverse  => 0,
+            stats_short    => 0,
+            show_all_stats => 0,
         }
     };
     $allfns{qsnet_groups} = {
-        'handler_all' => \&inner_show_stats,
-        'out_handler' => \&group_status,
-        'qsnet'       => 1,
-        'arg_long'    => 'group',
-        'arg_short'   => 'g',
-        'help'        => 'Show the state of collective operations (groups).',
-        'options_i'   => {
-            'show_group_members' => 0,
-            'show_all_groups'    => 0,
+        handler_all => \&inner_show_stats,
+        out_handler => \&group_status,
+        qsnet       => 1,
+        arg_long    => 'group',
+        arg_short   => 'g',
+        help        => 'Show the state of collective operations (groups).',
+        options_i   => {
+            show_group_members => 0,
+            show_all_groups    => 0,
         }
     };
 
