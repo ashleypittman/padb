@@ -1905,7 +1905,7 @@ sub cmp_list {
 # This function returns an reference to an array of hashes, each
 # hash containing the "txt" of the function name and a further array
 # of hash references called "children".
-sub go_p {
+sub make_tree {
     my ( $level, $lines, @tags ) = @_;
 
     my @peers;
@@ -2002,7 +2002,7 @@ sub go_p {
             unshift @identical, $tag;
         }
 
-        $prev->{children} = go_p( $endlevel + 1, $lines, @identical );
+        $prev->{children} = make_tree( $endlevel + 1, $lines, @identical );
     }
 
     debug_log(
@@ -2012,7 +2012,7 @@ sub go_p {
     );
 
     if (@different) {
-        my $new = go_p( $level, $lines, @different );
+        my $new = make_tree( $level, $lines, @different );
         foreach my $n ( @{$new} ) {
             push @peers, $n;
         }
@@ -3050,7 +3050,7 @@ sub show_proc_format {
 }
 
 # XXX: Now only called when loading things from file.
-sub show_results {
+sub show_results_from_file {
     my ( $nlines, $mode, $handle ) = @_;
 
     my $lines = $nlines->{lines};
@@ -3068,7 +3068,7 @@ sub show_results {
 
     if ($tree) {
         print show_tree(
-            go_p( 0, $lines, ( sort { $a <=> $b } ( keys %$lines ) ) ) );
+            make_tree( 0, $lines, ( sort { $a <=> $b } ( keys %$lines ) ) ) );
     } elsif ($compress) {
         foreach my $tag ( sort { $a <=> $b } ( keys %$lines ) ) {
             next if ( !defined( $lines->{$tag} ) );
@@ -3160,7 +3160,7 @@ sub default_output_handler {
 
     if ( $output eq 'tree' ) {
         print show_tree(
-            go_p( 0, $lines, ( sort { $a <=> $b } ( keys %$lines ) ) ) );
+            make_tree( 0, $lines, ( sort { $a <=> $b } ( keys %$lines ) ) ) );
 
     } elsif ( $output eq 'compress' ) {
 
@@ -3207,7 +3207,7 @@ sub default_output_handler {
     return;
 }
 
-sub go_file {
+sub load_and_display_from_file {
     my $file = shift;
     my $mode = shift;
 
@@ -3234,7 +3234,7 @@ sub go_file {
         process_line( $line, \%lines );
     }
     post_process_lines( \%lines );
-    show_results( \%lines, $mode, undef );
+    show_results_from_file( \%lines, $mode, undef );
     return;
 }
 
@@ -4502,7 +4502,7 @@ sub outer_main {
         if ( defined $mode ) {
             $m = $mode;
         }
-        go_file( $input_file, $m );
+        load_and_display_from_file( $input_file, $m );
         exit 0;
     }
 
@@ -6155,7 +6155,7 @@ sub show_proc {
     return;
 }
 
-sub show_vars {
+sub show_stack_vars {
     my ( $vp, $frame, $type ) = @_;
     my %l;
     $l{t} = 0;
@@ -6294,10 +6294,10 @@ sub stack_trace_from_pids {
                       . ( $$frame{file} || '?' ) . ':'
                       . ( $$frame{line} || '?' ) );
                 if ( $carg->{stack_shows_params} ) {
-                    show_vars( $vp, $frame, 'params' );
+                    show_stack_vars( $vp, $frame, 'params' );
                 }
                 if ( $carg->{stack_shows_locals} ) {
-                    show_vars( $vp, $frame, 'locals' );
+                    show_stack_vars( $vp, $frame, 'locals' );
                 }
 
             }
