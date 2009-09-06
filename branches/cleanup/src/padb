@@ -2526,7 +2526,7 @@ sub find_ompi_prefix {
         next unless ( -x "$dir/$name" );
         my @d = split( "/", $dir );
         pop @d;
-        my $prefix = join( "/", @d );
+        my $prefix = join q{/}, @d;
         return "--prefix $prefix";
     }
     return "";
@@ -3090,7 +3090,7 @@ sub show_proc_format {
                 $proc_format_header{$key} );
             push @res, $l;
         }
-        my $line = join( $separator, @res );
+        my $line = join $separator, @res;
         print "$line\n";
     }
     my $count = $carg->{nprocs_output};
@@ -3103,7 +3103,7 @@ sub show_proc_format {
             }
             push @res, sprintf( "%$proc_format_lengths{$key}s", $value );
         }
-        my $line = join( $separator, @res );
+        my $line = join $separator, @res;
         print "$line\n";
         if ( defined($count) and ( --$count == 0 ) ) {
             return;
@@ -3144,7 +3144,7 @@ sub show_results {
                 }
             }
             print("----------------\n");
-            printf "%s\n", join( ",", compress( @identical, $tag ) );
+            printf "%s\n", join q{,}, compress( @identical, $tag );
             print("----------------\n");
             foreach my $data ( @{ $lines->{$tag} } ) {
                 print("$data\n");
@@ -4434,7 +4434,7 @@ sub outer_main {
                 print "$r: ";
                 my @jobs = $rmgr{$res}{get_active_jobs}($user);
                 if ( $#jobs > -1 ) {
-                    my $j = join( " ", sortn(@jobs) );
+                    my $j = join q{" }, sortn(@jobs);
                     print "jobs($j)\n";
                 } else {
                     print "No active jobs\n";
@@ -5768,7 +5768,7 @@ sub stack_from_core {
                         push @a, "$arg = ??";
                     }
                 }
-                my $a = join( ", ", @a );
+                my $a = join q{, }, @a;
                 my $file = $frame->{file} || "?";
                 my $line = $frame->{line} || "?";
                 print "$frame->{func}($a) at $file:$line\n";
@@ -5840,7 +5840,7 @@ sub get_remote_env {
         my @f   = split "=";
         my $key = $f[0];
         shift @f;
-        $env{$key} = join( "=", @f );
+        $env{$key} = join q{=}, @f;
     }
     close $FD;
     return %env;
@@ -6422,7 +6422,7 @@ sub show_clever_full_stack {
                         push @a, "$arg = ??";
                     }
                 }
-                my $a = join( ", ", @a );
+                my $a = join q{, }, @a;
                 my $file = $frame->{file} || '?';
                 my $line = $frame->{line} || '?';
                 output( $vp, "$frame->{func}($a) at $file:$line" );
