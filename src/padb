@@ -633,7 +633,7 @@ sub slurp_file {
 
 sub slurp_cmd {
     my ($cmd) = @_;
-    open( my $CFD, '-|', $cmd ) or return;
+    open( my $CFD, '-|', "$cmd 2>/dev/null" ) or return;
     my @out = <$CFD>;
     close $CFD;
     return @out;
