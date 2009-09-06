@@ -4374,7 +4374,7 @@ sub outer_main {
                 print "$r: ";
                 my @jobs = $rmgr{$res}{get_active_jobs}($user);
                 if ( $#jobs > -1 ) {
-                    my $j = join q{" }, sort { $a <=> $b } @jobs;
+                    my $j = join q{ }, sort { $a <=> $b } @jobs;
                     print "jobs($j)\n";
                 } else {
                     print "No active jobs\n";
