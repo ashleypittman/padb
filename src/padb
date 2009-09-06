@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl
 
 # padb. a simple parallel debugging aid.
 
@@ -204,6 +204,7 @@
 
 ###############################################################################
 
+use warnings;
 use strict;
 use Getopt::Long;
 use File::Basename;
