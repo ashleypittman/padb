@@ -6399,50 +6399,6 @@ sub show_queue {
     return;
 }
 
-sub show_clever_full_stack {
-    my ( $vp, $pid ) = @_;
-
-    my $gdb = gdb_start();
-
-    if ( gdb_attach( $gdb, $pid ) ) {
-        my @threads = gdb_dump_frames_per_thread( $gdb, 1 );
-        gdb_detach($gdb);
-        gdb_quit($gdb);
-
-        foreach my $thread ( sort { $a->{id} <=> $b->{id} } @threads ) {
-            my @frames = @{ $thread->{frames} };
-            for ( my $i = $#frames ; $i >= 0 ; $i-- ) {
-                my $frame = $frames[$i];
-
-                my @a;
-                foreach my $arg ( @{ $frame->{params} } ) {
-                    if ( defined $frame->{vals}{$arg} ) {
-                        push @a, "$arg = $frame->{vals}{$arg}";
-                    } else {
-                        push @a, "$arg = ??";
-                    }
-                }
-                my $a = join q{, }, @a;
-                my $file = $frame->{file} || '?';
-                my $line = $frame->{line} || '?';
-                output( $vp, "$frame->{func}($a) at $file:$line" );
-
-                my $show_locals = 0;
-                if ($show_locals) {
-                    foreach my $arg ( @{ $frame->{locals} } ) {
-                        if ( defined $frame->{vals}{$arg} ) {
-                            output( $vp, "  $arg = $frame->{vals}{$arg}" );
-                        } else {
-                            output( $vp, "  $arg = ??" );
-                        }
-                    }
-                }
-            }
-        }
-    }
-    return;
-}
-
 sub show_full_stack {
     my ( $vp, $pid, $file ) = @_;
     run_ptrack_cmd( $vp, $pid, "gdb -batch -x $file -p $pid" );
@@ -6451,15 +6407,6 @@ sub show_full_stack {
 
 sub show_full_stacks {
     my ( $carg, $list ) = @_;
-
-    if (0) {
-
-        # -x does this, just do what we used to.
-        foreach my $proc ( @{$list} ) {
-            show_clever_full_stack( $proc->{vp}, $proc->{pid} );
-        }
-        return;
-    }
 
     my ( $fh, $file ) = tempfile('/tmp/padb.XXXXXXXX');
     print {$fh} "where full\n";
