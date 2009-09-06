@@ -6701,19 +6701,6 @@ sub inner_show_stats {
     return;
 }
 
-sub default_handler_all {
-    my ( $cmd, $list ) = @_;
-    my %gres;
-    foreach my $proc ( @{$list} ) {
-        my $vp  = $proc->{vp};
-        my $pid = $proc->{pid};
-        my $res = $allfns{ $cmd->{mode} }{handler}( $cmd->{cargs}, $vp, $pid );
-        $gres{$vp} = $res if ( defined $res );
-    }
-    return if not %gres;
-    return \%gres;
-}
-
 # Receive a reply from a child.
 # If it's the last reply then combine
 # with others and forward to parent.
@@ -6886,6 +6873,7 @@ sub convert_pids_to_child_pids {
     }
 
     # Now chose what pid to target.
+    my @apids;
     foreach my $key ( keys %{$ipids} ) {
         my $ip = $ipids->{$key};
 
@@ -6902,12 +6890,16 @@ sub convert_pids_to_child_pids {
             my @ppids = sort @{ $ip->{notscripts} };
             $newpid = $ppids[0];
         }
-        my %pd;
-        $pd{pid} = $newpid;
-        $pd{vp}  = $ip->{rank};
-        push @{ $confInner{all_pids} }, \%pd;
 
+        push @apids,
+          {
+            pid => $newpid,
+            vp  => $ip->{rank}
+          };
     }
+
+    # Sort local pids by order of increasing rank.
+    @{ $confInner{all_pids} } = sort { $a->{vp} <=> $b->{vp} } @apids;
     return;
 }
 
@@ -6946,6 +6938,8 @@ sub inner_find_pids {
 # 3) If we have no children send reply.
 sub command_from_parent {
     my ( $netdata, $cmd ) = @_;
+
+    $netdata->{host_responce} = "ok";
 
     if ( $cmd->{mode} eq 'signon' ) {
         $netdata->{signon_cmd} = my_encode($cmd);
@@ -7025,15 +7019,55 @@ sub command_from_parent {
         $pid_list = $confInner{all_pids};
     }
 
-    # Now do the work.
-    my $res;
+    # Now do the work by calling handler or handler_all.  Catch any exception
+    # errors here and extract the top line of the error to report to the user.
+    # If calling handler then just report an error for that rank and move on,
+    # if using handler_all then report errors for all ranks on this node.
+
+    # This has the advantage that even if there is an error with data
+    # collection on this node the rest of the application can carry and
+    # hopefully still give the user meaningful information or at least
+    # meaningful error messages.
+
+    # Even if a exception is generated rank output may still exist for that
+    # or any other rank on this node, we'll have to see if that causes problems
+    # or if it's best to clear the target_key_pait() and output() data for this
+    # node/rank.
     if ( defined $allfns{ $cmd->{mode} }{handler_all} ) {
-        $res = $allfns{ $cmd->{mode} }{handler_all}( $cmd->{cargs}, $pid_list );
+        eval {
+            $netdata->{target_responce} =
+              $allfns{ $cmd->{mode} }{handler_all}( $cmd->{cargs}, $pid_list );
+        };
+        if ($@) {
+            my $error = $@;
+            my @e = split qr{\n}, $error;
+            $netdata->{host_responce} = "error";
+            foreach my $proc ( @{$pid_list} ) {
+                target_error( $proc->{vp}, "Critial error: ($e[0])" );
+            }
+        }
     } else {
-        $res = default_handler_all( $cmd, $pid_list );
-    }
-    if ($res) {
-        $netdata->{target_responce} = $res;
+
+        my %gres;
+        foreach my $proc ( @{$pid_list} ) {
+            my $vp  = $proc->{vp};
+            my $pid = $proc->{pid};
+            eval {
+                my $res =
+                  $allfns{ $cmd->{mode} }{handler}( $cmd->{cargs}, $vp, $pid );
+                $gres{$vp} = $res if ( defined $res );
+            };
+            if ($@) {
+                my $error = $@;
+                my @e = split qr{\n}, $error;
+                $netdata->{host_responce} = "error";
+                target_error( $vp, "Critial error: ($e[0])" );
+            }
+        }
+
+        if (%gres) {
+            $netdata->{target_responce} = \%gres;
+        }
     }
 
     return;
@@ -7055,7 +7089,8 @@ sub inner_cleanup_and_exit {
 sub reply_to_parent {
     my ( $netdata, $cmd ) = @_;
 
-    $cmd->{host_responce}{ok}{ $confInner{hostname} } = 1;
+    $cmd->{host_responce}{ $netdata->{host_responce} }{ $confInner{hostname} } =
+      1;
 
     my $reply = my_encode($cmd);
     $netdata->{parent}->{socket}->print("$reply\n");
