@@ -2055,16 +2055,6 @@ sub show_tree {
     return _show_tree( $ref, undef, "" );
 }
 
-# sortn:
-#
-# # sort a group of alphanumeric strings by the last group of numerals in
-# that string
-#
-sub sortn {
-    map { $$_[0] }
-      sort { ( $$a[1] || 0 ) <=> ( $$b[1] || 0 ) } map { [ $_, /(\d*)$/ ] } @_;
-}
-
 ###############################################################################
 #
 # RMS support.
@@ -3203,7 +3193,8 @@ sub default_output_handler {
         }
     } else {
         my $nprocesses = keys %{ $d->{target_output} };
-        foreach my $process ( sortn( keys %{ $d->{target_output} } ) ) {
+        foreach my $process ( sort { $a <=> $b } keys %{ $d->{target_output} } )
+        {
             foreach my $line ( @{ $d->{target_output}{$process} } ) {
                 if ( $nprocesses == 1 ) {
                     print "$line\n";
@@ -3382,7 +3373,7 @@ sub connect_to_children {
 
     debug_log( 'signon', undef, 'Received last signon, connecting to inner' );
 
-    @{ $comm_data->{host_ids} } = sortn( keys %{ $comm_data->{remote} } );
+    @{ $comm_data->{host_ids} } = sort keys %{ $comm_data->{remote} };
     $comm_data->{connection_tree} =
       generate_comm_tree( $comm_data->{host_ids} );
 
@@ -3578,7 +3569,7 @@ sub format_target_data {
     my $ret = "\n";
     foreach my $name ( sort keys %{$td} ) {
         $ret .= "Namespace: \"$name\"\n";
-        foreach my $value ( sortn( keys %{ $td->{$name} } ) ) {
+        foreach my $value ( sort( keys %{ $td->{$name} } ) ) {
             $ret .= "    $value\t";
             $ret .= rng_convert_to_user( $td->{$name}{$value} ) . "\n";
         }
@@ -4383,7 +4374,7 @@ sub outer_main {
                 print "$r: ";
                 my @jobs = $rmgr{$res}{get_active_jobs}($user);
                 if ( $#jobs > -1 ) {
-                    my $j = join q{" }, sortn(@jobs);
+                    my $j = join q{" }, sort { $a <=> $b } @jobs;
                     print "jobs($j)\n";
                 } else {
                     print "No active jobs\n";
