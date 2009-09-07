@@ -656,6 +656,11 @@ sub get_process_list {
     foreach my $pid (@pids) {
         next unless ( $pid =~ m{\A\d+\z}xms );
         my ( undef, undef, undef, undef, $owner ) = stat("/proc/$pid");
+
+        # Check the stat worked, it's possible for processes to dissapear
+        # Take care to check for defined rather than true as root has a
+        # uid of zero.
+        next unless defined $owner;
         next unless $owner == $uid;
         push @userpids, $pid;
     }
@@ -6570,7 +6575,7 @@ sub find_from_status {
 sub is_resmgr_process {
     my $pid  = shift;
     my $name = find_from_status( $pid, 'Name' );
-    my $mgrs = { 'rmsloader' => 1, 'slurmd' => 1, 'slurmstepd' => 1 };
+    my $mgrs = { rmsloader => 1, slurmd => 1, slurmstepd => 1 };
     return 1 if ( defined $mgrs->{$name} );
     return;
 }
@@ -6891,11 +6896,16 @@ sub convert_pids_to_child_pids {
             $newpid = $ppids[0];
         }
 
-        push @apids,
-          {
-            pid => $newpid,
-            vp  => $ip->{rank}
-          };
+        # The process might have died and we simply didn't find anything,
+        # if this is the case then just skip it, the outer will notice
+        # the missing signon and report an approtiate error.
+        if ( defined $newpid ) {
+            push @apids,
+              {
+                pid => $newpid,
+                vp  => $ip->{rank}
+              };
+        }
     }
 
     # Sort local pids by order of increasing rank.
