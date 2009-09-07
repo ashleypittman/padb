@@ -2826,6 +2826,8 @@ sub cleanup_pcmd {
 #
 ###############################################################################
 
+# This function isn't called but I've kept it for now in case it becomes
+# needed when dealing with files.
 sub strip_stack_traces {
     my ( $cargs, $lines ) = @_;
 
@@ -3133,11 +3135,12 @@ sub default_output_handler {
     my $lines = $d->{target_output};
     my $mode  = $req->{mode};
 
-    if ( $mode eq 'stack' or $input_file ) {
-        if ( $cargs->{strip_below_main} or $cargs->{strip_above_wait} ) {
-            strip_stack_traces( $cargs, $lines );
-        }
-    }
+    # This is done internally by the node-agent now.
+    #if ( $mode eq 'stack' or $input_file ) {
+    #    if ( $cargs->{strip_below_main} or $cargs->{strip_above_wait} ) {
+    #        strip_stack_traces( $cargs, $lines );
+    #    }
+    #}
 
     if ( defined $req->{out_format} ) {
         complex_output_handler( $req->{out_format}, $lines );
@@ -6188,6 +6191,17 @@ sub stack_trace_from_pids {
 
     my @all;
 
+    my %above;
+    my %below;
+
+    if ( $carg->{strip_above_wait} ) {
+        map { $above{$_} = 1 } split qr{,}, $carg->{stack_strip_above};
+    }
+
+    if ( $carg->{strip_below_main} ) {
+        map { $below{$_} = 1 } split qr{,}, $carg->{stack_strip_below};
+    }
+
     foreach my $proc ( @{$list} ) {
         my $vp  = $proc->{vp};
         my $pid = $proc->{pid};
@@ -6265,12 +6279,13 @@ sub stack_trace_from_pids {
             and ( $tries < $carg->{gdb_retry_count} ) );
 
         if ( not defined $threads[0]{id} ) {
-            output( $vp, 'Could not extract stack trace from application' );
+            target_error( $vp,
+                'Could not extract stack trace from application' );
             return;
         }
 
         if ( defined $threads[0]{error} ) {
-            output( $vp, $threads[0]{error} );
+            target_error( $vp, $threads[0]{error} );
             return;
         }
 
@@ -6280,20 +6295,42 @@ sub stack_trace_from_pids {
 
             output( $vp, "ThreadId: $thread->{id}" ) if ( $#threads != 0 );
 
+            my $strip_below;
+
+            # Find a funtion to strip above.  Only actually enable
+            # this if there is a function present which we are targeting
+            # or else no output will be generated!
+            if ( $carg->{strip_below_main} ) {
+                foreach my $frame (@frames) {
+                    next unless exists $frame->{func};
+                    if ( defined $below{ $frame->{func} } ) {
+                        $strip_below = $frame->{func};
+                    }
+                }
+            }
+
             for ( my $i = $#frames ; $i >= 0 ; $i-- ) {
                 my $frame = $frames[$i];
 
-                output( $vp, "ERROR: $$frame{error}" )
-                  if exists $$frame{error};
+                target_error( $vp, "error from gdb: $frame->{error}" )
+                  if exists $frame->{error};
 
-                next unless exists $$frame{level};
-                next unless exists $$frame{func};
+                next unless exists $frame->{level};
+                next unless exists $frame->{func};
+
+                # This seemingly always gets set by gdb even if it is
+                # sometimes set to '??'
+                my $function = $frame->{func};
+
+                next if ( defined $strip_below and $strip_below ne $function );
+
+                $strip_below = undef;
 
                 output( $vp,
-                        ( $$frame{func} || '?' ) 
+                        $function 
                       . '() at '
-                      . ( $$frame{file} || '?' ) . ':'
-                      . ( $$frame{line} || '?' ) );
+                      . ( $frame->{file} || '?' ) . ':'
+                      . ( $frame->{line} || '?' ) );
                 if ( $carg->{stack_shows_params} ) {
                     show_stack_vars( $vp, $frame, 'params' );
                 }
@@ -6301,6 +6338,10 @@ sub stack_trace_from_pids {
                     show_stack_vars( $vp, $frame, 'locals' );
                 }
 
+                # Strip below this function if we need to.
+                if ( defined $above{$function} ) {
+                    last;
+                }
             }
         }
     }
