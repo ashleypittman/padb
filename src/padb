@@ -3069,43 +3069,19 @@ sub show_results_from_file {
         return;
     }
 
+    my $of = 'raw';
+    $of = 'tree'       if $tree;
+    $of = 'compress'   if $compress;
+    $of = 'compress_c' if $compress_c;
+
     #if ( $mode eq "stack" or $input_file ) {
     #    if ( $strip_below_main or $strip_above_wait ) {
     #        strip_stack_traces(undef,$lines);
     #    }
     #}
 
-    if ($tree) {
-        print show_tree( make_tree($lines) );
-    } elsif ($compress) {
-        foreach my $tag ( sort { $a <=> $b } ( keys %$lines ) ) {
-            next if ( not defined $lines->{$tag} );
-            my $rng = rng_create_empty();
-            rng_add_value( $rng, $tag );
-            foreach my $tag2 ( keys %$lines ) {
-                next if ( $tag2 eq $tag );
-                if ( cmp_list( \@{ $lines->{$tag} }, \@{ $lines->{$tag2} } ) ) {
-                    rng_add_value( $rng, $tag2 );
-                    delete( $lines->{$tag2} );
-                }
-            }
-            print("----------------\n");
-            printf "%s\n", rng_convert_to_user($rng);
-            print("----------------\n");
-            foreach my $data ( @{ $lines->{$tag} } ) {
-                print("$data\n");
-            }
-        }
-    } elsif ($compress_c) {
-        foreach my $tag ( sort { $a <=> $b } ( keys %$lines ) ) {
-            print("----------------\n");
-            print("$tag\n");
-            print("----------------\n");
-            foreach my $data ( @{ $lines->{$tag} } ) {
-                print("$data\n");
-            }
-        }
-    }
+    complex_output_handler( $of, $lines );
+
     return;
 }
 
@@ -3154,17 +3130,35 @@ sub default_output_handler {
     # Warn on missing output here...
     return unless exists $d->{target_output};
 
-    my $lines  = $d->{target_output};
-    my $mode   = $req->{mode};
-    my $output = 'raw';
-
-    $output = $req->{out_format} if defined $req->{out_format};
+    my $lines = $d->{target_output};
+    my $mode  = $req->{mode};
 
     if ( $mode eq 'stack' or $input_file ) {
         if ( $cargs->{strip_below_main} or $cargs->{strip_above_wait} ) {
             strip_stack_traces( $cargs, $lines );
         }
     }
+
+    if ( defined $req->{out_format} ) {
+        complex_output_handler( $req->{out_format}, $lines );
+    } else {
+        my $nprocesses = keys %{ $d->{target_output} };
+        foreach my $process ( sort { $a <=> $b } keys %{ $d->{target_output} } )
+        {
+            foreach my $line ( @{ $d->{target_output}{$process} } ) {
+                if ( $nprocesses == 1 ) {
+                    print "$line\n";
+                } else {
+                    print "$process:$line\n";
+                }
+            }
+        }
+    }
+    return;
+}
+
+sub complex_output_handler {
+    my ( $output, $lines ) = @_;
 
     if ( $output eq 'tree' ) {
         print show_tree( make_tree($lines) );
@@ -3198,17 +3192,7 @@ sub default_output_handler {
             }
         }
     } else {
-        my $nprocesses = keys %{ $d->{target_output} };
-        foreach my $process ( sort { $a <=> $b } keys %{ $d->{target_output} } )
-        {
-            foreach my $line ( @{ $d->{target_output}{$process} } ) {
-                if ( $nprocesses == 1 ) {
-                    print "$line\n";
-                } else {
-                    print "$process:$line\n";
-                }
-            }
-        }
+        die("Unexpected output mode $output");
     }
     return;
 }
