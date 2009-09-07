@@ -1848,7 +1848,7 @@ sub local_stats_from_job {
     }
 
     my @data;
-    open( my $PCMD, "edb -k $key --stats-raw 2>/dev/null|" )
+    open( my $PCMD, '-|', "edb -k $key --stats-raw 2>/dev/null" )
       or confess "$prog: cant open file: $!\n";
     local $/ = "\n\n";
     while (<$PCMD>) {
@@ -2600,9 +2600,7 @@ sub lsf_get_jobs {
 
     my @jobs;
 
-    open( my $LSF, "bjobs -r -u $user 2>/dev/null|" ) or return;
-    my @out = <$LSF>;
-    close $LSF;
+    my @out = slurp_cmd("bjobs -r -u $user");
     foreach my $l (@out) {
         my ( $job, $user, $stat, $queue, $from, $exec, $name, $time ) =
           split( " ", $l );
@@ -2630,12 +2628,9 @@ sub lsf_setup_pcmd {
 
     my ( $res, $ncpus ) = split( " ", $result );
 
-    open(
-        my $QUERY,
-"rmsquery \"select name from jobs where jobs.resource=\'$res\' and status = \'running\' order by name\"|"
+    my @out = slurp_cmd(
+"rmsquery \"select name from jobs where jobs.resource=\'$res\' and status = \'running\' order by name\""
     );
-    my @out = <$QUERY>;
-    close $QUERY;
 
     my $rjob;
 
@@ -3236,7 +3231,7 @@ sub load_and_display_from_file {
     #    return;
     #}
 
-    open( my $PCMD, "$file" ) or die "$prog: cant open file $file: $!\n";
+    open( my $PCMD, '<', "$file" ) or die "$prog: cant open file $file: $!\n";
     my @data = <$PCMD>;
     close($PCMD);
 
@@ -5759,7 +5754,7 @@ sub run_ptrack_cmd {
     my $lines = 0;
 
     send_cont_signal($pid);
-    open( my $CMD, "$cmd 2>/dev/null|" )
+    open( my $CMD, '-|', "$cmd 2>/dev/null" )
       || p_die( $vp, "cant start command $cmd" );
     while (<$CMD>) {
         chomp $_;
@@ -5774,7 +5769,7 @@ sub run_ptrack_cmd {
 sub run_command {
     my ( $vp, $cmd ) = @_;
     debug $vp, "running $cmd";
-    open( my $CMDS, "$cmd|" ) || p_die $vp, 'cant fork subcommand';
+    open( my $CMDS, '-|', "$cmd" ) || p_die $vp, 'cant fork subcommand';
     while (<$CMDS>) {
         chomp $_;
         output $vp, $_;
@@ -5790,7 +5785,7 @@ sub get_remote_env {
     my %env;
 
     local $/ = "\0";
-    open( my $FD, "/proc/$pid/environ" ) or return;
+    open( my $FD, '<', "/proc/$pid/environ" ) or return;
     while (<$FD>) {
         chomp;
         my @f   = split "=";
@@ -5814,7 +5809,7 @@ sub load_rms_procs {
     #
     # Of course it could mean that whatever jobs were supposed
     # to be running on this node aren't.
-    open( my $PIDFILE, "/proc/rms/programs/$job/pids" ) or return;
+    open( my $PIDFILE, '<', "/proc/rms/programs/$job/pids" ) or return;
 
     my @procs;
 
@@ -6046,10 +6041,10 @@ sub show_proc_all {
     if ( $carg->{proc_shows_proc} ) {
         foreach my $proc ( @{$list} ) {
             my $pid = $proc->{pid};
-            open( $proc->{handle}, "/proc/$pid/stat" );
+            open( $proc->{handle}, '<', "/proc/$pid/stat" );
         }
 
-        open( $SFD, "/proc/stat\n" );
+        open( $SFD, '<', '/proc/stat' );
 
         # Begin critical path.
         my $stat = <$SFD>;
@@ -6067,7 +6062,7 @@ sub show_proc_all {
         # End critical path.
 
         $jiffies_start = add_and_divide_jiffies( $stat, $stat2 );
-        open( my $LFD, '/proc/loadavg' );
+        open( my $LFD, '<', '/proc/loadavg' );
         $load_avg = <$LFD>;
         close $LFD;
     }
