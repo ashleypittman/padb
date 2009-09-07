@@ -1912,36 +1912,38 @@ sub cmp_list {
 # hash containing the "txt" of the function name and a further array
 # of hash references called "children".
 sub _make_tree {
-    my ( $level, $lines, @tags ) = @_;
+    my ( $level, $lines, $trange ) = @_;
 
     my @peers;
     my $prev;
-    my $tag = shift @tags;
+    my $tag = rng_shift($trange);
 
-    debug_log( 'tree', \@tags, 'called tag:%s, level:%d', $tag, $level );
+    debug_log( 'tree', undef, 'called tag:%s, level:%d tags %s',
+        $tag, $level, rng_convert_to_user($trange) );
 
     return if ( !defined($tag) );
     return if ( !defined( $lines->{$tag} ) );
 
     my @identical;
-    my @different;
+    my $different_rng;
 
     my $endlevel = $level;
 
     # Populate the two lists, @identical and @different
     my $line = $lines->{$tag}[$level];
     if ( defined $line ) {
-        foreach my $tag2 (@tags) {
+        $different_rng = rng_create_empty();
+        while ( defined( my $tag2 = rng_shift($trange) ) ) {
             if ( defined( $lines->{$tag2}[$level] )
                 and $line eq $lines->{$tag2}[$level] )
             {
                 push @identical, $tag2;
             } else {
-                push @different, $tag2;
+                rng_add_value( $different_rng, $tag2 );
             }
         }
     } else {
-        @different = @tags;
+        $different_rng = $trange;
     }
 
     # Move $endlevel on as far as we can...
@@ -1971,9 +1973,11 @@ sub _make_tree {
     }
 
     debug_log(
-        'tree', undef,
-
-"level $level, endlevel $endlevel, identical:@identical different:@different"
+        'tree',
+        undef,
+        "level $level, endlevel $endlevel, identical:%s different: %s",
+        rng_convert_to_user( rng_create_from_array(@identical) ),
+        rng_convert_to_user($different_rng)
     );
 
     for ( my $l = $level ; $l <= $endlevel ; $l++ ) {
@@ -2005,17 +2009,20 @@ sub _make_tree {
             unshift @identical, $tag;
         }
 
-        $prev->{children} = _make_tree( $endlevel + 1, $lines, @identical );
+        my $r = rng_create_from_array(@identical);
+        $prev->{children} = _make_tree( $endlevel + 1, $lines, $r );
     }
 
     debug_log(
-        'tree', undef,
-
-"returning level:$level endlevel:$endlevel identical:@identical different:@different"
+        'tree',
+        undef,
+        "returning level:$level endlevel:$endlevel identical:%s different: %s",
+        rng_convert_to_user( rng_create_from_array(@identical) ),
+        rng_convert_to_user($different_rng)
     );
 
-    if (@different) {
-        my $new = _make_tree( $level, $lines, @different );
+    if ( not rng_empty($different_rng) ) {
+        my $new = _make_tree( $level, $lines, $different_rng );
         push @peers, ( @{$new} );
     }
 
@@ -2025,7 +2032,8 @@ sub _make_tree {
 # Convert the rank output into a tree based form suitable for use with show_tree.
 sub make_tree {
     my ($lines) = @_;
-    return _make_tree( 0, $lines, ( sort { $a <=> $b } ( keys %$lines ) ) );
+    my $rng = rng_create_from_array( keys(%$lines) );
+    return _make_tree( 0, $lines, $rng );
 }
 
 # Takes a ref to a array of hashes...
