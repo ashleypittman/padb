@@ -603,7 +603,7 @@ sub debug_log {
         exit 1;
     }
     return unless $debugModes{$type};
-    my $time = time() - $start_time;
+    my $time = time - $start_time;
     printf "DEBUG ($type): %3d: $str\n", $time, @params;
     return if $debugModes{$type} eq 'basic';
     return unless defined $handle;
@@ -625,15 +625,15 @@ $debugModes{tdata}       = undef;
 
 sub slurp_file {
     my ($file) = @_;
-    open( my $FD, '<', $file ) or return;
+    open my $FD, '<', $file or return;
     my @contents = <$FD>;
-    close($FD);
+    close $FD;
     return @contents;
 }
 
 sub slurp_cmd {
     my ($cmd) = @_;
-    open( my $CFD, '-|', "$cmd 2>/dev/null" ) or return;
+    open my $CFD, '-|', "$cmd 2>/dev/null" or return;
     my @out = <$CFD>;
     close $CFD;
     return @out;
@@ -641,21 +641,21 @@ sub slurp_cmd {
 
 sub slurp_dir {
     my ($dir) = @_;
-    opendir( my $DIR, $dir ) or return;
-    my @files = readdir($DIR);
-    closedir($DIR);
+    opendir my $DIR, $dir or return;
+    my @files = readdir $DIR;
+    closedir $DIR;
     return @files;
 }
 
 sub get_process_list {
     my ($user) = @_;
-    my $uid = getpwnam($user);
+    my $uid = getpwnam $user;
     return unless defined $uid;
     my @pids = slurp_dir('/proc');
     my @userpids;
     foreach my $pid (@pids) {
         next unless ( $pid =~ m{\A\d+\z}xms );
-        my ( undef, undef, undef, undef, $owner ) = stat("/proc/$pid");
+        my ( undef, undef, undef, undef, $owner ) = stat "/proc/$pid";
 
         # Check the stat worked, it's possible for processes to dissapear
         # Take care to check for defined rather than true as root has a
@@ -721,7 +721,7 @@ sub parse_args_outer {
     GetOptions(%optionhash) or exit 1;
 
     if ( defined $debugflag ) {
-        foreach my $f ( split( ",", $debugflag ) ) {
+        foreach my $f ( split ',', $debugflag ) {
             my ( $name, $v ) = split( "=", $f );
             if ( exists $debugModes{$name} ) {
                 $debugModes{$name} = defined $v ? $v : 'basic';
@@ -784,7 +784,7 @@ sub _hex {
     } else {
 
         if ( length $str < 10 ) {
-            return hex($str);
+            return hex $str;
         }
 
         # It was hard to write, it's supposed to be hard to read.
@@ -943,7 +943,7 @@ sub show_bin {
     my $ret = "";
     foreach my $bin ( sort keys %{$d} ) {
 
-        if (   $d->{$bin}{raw}[0] || $d->{$bin}{raw}[34]
+        if ( ( $d->{$bin}{raw}[0] || $d->{$bin}{raw}[34] )
             or $conf{show_all_stats} )
         {
             my $total = $d->{$bin}{raw}[34];
@@ -1599,7 +1599,7 @@ sub group_status_helper {
     my $str        = shift;    # tagged onto the end of the line.
     my $possessive = shift;    # syntax to use (possessive/attributive)
     my $size       = shift;    # size of the group
-    my @identical  = @_;       # member list
+    my @identical  = (@_);     # member list
     my $ret;
     my $sstr = defined $size ? " (size $size)" : "";
 
@@ -2888,7 +2888,7 @@ sub strip_stack_traces {
 sub sort_proc_hashes {
     my $carg = shift;
     my $key  = shift;
-    my @all  = @_;
+    my @all  = (@_);
 
     if ( $carg->{reverse_sort_order} ) {
         return ( reverse( sort { $a->{$key} <=> $b->{$key} } @all ) );
@@ -3144,7 +3144,7 @@ sub process_line {
 
 sub post_process_lines {
     my $lines = shift;
-    return unless exists( $lines->{base64} );
+    return unless exists $lines->{base64};
     foreach my $tag ( keys %{ $lines->{base64} } ) {
         $lines->{raw}{$tag} =
           thaw( decode_base64( join( "\n", @{ $lines->{base64}{$tag} } ) ) );
@@ -4041,7 +4041,7 @@ sub go_parallel {
     $sel->add( $pcmd->{err} );
 
     $comm_data->{sel} = $sel;
-    my $start = time();
+    my $start = time;
 
     my %op;
     $op{str}                              = "";
@@ -4071,7 +4071,7 @@ sub go_parallel {
                 }
             }
         }
-        my $t2    = time() - $start;
+        my $t2    = time - $start;
         my $count = $sel->count();
         if ( $count > 0 ) {
 
@@ -4226,7 +4226,9 @@ sub config_set {
     my ( $key, $value ) = @_;
     print "Setting '$key' to '$value'\n" if ( $conf{verbose} );
 
-    if ( !exists $conf{$key} and !exists $conf{mode_options_reverse}{$key} ) {
+    if (    not exists $conf{$key}
+        and not exists $conf{mode_options_reverse}{$key} )
+    {
         print {*STDERR}
           "Warning, unknown config option '$key' value '$value'.\n";
     }
@@ -4317,7 +4319,7 @@ sub outer_main {
 
     my $mode = parse_args_outer();
 
-    if ( getpwnam($user) eq "" ) {
+    if ( getpwnam $user eq "" ) {
         print {*STDERR} "$prog: Error: no such user as '$user'\n";
         exit 1;
     }
@@ -4356,8 +4358,8 @@ sub outer_main {
             exit 1;
         }
 
-        if (    !exists $conf{$key}
-            and !exists $conf{mode_options_reverse}{$key} )
+        if (    not exists $conf{$key}
+            and not exists $conf{mode_options_reverse}{$key} )
         {
             print "Error, unknown config option '$name'\n";
             config_help();
@@ -4505,7 +4507,9 @@ sub outer_main {
         }
     }
 
-    if ( $tree and !( ( defined $mode && $mode eq 'stack' ) or $input_file ) ) {
+    if ( $tree
+        and not( ( defined $mode and $mode eq 'stack' ) or $input_file ) )
+    {
         cmdline_error("$prog: Error: --tree only works with --stack-trace\n");
     }
 
@@ -7018,7 +7022,7 @@ sub command_from_parent {
 
     # If supplied with a rank list then use it now to generate a list of
     # processes to inspect.
-    if ( exists( $cmd->{ranks} ) ) {
+    if ( exists $cmd->{ranks} ) {
         my $rng = rng_dup( $cmd->{ranks} );
 
         # Loop over ranks first as there are potentially more of them.
@@ -7183,7 +7187,7 @@ sub inner_loop_for_comms {
 
     my $lport    = $server->sockport();
     my $hostname = $confInner{hostname};
-    my $key      = rand();
+    my $key      = rand;
 
     if ( defined $outerloc ) {
         my ( $ohost, $oport ) = split( ":", $outerloc );
@@ -7193,7 +7197,7 @@ sub inner_loop_for_comms {
             Proto    => 'tcp',
         ) or confess('Failed to connect to outer');
         my $secret = find_padb_secret();
-        die('No secret') if not defined $secret;
+        die 'No secret' if not defined $secret;
         $os->print("Hello $secret $hostname $lport $key\n");
         $os->close();
     } else {
@@ -7212,7 +7216,7 @@ sub inner_loop_for_comms {
 
     my $sel = $netdata->{sel};
 
-    my $stime = time();
+    my $stime = time;
 
     while ( $sel->count() > 0 ) {
         while ( my @data = $sel->can_read(5) ) {
@@ -7220,10 +7224,10 @@ sub inner_loop_for_comms {
                 if ( $s == $server ) {
                     my $new = $server->accept() or confess('Failed accept');
                     $sel->add($new);
-                    my $peer = getpeername($new);
+                    my $peer = getpeername $new;
                     my ( $port, $addr ) = unpack_sockaddr_in($peer);
                     my $ip = inet_ntoa($addr);
-                    my $hostname = gethostbyaddr( $addr, AF_INET );
+                    my $hostname = gethostbyaddr $addr, AF_INET;
 
                     my %sinfo;
                     $sinfo{hostname}              = $hostname;
@@ -7238,12 +7242,12 @@ sub inner_loop_for_comms {
 
                 my $sinfo = $netdata->{connections}{$s};
                 my $d;
-                my $count = sysread( $s, $d, 65536 );
+                my $count = sysread $s, $d, 65536;
 
                 # Dead connection.
                 if ( not defined $d or $count == 0 ) {
 
-                    if ( eof($s) ) {
+                    if ( eof $s ) {
                         $sel->remove($s);
                         $s->close();
                         $sinfo->{trusted} = 0;
@@ -7258,7 +7262,7 @@ sub inner_loop_for_comms {
 
             }
         }
-        my $time = time();
+        my $time = time;
 
        # Should probably handle this better, if the outer or tree never signons
        # for whatever reason silently die as it's probably the best thing do to.
