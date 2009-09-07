@@ -444,7 +444,7 @@ sub show_version {
     exit 0;
 }
 
-my $usage = <<EOF;
+my $usage = <<'EOF';
 Usage: padb [-hv] [-c|-C|-t] -g|-q|-s|-x|-X [-O <opt>=<val>
             [,<opt>=<val>...]] [-i <file>] [-r <rank>] [-u <user>]
             -a|-A|<jobid ...>
@@ -506,6 +506,7 @@ XXXX
 -v --verbose           Verbose.
 -V --version           Show version number and exit.
 -h --help              print this usage message.
+
 EOF
 
 sub usage {
@@ -543,9 +544,7 @@ sub usage {
     $usage =~ s{XXXX}
                {$extra}xms;
 
-    print {*STDERR} <<EOF;
-$usage
-EOF
+    print {*STDERR} $usage;
     exit 1;
 }
 
@@ -2894,7 +2893,7 @@ sub sort_proc_hashes {
 
 sub pre_mpi_watch {
     my ($nprocs) = @_;
-    my $header = <<EOF;
+    my $header = <<'EOF';
 u: unexpected messages U: unexpected and other messages
 s: sending messages r: receiving messages m: sending and receiving
 b: Barrier B: Broadcast g: Gather G: AllGather r: reduce: R: AllReduce
@@ -4622,9 +4621,7 @@ sub target_key_pair {
 
 sub p_die {
     my ( $vp, $str ) = @_;
-    $confInner{verbose}++;
-    debug( $vp, "$str, '$@'" );
-    exit 1;
+    croak($str);
 }
 
 sub is_parent_resmgr {
@@ -4652,7 +4649,7 @@ sub gdb_start {
     }
 
     $gdb->{gdbpid} = open3( $gdb->{wtr}, $gdb->{rdr}, $gdb->{err}, $cmd )
-      or die "Unable to popen() gdb: $!\n";
+      or croak "Unable to popen() gdb: $!";
 
     return $gdb;
 }
@@ -6379,7 +6376,7 @@ sub set_debug {
     return;
 }
 
-my $mpi_watch_data = <<EOF;
+my $mpi_watch_data = <<'EOF';
 Barrier,b,elan_gsync,elan_hgsync,PMPI_Barrier,MPI_Barrier,shmem_barrier
 Broadcast,B,elan_hbcast,elan_bcast,PMPI_Bcast,MPI_Bcast,shmem_bcast
 AllGather,G,PMPI_Allgather,MPI_ALLgather
@@ -7052,15 +7049,15 @@ sub command_from_parent {
         eval {
             $netdata->{target_responce} =
               $allfns{ $cmd->{mode} }{handler_all}( $cmd->{cargs}, $pid_list );
-        };
-        if ($@) {
+            1;
+        } or do {
             my $error = $@;
             my @e = split qr{\n}, $error;
             $netdata->{host_responce} = "error";
             foreach my $proc ( @{$pid_list} ) {
                 target_error( $proc->{vp}, "Critial error: ($e[0])" );
             }
-        }
+          }
     } else {
 
         my %gres;
@@ -7071,13 +7068,13 @@ sub command_from_parent {
                 my $res =
                   $allfns{ $cmd->{mode} }{handler}( $cmd->{cargs}, $vp, $pid );
                 $gres{$vp} = $res if ( defined $res );
-            };
-            if ($@) {
+                1;
+            } or do {
                 my $error = $@;
                 my @e = split qr{\n}, $error;
                 $netdata->{host_responce} = "error";
                 target_error( $vp, "Critial error: ($e[0])" );
-            }
+              }
         }
 
         if (%gres) {
@@ -7191,9 +7188,9 @@ sub inner_loop_for_comms {
             PeerPort => $oport,
             Proto    => 'tcp',
         ) or confess('Failed to connect to outer');
-        my $secret = find_padb_secret();
-        die 'No secret' if not defined $secret;
-        $os->print("Hello $secret $hostname $lport $key\n");
+        my $sec = find_padb_secret();
+        die 'No secret' if not defined $sec;
+        $os->print("Hello $sec $hostname $lport $key\n");
         $os->close();
     } else {
 
@@ -7222,13 +7219,13 @@ sub inner_loop_for_comms {
                     my $peer = getpeername $new;
                     my ( $port, $addr ) = unpack_sockaddr_in($peer);
                     my $ip = inet_ntoa($addr);
-                    my $hostname = gethostbyaddr $addr, AF_INET;
+                    my $remhost = gethostbyaddr $addr, AF_INET;
 
                     my %sinfo;
-                    $sinfo{hostname}              = $hostname;
+                    $sinfo{hostname}              = $remhost;
                     $sinfo{trusted}               = 0;
                     $sinfo{port}                  = $port;
-                    $sinfo{desc}                  = "$hostname:$port";
+                    $sinfo{desc}                  = "$remhost:$port";
                     $sinfo{socket}                = $new;
                     $sinfo{line_cb}               = \&command_from_outer;
                     $netdata->{connections}{$new} = \%sinfo;
