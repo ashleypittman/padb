@@ -1911,20 +1911,20 @@ sub cmp_list {
 # This function returns an reference to an array of hashes, each
 # hash containing the "txt" of the function name and a further array
 # of hash references called "children".
-sub make_tree {
+sub _make_tree {
     my ( $level, $lines, @tags ) = @_;
 
     my @peers;
     my $prev;
-    my $tag = $tags[0];
+    my $tag = shift @tags;
 
     debug_log( 'tree', \@tags, 'called tag:%s, level:%d', $tag, $level );
 
     return if ( !defined($tag) );
     return if ( !defined( $lines->{$tag} ) );
 
-    my @identical = ();
-    my @different = ();
+    my @identical;
+    my @different;
 
     my $endlevel = $level;
 
@@ -1932,23 +1932,16 @@ sub make_tree {
     my $line = $lines->{$tag}[$level];
     if ( defined $line ) {
         foreach my $tag2 (@tags) {
-            next if ( $tag2 eq $tag );
             if ( defined( $lines->{$tag2}[$level] )
                 and $line eq $lines->{$tag2}[$level] )
             {
                 push @identical, $tag2;
-                delete( $lines->{$tag2}[$level] );
             } else {
                 push @different, $tag2;
             }
         }
     } else {
-        foreach my $dtag (@tags) {
-            if ( $dtag != $tag ) {
-                push @different, $dtag;
-            }
-        }
-
+        @different = @tags;
     }
 
     # Move $endlevel on as far as we can...
@@ -1987,10 +1980,14 @@ sub make_tree {
 
         my %this;
         $this{txt} = $lines->{$tag}[$l];
-        @{ $this{vps} } = ( $tag, @identical );
 
+        # @{ $this{vps} } = ( $tag, @identical );
+
+        # The plus two here is one for $tag and one to convert
+        # from array idx to number of entries.
+        $this{vpcount} = $#identical + 2;
         $this{vpspec} =
-          rng_convert_to_user( rng_create_from_array( @{ $this{vps} } ) );
+          rng_convert_to_user( rng_create_from_array( ( $tag, @identical ) ) );
 
         if ( defined $prev ) {
             push @{ $prev->{children} }, \%this;
@@ -2008,7 +2005,7 @@ sub make_tree {
             unshift @identical, $tag;
         }
 
-        $prev->{children} = make_tree( $endlevel + 1, $lines, @identical );
+        $prev->{children} = _make_tree( $endlevel + 1, $lines, @identical );
     }
 
     debug_log(
@@ -2018,13 +2015,17 @@ sub make_tree {
     );
 
     if (@different) {
-        my $new = make_tree( $level, $lines, @different );
-        foreach my $n ( @{$new} ) {
-            push @peers, $n;
-        }
+        my $new = _make_tree( $level, $lines, @different );
+        push @peers, ( @{$new} );
     }
 
     return \@peers;
+}
+
+# Convert the rank output into a tree based form suitable for use with show_tree.
+sub make_tree {
+    my ($lines) = @_;
+    return _make_tree( 0, $lines, ( sort { $a <=> $b } ( keys %$lines ) ) );
 }
 
 # Takes a ref to a array of hashes...
@@ -2033,16 +2034,17 @@ sub _show_tree {
     my ( $ref, $parent, $indent ) = @_;
 
     my $ret = "";
-    my @peers = sort { $a->{vps}[0] <=> $b->{vps}[0] } ( @{$ref} );
 
+    # Don't need to sort the peers here because make_tree ensures
+    # the are sorted.
+    # my @peers = sort { $a->{vps}[0] <=> $b->{vps}[0] } ( @{$ref} );
+
+    my @peers = @{$ref};
     foreach my $peer (@peers) {
 
-        if ( $#peers != 0 or not defined $parent or $parent ne $peer->{vpspec} )
-        {
-            my $count   = $#{ $peer->{vps} } + 1;
-            my $i_level = "$peer->{vpspec} ($count processes)";
+        if ( $#peers != 0 or $parent ne $peer->{vpspec} ) {
             $ret .= "$indent-----------------\n";
-            $ret .= "$indent$i_level\n";
+            $ret .= "$indent$peer->{vpspec} ($peer->{vpcount} processes)\n";
             $ret .= "$indent-----------------\n";
         }
 
@@ -2058,7 +2060,7 @@ sub _show_tree {
 sub show_tree {
     my $ref = shift;
     debug_log( 'tree', $ref, 'Complete tree' );
-    return _show_tree( $ref, undef, "" );
+    return _show_tree( $ref, "no-parent", "" );
 }
 
 ###############################################################################
@@ -3073,8 +3075,7 @@ sub show_results_from_file {
     #}
 
     if ($tree) {
-        print show_tree(
-            make_tree( 0, $lines, ( sort { $a <=> $b } ( keys %$lines ) ) ) );
+        print show_tree( make_tree($lines) );
     } elsif ($compress) {
         foreach my $tag ( sort { $a <=> $b } ( keys %$lines ) ) {
             next if ( !defined( $lines->{$tag} ) );
@@ -3165,9 +3166,7 @@ sub default_output_handler {
     }
 
     if ( $output eq 'tree' ) {
-        print show_tree(
-            make_tree( 0, $lines, ( sort { $a <=> $b } ( keys %$lines ) ) ) );
-
+        print show_tree( make_tree($lines) );
     } elsif ( $output eq 'compress' ) {
 
         foreach my $tag ( sort { $a <=> $b } ( keys %$lines ) ) {
