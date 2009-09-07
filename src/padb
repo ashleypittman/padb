@@ -521,9 +521,9 @@ sub usage {
         } else {
             $extra .= "  ";
         }
-        $extra .= sprintf( " --%-18s%s.\n",
-            $allfns{$arg}{arg_long},
-            $allfns{$arg}{help} );
+        $extra .= sprintf " --%-18s%s.\n",
+          $allfns{$arg}{arg_long},
+          $allfns{$arg}{help};
     }
 
     $extra .= "\nQsNet specific modes\n";
@@ -535,9 +535,9 @@ sub usage {
         } else {
             $extra .= "  ";
         }
-        $extra .= sprintf( " --%-18s%s.\n",
-            $allfns{$arg}{arg_long},
-            $allfns{$arg}{help} );
+        $extra .= sprintf " --%-18s%s.\n",
+          $allfns{$arg}{arg_long},
+          $allfns{$arg}{help};
     }
 
     $usage =~ s{XXXX}
@@ -724,7 +724,7 @@ sub parse_args_outer {
         foreach my $f ( split( ",", $debugflag ) ) {
             my ( $name, $v ) = split( "=", $f );
             if ( exists $debugModes{$name} ) {
-                $debugModes{$name} = defined($v) ? $v : 'basic';
+                $debugModes{$name} = defined $v ? $v : 'basic';
             } else {
                 print "Attempt to set unknown debug flag \"$name\".\n";
             }
@@ -928,11 +928,10 @@ sub show_tally {
     my $ret = "";
     foreach my $tally ( sort keys %{$d} ) {
         if ( $d->{$tally}{raw}[0] or $conf{show_all_stats} ) {
-            $ret .= sprintf(
-                "%16s: Total: %d Active: %d HWM: %d\n",
-                $d->{$tally}{name},   $d->{$tally}{raw}[0],
-                $d->{$tally}{raw}[1], $d->{$tally}{raw}[2]
-            );
+            $ret .= sprintf
+              "%16s: Total: %d Active: %d HWM: %d\n",
+              $d->{$tally}{name}, $d->{$tally}{raw}[0],
+              $d->{$tally}{raw}[1], $d->{$tally}{raw}[2];
         }
     }
     return $ret;
@@ -955,25 +954,25 @@ sub show_bin {
                 $scale++;
             }
 
-            $ret .= sprintf(
+            $ret .= sprintf
 "%16s: min $d->{$bin}{raw}[32] max $d->{$bin}{raw}[33] total $d->{$bin}{raw}[34] (%0.2f $scales[$scale])\n",
-                $d->{$bin}{name}, $total );
+              $d->{$bin}{name}, $total;
 
             my @vals;
             for ( my $j = 0 ; $j < 32 ; $j++ ) {
                 if ( $d->{$bin}{raw}[$j] or $conf{show_all_stats} > 1 ) {
                     push @vals,
-                      sprintf( '%9s: %10d',
-                        $bin_names[$j], $d->{$bin}{raw}[$j] );
+                      sprintf '%9s: %10d',
+                      $bin_names[$j], $d->{$bin}{raw}[$j];
 
                     if ( $#vals == 2 ) {
-                        $ret .= sprintf( "  %s\n", join( " ", @vals ) );
+                        $ret .= sprintf "  %s\n", join( " ", @vals );
                         undef @vals;
                     }
                 }
             }
             if ( $#vals != -1 ) {
-                $ret .= sprintf( "  %s\n", join( " ", @vals ) );
+                $ret .= sprintf "  %s\n", join( " ", @vals );
                 undef @vals;
             }
         }
@@ -1618,8 +1617,8 @@ sub group_status_helper {
         $are = $have;
     }
 
-    $ret .= sprintf( "Group $members %s$sstr $are $str.\n",
-        rng_convert_to_user( rng_create_from_array(@identical) ) );
+    $ret .= sprintf "Group $members %s$sstr $are $str.\n",
+      rng_convert_to_user( rng_create_from_array(@identical) );
 
     return $ret;
 }
@@ -1921,8 +1920,8 @@ sub _make_tree {
     debug_log( 'tree', undef, 'called tag:%s, level:%d tags %s',
         $tag, $level, rng_convert_to_user($trange) );
 
-    return if ( !defined($tag) );
-    return if ( !defined( $lines->{$tag} ) );
+    return if ( not defined $tag );
+    return if ( not defined $lines->{$tag} );
 
     my @identical;
     my $different_rng;
@@ -1934,7 +1933,7 @@ sub _make_tree {
     if ( defined $line ) {
         $different_rng = rng_create_empty();
         while ( defined( my $tag2 = rng_shift($trange) ) ) {
-            if ( defined( $lines->{$tag2}[$level] )
+            if ( defined $lines->{$tag2}[$level]
                 and $line eq $lines->{$tag2}[$level] )
             {
                 push @identical, $tag2;
@@ -1955,7 +1954,7 @@ sub _make_tree {
             $endlevel++;
             if ( defined $lines->{$tag}[$endlevel] ) {
                 foreach my $tag2 (@identical) {
-                    if ( defined( $lines->{$tag2}[$endlevel] )
+                    if ( defined $lines->{$tag2}[$endlevel]
                         and $lines->{$tag}[$endlevel] eq
                         $lines->{$tag2}[$endlevel] )
                     {
@@ -2203,7 +2202,7 @@ sub rms_job_to_nhosts {
                     exit 1;
                 }
 
-                if ( defined($2) ) {
+                if ( defined $2 ) {
 
                     # square braces with range, eg 		    'machine[0-3]'
                     for ( $i = $1 ; $i <= $2 ; $i++ ) {
@@ -2463,7 +2462,7 @@ sub mpd_setup_pcmd {
 }
 
 sub mpd_cleanup_pcmd {
-    unlink($mpd_dfile) if ( defined($mpd_dfile) );
+    unlink($mpd_dfile) if ( defined $mpd_dfile );
     return;
 }
 
@@ -2579,7 +2578,7 @@ sub open_setup_pcmd {
 }
 
 sub open_cleanup_pcmd {
-    unlink($open_dfile) if ( defined($open_dfile) );
+    unlink($open_dfile) if ( defined $open_dfile );
     return;
 }
 
@@ -2821,7 +2820,7 @@ sub setup_pcmd {
 
 sub cleanup_pcmd {
     my $job = shift;
-    if ( defined( $rmgr{ $conf{rmgr} }{cleanup_pcmd} ) ) {
+    if ( defined $rmgr{ $conf{rmgr} }{cleanup_pcmd} ) {
         $rmgr{ $conf{rmgr} }{cleanup_pcmd}();
     }
     return;
@@ -2857,7 +2856,7 @@ sub strip_stack_traces {
                     $main_idx = $l;
                 }
                 if ( defined $above{$1} ) {
-                    if ( defined($main_idx) ) {
+                    if ( defined $main_idx ) {
                         $wait_idx = $l;
                         last;
                     }
@@ -3039,8 +3038,8 @@ sub show_proc_format {
     if ( $carg->{proc_show_header} ) {
         my @res;
         foreach my $key (@proc_format_array) {
-            my $l .= sprintf( "%-$proc_format_lengths{$key}s",
-                $proc_format_header{$key} );
+            my $l .= sprintf "%-$proc_format_lengths{$key}s",
+              $proc_format_header{$key};
             push @res, $l;
         }
         my $line = join $separator, @res;
@@ -3054,11 +3053,11 @@ sub show_proc_format {
             if ( defined $hash->{$key} ) {
                 $value = $hash->{$key};
             }
-            push @res, sprintf( "%$proc_format_lengths{$key}s", $value );
+            push @res, sprintf "%$proc_format_lengths{$key}s", $value;
         }
         my $line = join $separator, @res;
         print "$line\n";
-        if ( defined($count) and ( --$count == 0 ) ) {
+        if ( defined $count and ( --$count == 0 ) ) {
             return;
         }
     }
@@ -3086,7 +3085,7 @@ sub show_results_from_file {
         print show_tree( make_tree($lines) );
     } elsif ($compress) {
         foreach my $tag ( sort { $a <=> $b } ( keys %$lines ) ) {
-            next if ( !defined( $lines->{$tag} ) );
+            next if ( not defined $lines->{$tag} );
             my $rng = rng_create_empty();
             rng_add_value( $rng, $tag );
             foreach my $tag2 ( keys %$lines ) {
@@ -3178,7 +3177,7 @@ sub default_output_handler {
     } elsif ( $output eq 'compress' ) {
 
         foreach my $tag ( sort { $a <=> $b } ( keys %$lines ) ) {
-            next if ( !defined( $lines->{$tag} ) );
+            next if ( not defined $lines->{$tag} );
             my $rng = rng_create_empty();
             rng_add_value( $rng, $tag );
             foreach my $tag2 ( keys %$lines ) {
@@ -3451,8 +3450,8 @@ sub push_command {
 
     my %cmd;
     $cmd{mode}       = $mode;
-    $cmd{out_format} = $out_format if defined($out_format);
-    $cmd{args}       = $args if defined($args);
+    $cmd{out_format} = $out_format if defined $out_format;
+    $cmd{args}       = $args if defined $args;
     push @commands, \%cmd;
     return;
 }
@@ -3495,7 +3494,7 @@ sub next_command {
     # are already defined.
     if ( defined $allfns{ $req->{mode} }{secondary} ) {
         foreach my $sec ( @{ $allfns{ $req->{mode} }{secondary} } ) {
-            if ( not defined( $req->{cargs}{ $sec->{arg_long} } ) ) {
+            if ( not defined $req->{cargs}{ $sec->{arg_long} } ) {
                 $req->{cargs}{ $sec->{arg_long} } = $sec->{value};
             }
         }
@@ -3655,7 +3654,7 @@ sub command_from_inner {
         print "========\n";
     }
 
-    if ( defined( $allfns{$mode}{out_handler} ) ) {
+    if ( defined $allfns{$mode}{out_handler} ) {
         $allfns{$mode}{out_handler}( $conf{mode_options}{$mode}, $d );
     } else {
         default_output_handler( $comm_data->{current_req}, $d );
@@ -3747,7 +3746,7 @@ sub handle_event_from_socket {
     my $nb = sysread( $h, $data, 65536 );
 
     if ( $nb == 0 ) {
-        if ( defined( $cdata->{eof_cb} ) ) {
+        if ( defined $cdata->{eof_cb} ) {
             $cdata->{eof_cb}( $comm_data, $cdata );
         }
         $comm_data->{sel}->remove($h);
@@ -4364,7 +4363,7 @@ sub outer_main {
             config_help();
             exit 1;
         }
-        if ( !defined $val ) {
+        if ( not defined $val ) {
             print "Error, config option '$name' requires value\n";
             config_help();
             exit 1;
@@ -4496,7 +4495,7 @@ sub outer_main {
     }
 
     # If delivering a signal check that it's valid.
-    if ( defined($mode) and ( $mode eq 'kill' ) ) {
+    if ( defined $mode and ( $mode eq 'kill' ) ) {
         my $signal = uc( $secondary_args{signal} );
         my %sig_names;
         map { $sig_names{$_} = 1 } split( " ", $Config{sig_name} );
@@ -4510,7 +4509,7 @@ sub outer_main {
         cmdline_error("$prog: Error: --tree only works with --stack-trace\n");
     }
 
-    if ( defined($input_file) ) {
+    if ( defined $input_file ) {
         my $m = 'input';
         if ( defined $mode ) {
             $m = $mode;
@@ -5042,11 +5041,11 @@ sub gdb_string {
     my $offset = 0;
     my $str    = "";
     my @s      = gdb_read_raw( $gdb, $strp, 128 );
-    return if ( not defined( $s[0] ) );
+    return if ( not defined $s[0] );
     foreach my $d (@s) {
         my $v = hex($d);
         return $str if ( $v == 0 );
-        $str .= sprintf( '%c', $v );
+        $str .= sprintf '%c', $v;
     }
     return $str;
 }
@@ -5079,7 +5078,7 @@ sub handle_query {
         $stats->{symbol}++;
     } elsif ( $cmd eq 'data' ) {
         my @r = gdb_read_raw( $gdb, $params[0], $params[1] );
-        if ( defined( $r[0] ) ) {
+        if ( defined $r[0] ) {
             $res = "@r";
             $stats->{datareads}++;
             $stats->{databytes} += $params[1];
@@ -5194,7 +5193,7 @@ sub fetch_mpi_queue {
     }
 
     my $base = gdb_var_addr( $g, 'MPIR_dll_name' );
-    if ( !defined $base ) {
+    if ( not defined $base ) {
         target_error( $vp,
             'Process does not appear to be using MPI (No MPIR_dll_name symbol)'
         );
@@ -5203,7 +5202,7 @@ sub fetch_mpi_queue {
     if ( defined $carg->{mpi_dll} ) {
         $ENV{MPINFO_DLL} = $carg->{mpi_dll};
     } else {
-        if ( !defined $base ) {
+        if ( not defined $base ) {
             gdb_detach($g);
             gdb_quit($g);
             return;
@@ -5221,7 +5220,7 @@ sub fetch_mpi_queue_gdb {
     my ( $carg, $vp, $pid, $g ) = @_;
 
     my $base = gdb_var_addr( $g, 'MPIR_dll_name' );
-    if ( !defined $base ) {
+    if ( not defined $base ) {
         target_error( $vp,
             'Process does not appear to be using MPI (No MPIR_dll_name symbol)'
         );
@@ -5230,7 +5229,7 @@ sub fetch_mpi_queue_gdb {
     if ( defined $carg->{mpi_dll} ) {
         $ENV{MPINFO_DLL} = $carg->{mpi_dll};
     } else {
-        if ( !defined $base ) {
+        if ( not defined $base ) {
             return;
         }
     }
@@ -5987,7 +5986,7 @@ sub pcpu_user {
     my @post = split( " ", $end );
     my $jused = $post[13] - $pre[13];
     my $used  = ( $jused / $elapsed ) * $cpucount * 100;
-    return sprintf( "%d", $used );
+    return sprintf "%d", $used;
 }
 
 sub pcpu_sys {
@@ -5996,7 +5995,7 @@ sub pcpu_sys {
     my @post = split( " ", $end );
     my $jused = $post[14] - $pre[14];
     my $used  = ( $jused / $elapsed ) * $cpucount * 100;
-    return sprintf( "%d", $used );
+    return sprintf "%d", $used;
 }
 
 sub pcpu_total {
@@ -6005,7 +6004,7 @@ sub pcpu_total {
     my @post = split( " ", $end );
     my $jused = $post[13] - $pre[13] + $post[14] - $pre[14];
     my $used  = ( $jused / $elapsed ) * $cpucount * 100;
-    return sprintf( "%d", $used );
+    return sprintf "%d", $used;
 }
 
 my %proc_keys;
@@ -6173,18 +6172,18 @@ sub show_stack_vars {
     my %l;
     $l{t} = 0;
     $l{n} = 0;
-    return unless defined( $frame->{$type} );
+    return unless defined $frame->{$type};
     return if ( @{ $frame->{$type} } == 0 );
     foreach my $arg ( @{ $frame->{$type} } ) {
         $l{t} = length( $arg->{type} ) if ( length( $arg->{type} ) > $l{t} );
         $l{n} = length( $arg->{name} ) if ( length( $arg->{name} ) > $l{n} );
     }
-    my $header = sprintf("  $type:");
+    my $header = sprintf "  $type:";
     output( $vp, $header );
     foreach my $arg ( @{ $frame->{$type} } ) {
         my $value = ( defined $arg->{value} ? $arg->{value} : '??' );
-        my $output =
-          sprintf( "  %-$l{t}s %$l{n}s = $value", $arg->{type}, $arg->{name} );
+        my $output = sprintf "  %-$l{t}s %$l{n}s = $value", $arg->{type},
+          $arg->{name};
         output( $vp, $output );
     }
     return;
@@ -6877,7 +6876,7 @@ sub convert_pids_to_child_pids {
 
         next unless defined $rmpid;
 
-        if ( defined( $scripts{ pid_to_name($pid) } ) ) {
+        if ( defined $scripts{ pid_to_name($pid) } ) {
             push @{ $ipids->{$rmpid}{scripts} }, $pid;
         } else {
             push @{ $ipids->{$rmpid}{notscripts} }, $pid;
@@ -6891,14 +6890,14 @@ sub convert_pids_to_child_pids {
 
         my $newpid;
 
-        if ( defined( $ip->{scripts} ) ) {
+        if ( defined $ip->{scripts} ) {
             my @ppids = sort @{ $ip->{scripts} };
             $newpid = $ppids[0];
         }
 
         # If there are any pids which aren't scripts then target the
         # first one.
-        if ( defined( $ip->{notscripts} ) ) {
+        if ( defined $ip->{notscripts} ) {
             my @ppids = sort @{ $ip->{notscripts} };
             $newpid = $ppids[0];
         }
