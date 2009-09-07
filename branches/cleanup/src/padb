@@ -6174,6 +6174,15 @@ sub show_stack_vars {
 # not spinning whilst gdb is doing it's thing which will mean a quicker runtime
 # but also that the resulting stack traces will have less artifacts because running
 # processes bunch up behind the non-running ones.
+
+# We used to reguarly get garbage from gdb so there is a test here for finding
+# main, with code to detach and try again if we don't.  This served us well on
+# ia64 where gdb isn't very good however it as on most machines gdb gives
+# you results below main (__libc_start_main()) this test fails which causes
+# padb to loop a number of times for each procees on a node.  For now I've left
+# the code to loop here but have set the default gdb_retry_count to zero to
+# disable the code in the simple case.  This option will probably be removed
+# completely soon.
 sub stack_trace_from_pids {
     my ( $carg, $list ) = @_;
 
@@ -7434,7 +7443,7 @@ sub common_main {
         options_i   => {
             stack_shows_params => 0,
             stack_shows_locals => 0,
-            gdb_retry_count    => 3,
+            gdb_retry_count    => 0,
             stack_strip_above =>
 'elan_waitWord,elan_pollWord,elan_deviceCheck,opal_condition_wait,opal_progress',
             stack_strip_below => 'main',
