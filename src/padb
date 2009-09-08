@@ -3887,6 +3887,11 @@ sub rng_shift {
     return $value;
 }
 
+# Note the performance of this function is much higher when adding
+# values at the top of the range than at the start, persumably it's
+# easier to make an array longer than it is to unshift something onto
+# the start.
+# Quietly return if the value is already in the range.
 sub rng_add_value {
     my ( $rg, $value ) = @_;
 
@@ -3896,7 +3901,13 @@ sub rng_add_value {
     }
 
     # If it's after the last value then just add it.
-    if ( $value > $rg->[-1]->{u} + 1 ) {
+    if ( $value > $rg->[-1]->{u} ) {
+
+        if ( $value == $rg->[-1]->{u} + 1 ) {
+            $rg->[-1]->{u}++;
+            return;
+        }
+
         push @{$rg}, { l => $value, u => $value };
         return;
     }
@@ -3928,7 +3939,8 @@ sub rng_add_value {
             }
             return;
         } elsif ( $value >= $part->{l} and $value <= $part->{u} ) {
-            carp('Failed to add value to range (Value already in range)');
+
+            # Already in range.
             return;
         }
         $idx++;
