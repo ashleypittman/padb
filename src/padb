@@ -3443,13 +3443,17 @@ sub push_command {
     return;
 }
 
+sub last_command {
+    my $req;
+    $req->{mode} = 'exit';
+    return $req;
+}
+
 sub next_command {
     my $comm_data = shift;
 
     if ( $#commands == -1 ) {
-        my $req;
-        $req->{mode} = 'exit';
-        return $req;
+        return last_command();
     }
 
     my $cmd;
@@ -3512,9 +3516,19 @@ sub report_failed_signon {
     return;
 }
 
+# Check all processes are detected and report an error to the user.  Return true if
+# there is no processes are detected.
 sub check_signon {
     my ( $comm_data, $data ) = @_;
     return if ( $conf{check_signon} eq 'none' );
+
+    if ( not defined $data->{target_data}{found}{yes}
+        or rng_empty( $data->{target_data}{found}{yes} ) )
+    {
+        printf "Warning, failed to locate any ranks\n";
+        return 1;
+    }
+
     my %here;
     while (
         defined( my $proc = rng_shift( $data->{target_data}{found}{yes} ) ) )
@@ -3594,10 +3608,19 @@ sub command_from_inner {
 
     # The inner process has signed on.
     if ( $comm_data->{current_req}->{mode} eq 'signon' ) {
-        $comm_data->{current_req} = next_command($comm_data);
+
+        # Check the signon messages, reporting minor errors to the user, if no
+        # processes are found then don't bother processing any commands but just
+        # tell the inner to exit.
+        my $error = check_signon( $comm_data, $d );
+        if ($error) {
+            $comm_data->{current_req} = last_command();
+        } else {
+            $comm_data->{current_req} = next_command($comm_data);
+        }
+
         issue_command_to_inner( $cdata, $comm_data->{current_req} );
         $comm_data->{state} = 'live';
-        check_signon( $comm_data, $d );
         return;
     }
 
