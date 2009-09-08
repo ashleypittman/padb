@@ -6283,8 +6283,8 @@ sub stack_trace_from_pids {
                 if ( gdb_attach( $g, $pid ) ) {
                     $gdb = $g;
                 } else {
-                    if ( defined $gdb->{error} ) {
-                        target_error( $vp, $gdb->{error} );
+                    if ( defined $g->{error} ) {
+                        target_error( $vp, $g->{error} );
                     } else {
                         target_error( $vp, 'Failed to attach to process' );
                     }
