@@ -6649,6 +6649,19 @@ sub find_from_status {
     return;
 }
 
+sub hash_from_status {
+    my ($pid) = @_;
+    my %status;
+    my @pairs = slurp_file("/proc/$pid/status");
+    return unless @pairs;
+    foreach my $pair (@pairs) {
+        if ( $pair =~ m{\A(\w+):\s*(.+)}x ) {
+            $status{$1} = $2;
+        }
+    }
+    return \%status;
+}
+
 sub is_resmgr_process {
     my $pid  = shift;
     my $name = find_from_status( $pid, 'Name' );
@@ -6947,7 +6960,13 @@ sub convert_pids_to_child_pids {
 
         next unless defined $rmpid;
 
-        if ( defined $scripts{ pid_to_name($pid) } ) {
+        # Handle with the process going away whilst we look here,
+        # if we don't have a name then it's gone and we should
+        # continue without it.
+        my $name = pid_to_name($pid);
+        next unless defined $name;
+
+        if ( defined $scripts{$name} ) {
             push @{ $ipids->{$rmpid}{scripts} }, $pid;
         } else {
             push @{ $ipids->{$rmpid}{notscripts} }, $pid;
@@ -6976,13 +6995,17 @@ sub convert_pids_to_child_pids {
         # The process might have died and we simply didn't find anything,
         # if this is the case then just skip it, the outer will notice
         # the missing signon and report an approtiate error.
-        if ( defined $newpid ) {
-            push @apids,
-              {
-                pid => $newpid,
-                vp  => $ip->{rank}
-              };
-        }
+        next unless defined $newpid;
+
+        my $status = hash_from_status($newpid);
+        next unless defined $status;
+        push @apids,
+          {
+            pid    => $newpid,
+            vp     => $ip->{rank},
+            status => $status,
+          };
+
     }
 
     # Sort local pids by order of increasing rank.
@@ -7006,13 +7029,11 @@ sub inner_find_pids {
     convert_pids_to_child_pids();
 
     foreach my $proc ( @{ $confInner{all_pids} } ) {
-        my $pid   = $proc->{pid};
-        my $vp    = $proc->{vp};
-        my $name  = readlink("/proc/$pid/exe");
-        my $state = find_from_status( $pid, 'State' );
+        my $pid  = $proc->{pid};
+        my $vp   = $proc->{vp};
         target_key_pair( $vp, 'found', 'yes' );
-        target_key_pair( $vp, 'name',  $name );
-        target_key_pair( $vp, 'state', $state );
+        target_key_pair( $vp, 'name',  $proc->{status}->{Name} );
+        target_key_pair( $vp, 'state', $proc->{status}->{State} );
     }
     return;
 }
@@ -7095,8 +7116,7 @@ sub command_from_parent {
         # Loop over ranks first as there are potentially more of them.
         while ( defined( my $rank = rng_shift($rng) ) ) {
             foreach my $proc ( @{ $confInner{all_pids} } ) {
-                my $vp  = $proc->{vp};
-                my $pid = $proc->{pid};
+                my $vp = $proc->{vp};
                 if ( $vp == $rank ) {
                     push @{$pid_list}, $proc;
                 }
