@@ -1916,8 +1916,10 @@ sub _make_tree {
     my $prev;
     my $tag = rng_shift($trange);
 
-    debug_log( 'tree', undef, 'called tag:%s, level:%d tags %s',
-        $tag, $level, rng_convert_to_user($trange) );
+    if (0) {
+        debug_log( 'tree', undef, 'called tag:%s, level:%d tags %s',
+            $tag, $level, rng_convert_to_user($trange) );
+    }
 
     return if ( not defined $tag );
     return if ( not defined $lines->{$tag} );
@@ -1970,13 +1972,15 @@ sub _make_tree {
         $endlevel = ( $#{ $lines->{$tag} } );
     }
 
-    debug_log(
-        'tree',
-        undef,
-        "level $level, endlevel $endlevel, identical:%s different: %s",
-        rng_convert_to_user( rng_create_from_array(@identical) ),
-        rng_convert_to_user($different_rng)
-    );
+    if (0) {
+        debug_log(
+            'tree',
+            undef,
+            "level $level, endlevel $endlevel, identical:%s different: %s",
+            rng_convert_to_user( rng_create_from_array(@identical) ),
+            rng_convert_to_user($different_rng)
+        );
+    }
 
     for ( my $l = $level ; $l <= $endlevel ; $l++ ) {
 
@@ -2011,13 +2015,15 @@ sub _make_tree {
         $prev->{children} = _make_tree( $endlevel + 1, $lines, $r );
     }
 
-    debug_log(
-        'tree',
-        undef,
-        "returning level:$level endlevel:$endlevel identical:%s different: %s",
-        rng_convert_to_user( rng_create_from_array(@identical) ),
-        rng_convert_to_user($different_rng)
-    );
+    if (0) {
+        debug_log(
+            'tree',
+            undef,
+"returning level:$level endlevel:$endlevel identical:%s different: %s",
+            rng_convert_to_user( rng_create_from_array(@identical) ),
+            rng_convert_to_user($different_rng)
+        );
+    }
 
     if ( not rng_empty($different_rng) ) {
         my $new = _make_tree( $level, $lines, $different_rng );
