@@ -6223,10 +6223,11 @@ sub show_stack_vars {
 # main, with code to detach and try again if we don't.  This served us well on
 # ia64 where gdb isn't very good however it as on most machines gdb gives
 # you results below main (__libc_start_main()) this test fails which causes
-# padb to loop a number of times for each procees on a node.  For now I've left
-# the code to loop here but have set the default gdb_retry_count to zero to
-# disable the code in the simple case.  This option will probably be removed
-# completely soon.
+# padb to loop a number of times for each procees on a node.
+# We still sometimes get garbage (due to hand-rolled memcpy()) so leave the loop
+# in but don't sleep every iteration.
+# This could be handled better by checking for the presence of one of the
+# stack_strip_below functions in the stack trace.
 sub stack_trace_from_pids {
     my ( $carg, $list ) = @_;
 
@@ -6278,7 +6279,6 @@ sub stack_trace_from_pids {
             if ($tries) {
                 debug $vp, "Re-attaching to $pid, $tries";
                 send_cont_signal($pid);
-                sleep(1);
                 my $g = gdb_start();
                 if ( gdb_attach( $g, $pid ) ) {
                     $gdb = $g;
@@ -6322,12 +6322,12 @@ sub stack_trace_from_pids {
         if ( not defined $threads[0]{id} ) {
             target_error( $vp,
                 'Could not extract stack trace from application' );
-            return;
+            next;
         }
 
         if ( defined $threads[0]{error} ) {
             target_error( $vp, $threads[0]{error} );
-            return;
+            next;
         }
 
         foreach my $thread ( sort { $a->{id} <=> $b->{id} } @threads ) {
@@ -7118,7 +7118,7 @@ sub command_from_parent {
 
     # Even if a exception is generated rank output may still exist for that
     # or any other rank on this node, we'll have to see if that causes problems
-    # or if it's best to clear the target_key_pait() and output() data for this
+    # or if it's best to clear the target_key_pair() and output() data for this
     # node/rank.
     if ( defined $allfns{ $cmd->{mode} }{handler_all} ) {
         eval {
@@ -7525,10 +7525,10 @@ sub common_main {
         options_i   => {
             stack_shows_params => 0,
             stack_shows_locals => 0,
-            gdb_retry_count    => 0,
+            gdb_retry_count    => 3,
             stack_strip_above =>
 'elan_waitWord,elan_pollWord,elan_deviceCheck,opal_condition_wait,opal_progress',
-            stack_strip_below => 'main',
+            stack_strip_below => 'main,__libc_start_main',
         },
         secondary => [
             {
