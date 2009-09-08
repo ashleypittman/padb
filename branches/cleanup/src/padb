@@ -4658,7 +4658,9 @@ sub is_parent_resmgr {
     return is_resmgr_process($parent_pid);
 }
 
-$SIG{PIPE} = 'IGNORE';
+# This used to happen on ia64 when gdb segfaulted, I've not seen that for a number
+# of years however so lets try not doing it for a while and see where that gets us.
+#$SIG{PIPE} = 'IGNORE';
 
 sub gdb_start {
     my ( $exe, $core ) = @_;
@@ -4666,9 +4668,6 @@ sub gdb_start {
         gdbpid   => -1,
         tracepid => -1,
         attached => 0,
-        rdr      => "",
-        wtr      => "",
-        err      => "",
     };
 
     my $cmd = 'gdb --interpreter=mi -q';
@@ -4686,9 +4685,10 @@ sub gdb_quit {
     my ($gdb) = @_;
     my $result = gdb_send( $gdb, 'quit' );
     waitpid( $gdb->{gdbpid}, 0 );
-    close( $gdb->{rdr} );
-    close( $gdb->{wtr} );
-    close( $gdb->{err} );
+    foreach my $fdname (qw(rdr wtr err)) {
+        next unless exists $gdb->{$fdname};
+        close( $gdb->{$fdname} );
+    }
     return;
 }
 
