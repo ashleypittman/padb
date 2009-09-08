@@ -459,8 +459,8 @@ Usage: padb [-hv] [-c|-C|-t] -g|-q|-s|-x|-X [-O <opt>=<val>
 XXXX
    --full-report=<JOBID> Generate a full report of job state.
 
-   --nostrip-below-main Don\'t strip stack traces below main.
-   --nostrip-above-wait Don\'t strip stack traces about elan_waitWord.
+   --nostrip-below-main Don't strip stack traces below main.
+   --nostrip-above-wait Don't strip stack traces about elan_waitWord.
 
    --proc-format       Specify information to show about processes.
 
