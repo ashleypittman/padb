@@ -584,10 +584,6 @@ my @config_options;
 my %ic_names;
 my %ic_names_cmd;
 
-# Populated in the outer args section so that outer code
-# can access secondary comamnd line argunments by name.
-my %secondary_args;
-
 # Debugging: this function is called periodically with
 # a mode, an abritary ref and a string, it can either print simply
 # the string or call dumper on the ref as well.
@@ -700,19 +696,24 @@ sub parse_args_outer {
         'debug=s'             => \$debugflag,
     );
 
+    # The primary modes, one of these only must be set.
     my %config_hash;
+
+    # The secondary args, specify all of them for now as we only
+    # call GetOptions once.
+    my %sec_args;
+
     foreach my $arg ( keys %allfns ) {
+
+        # Set the primary mode in the hash.
         $optionhash{ $allfns{$arg}{arg} } = \$config_hash{$arg};
+
         if ( defined $allfns{$arg}{secondary} ) {
             foreach my $sec ( @{ $allfns{$arg}{secondary} } ) {
-                $sec->{value} = $sec->{default};
-                $optionhash{ $sec->{arg} } = \$sec->{value};
-            }
-        }
-        if ( defined $allfns{$arg}{options_i} ) {
-            foreach my $o ( keys %{ $allfns{$arg}{options_i} } ) {
-                $conf{mode_options}{$arg}{$o} = $allfns{$arg}{options_i}{$o};
-                $conf{mode_options_reverse}{$o}{$arg} = 1;
+
+                # Set this option in the option hash.
+                $optionhash{ $sec->{arg} } = \$sec_args{ $sec->{arg_long} };
+
             }
         }
     }
@@ -753,10 +754,30 @@ sub parse_args_outer {
         }
     }
 
-    # Put the args in a hash so that they can be referenced by name.
-    if ( defined $mode and defined $allfns{$mode}{secondary} ) {
-        foreach my $sec ( @{ $allfns{$mode}{secondary} } ) {
-            $secondary_args{ $sec->{arg_long} } = $sec->{value};
+    foreach my $arg ( keys %allfns ) {
+        if ( defined $allfns{$arg}{options_i} ) {
+            foreach my $o ( keys %{ $allfns{$arg}{options_i} } ) {
+                $conf{mode_options}{$arg}{$o} = $allfns{$arg}{options_i}{$o};
+                $conf{mode_options_reverse}{$o}{$arg} = 1;
+            }
+        }
+
+        if ( defined $allfns{$arg}{secondary} ) {
+            foreach my $sec ( @{ $allfns{$arg}{secondary} } ) {
+
+                # If this is set then take the value it was set to.
+                if ( defined $sec_args{ $sec->{arg_long} } ) {
+                    $conf{mode_options}{$arg}{ $sec->{arg_long} } =
+                      $sec_args{ $sec->{arg_long} };
+                } else {
+
+                    # Else set it to the default for this mode.
+                    $conf{mode_options}{$arg}{ $sec->{arg_long} } =
+                      $sec->{default};
+                }
+
+                $conf{mode_options_reverse}{ $sec->{arg_long} }{$arg} = 1;
+            }
         }
     }
 
@@ -3066,9 +3087,8 @@ sub show_proc_format {
     return;
 }
 
-# XXX: Now only called when loading things from file.
 sub show_results_from_file {
-    my ( $nlines, $mode, $handle ) = @_;
+    my ( $nlines, $mode ) = @_;
 
     my $lines = $nlines->{lines};
 
@@ -3082,11 +3102,13 @@ sub show_results_from_file {
     $of = 'compress'   if $compress;
     $of = 'compress_c' if $compress_c;
 
-    #if ( $mode eq "stack" or $input_file ) {
-    #    if ( $strip_below_main or $strip_above_wait ) {
-    #        strip_stack_traces(undef,$lines);
-    #    }
-    #}
+    if ( $mode eq 'stack' ) {
+        if (   $conf{mode_options}{stack}{strip_above_wait}
+            or $conf{mode_options}{stack}{strip_below_main} )
+        {
+            strip_stack_traces( $conf{mode_options}{stack}, $lines );
+        }
+    }
 
     complex_output_handler( $of, $lines );
 
@@ -3233,7 +3255,7 @@ sub load_and_display_from_file {
         process_line( $line, \%lines );
     }
     post_process_lines( \%lines );
-    show_results_from_file( \%lines, $mode, undef );
+    show_results_from_file( \%lines, $mode );
     return;
 }
 
@@ -3479,16 +3501,6 @@ sub next_command {
 
     if ( defined $cmd->{out_format} ) {
         $req->{out_format} = $cmd->{out_format};
-    }
-
-    # Send along the secondary args, taking care not to override any that
-    # are already defined.
-    if ( defined $allfns{ $req->{mode} }{secondary} ) {
-        foreach my $sec ( @{ $allfns{ $req->{mode} }{secondary} } ) {
-            if ( not defined $req->{cargs}{ $sec->{arg_long} } ) {
-                $req->{cargs}{ $sec->{arg_long} } = $sec->{value};
-            }
-        }
     }
 
     if ( $conf{verbose} and defined $req->{cargs} ) {
@@ -4373,13 +4385,6 @@ sub outer_main {
 
         $key =~ s/\-/\_/g;
 
-        if ( $key eq 'scriptDir' ) {
-            print(
-"$prog: -OscriptDir deprecated, use -Oedb=/path/to/edb instead\n"
-            );
-            exit 1;
-        }
-
         if (    not exists $conf{$key}
             and not exists $conf{mode_options_reverse}{$key} )
         {
@@ -4520,7 +4525,7 @@ sub outer_main {
 
     # If delivering a signal check that it's valid.
     if ( defined $mode and ( $mode eq 'kill' ) ) {
-        my $signal = uc( $secondary_args{signal} );
+        my $signal = uc $conf{mode_options}{kill}{signal};
         my %sig_names;
         map { $sig_names{$_} = 1 } split( " ", $Config{sig_name} );
 
@@ -7029,8 +7034,8 @@ sub inner_find_pids {
     convert_pids_to_child_pids();
 
     foreach my $proc ( @{ $confInner{all_pids} } ) {
-        my $pid  = $proc->{pid};
-        my $vp   = $proc->{vp};
+        my $pid = $proc->{pid};
+        my $vp  = $proc->{vp};
         target_key_pair( $vp, 'found', 'yes' );
         target_key_pair( $vp, 'name',  $proc->{status}->{Name} );
         target_key_pair( $vp, 'state', $proc->{status}->{State} );
