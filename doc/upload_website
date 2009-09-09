@@ -1,5 +1,9 @@
 #!/bin/sh
 
+# upload_website: Basic formating and upload script for http://padb.pittman.co.uk
+# $Revision$
+# $Date$
+
 set -e
 
 echo Uploading website to http://padb.pittman.org.uk
