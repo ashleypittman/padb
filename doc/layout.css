@@ -1,19 +1,26 @@
 
+body {
+ background-color: #FFFFD0;
+}
+
 #header {
-	clear: both;
+ clear: both;
 }
 
 #navigation {
-	float: left;
-	width: 14em;
+ float: left;
+ width: 14em;
 }
 
 #content {
-	margin-left: 15em;
+ margin-left: 15em;
 }
 
+table.news {
+ background-color: #FFFFA0;
+}
 
 #footer {
-	clear: both;
+ clear: both;
 }
 

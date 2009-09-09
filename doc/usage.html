@@ -1,7 +1,7 @@
 <div id="content">
 <h1>Job selection</h1>
 
-<h2>Selecting the Resource Manager (Job Launcher)</h2>
+<a name=rmgr><h2>Selecting the Resource Manager (Job Launcher)</h2></a>
 <i>Padb</i> supports many resource managers and should select
 the appropriate one for your cluster, if you have more than
 one resource manager installed or <i>padb</i> can't detect
@@ -13,7 +13,7 @@ identifiers (pids) will be used instead of job ids.
 <p>The <b>--list-rmgrs</b> option can be used to show a list of detected
 resource managers and their active jobs.
 
-<h2>Selecting the job(s) to target</h2>
+<a name=job><h2>Selecting the job(s) to target</h2></a>
 <i>Padb</i> provides several ways for the user to select which jobs
 to target depending on requirements.  All jobs detected by padb are
 identified by a unique numeric "jobid", typically this maps directly
@@ -47,7 +47,7 @@ send to third parties or to inspect a job for anomalies.
 
 <hr>
 
-<h1>Selecting ranks (Processes)</h1>
+<a name=rank><h1>Selecting ranks (Processes)</h1></a>
 In modes where data for each process is reported separately it is possible
 to restrict which ranks are queried, this is done via the <b>--rank</b> option.
 Multiple ranks can be selected by specifying <b>--rank</b> multiple times.
@@ -60,7 +60,7 @@ select jobs and it can present it in a number of different ways.  With
 the exception of Full Report only one mode can be selected, if you need
 more information about the program run <i>padb</i> more than once.
 
-<h2>Full Report</h2>
+<a name=full-report><h2>Full Report</h2></a>
 If you are just starting with <i>padb</i> or are creating an error
 report for somebody else then the <b>--full-report=&lt;jobid&gt;</b> option is a good place
 to start, this will complete a full diagnostic report for the job
