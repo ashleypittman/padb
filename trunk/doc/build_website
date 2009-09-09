@@ -18,9 +18,9 @@ cp layout.css $TDIR
 for FILE in $FILES
 do
   echo Uploading $FILE
-  cat header.html > $TDIR/$FILE
-  cat $FILE.html >> $TDIR/$FILE
-  cat footer.html >> $TDIR/$FILE
+  cat header.html > $TDIR/$FILE.html
+  cat $FILE.html >> $TDIR/$FILE.html
+  cat footer.html >> $TDIR/$FILE.html
 done
 
 echo All done.

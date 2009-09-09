@@ -1,35 +1,45 @@
 <div id="content">
-<h1>Padb: A parallel debugging tool</h1>
-
 <h2>About</h2>
-<i>Padb</i> is a <b>Job Inspection Tool</b> for examining and
+<p><i>Padb</i> is a <b>Job Inspection Tool</b> for examining and
 debugging parallel programs, primarily it simplifies the process of
 gathering stack traces on compute clusters however it also supports a wide range of other functions.
-<i>Padb</i> supports a wide range of parallel environments and it's
-likely it'll work out-of-the-box on your cluster.  It's an
+<i>Padb</i> supports a number of parallel environments and it works out-of-the-box on the majority of
+clusters.  It's an
 open source, non-interactive, command line, script-able tool intended
-for use by programmers and system administrators alike.
+for use by programmers and system administrators alike.</p>
 
 <p>
 <i>Padb</i> is developed and maintained by
-<a href="mailto:ashley@pittman.co.uk">Ashley Pittman</a>.
+<a href="mailto:ashley@pittman.co.uk">Ashley Pittman</a>.</p>
 
-<h2>News</h2>
-25-06-09 <b> A 2.5 stable release (version 2.5) is avaliable to download from the
-  downloads page.</b>
+<table class="news" width="70%" cellspacing="0" cellpadding="5" border="1" align="center">
+<tr><td>
+
+<a name=news><h2 align="center">Recent News</h2></a>
+
+<ul>
+ <li><b>01-09-09</b>: A 3.0-rc release is avaliable to download from the
+  <a href="download.html">downloads page</a>.
+ <li><b>25-06-09</b>: A 2.5 stable release (version 2.5) is avaliable to download from the
+  <a href="download.html">downloads page</a>.
+  </li>
+</ul>
+</td></tr>
+</table>
 
 <h2>Features</h2>
+The following <a href="modes.html">modes</a> of operation are supported:
 <ul>
 <li>Stack trace generation</li>
 <li>MPI Message queue display</li>
-<li>Deadlock detection</li>
+<li>Deadlock detection and collective state reporting</li>
 <li>Process interrogation</li>
 <li>Signal forwarding/delivery</li>
 <li>MPI collective reporting</li>
 <li>Job monitoring</li>
 </ul>
 
-<h2>What padb isn't</h2>
+<h2>What padb can't do</h2>
 <i>Padb</i> is a job inspection tool, it can tell you want you want
 to know about your job and your MPI stack, it will not, however, tell
 you about your cluster as a whole and it won't diagnose problems
@@ -71,12 +81,10 @@ Supports mpd or MPICH2 jobs run under slurm.
 <h2>Prerequisites</h2>
 <i>Padb</i> requires very little support from the OS or parallel
 environment to run, it's main use is to assist in the debugging of
-parallel applications, it's assumed that you have a working MPI
-stack and that "Hello world" application runs to completion without
+parallel applications, it's therefore assumed that you have a working MPI
+stack or other parallel environment and that "Hello world" application runs to completion without
 error.<br>  A </i>Linux</i> operating system is assumed and a working
 <i>gdb</i> is required for stack trace functionality.<br>
-At the time of writing a shared filesystem between all nodes in the
-parallel job is required if using orte (Open-MPI runtime).
 </div>
 <div id="footer">
  <hr>
