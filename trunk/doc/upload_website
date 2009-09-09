@@ -13,6 +13,8 @@ echo Uploading website to http://padb.pittman.org.uk
 
 FILES="index usage download email extensions modes"
 
+ftp-upload --host padb.pittman.org.uk -u padb@pittman.co.uk --password $PASSWORD layout.css
+
 for FILE in $FILES
 do
   echo Uploading $FILE
