@@ -2980,6 +2980,11 @@ sub tree_from_namespace {
 sub show_mpi_watch {
     my ( $handle, $lines ) = @_;
 
+    if ( not defined $lines->{target_data}{found} ) {
+        printf("No processes!\n");
+        exit 0;
+    }
+
     my @all = array_from_target_namespace( $lines->{target_data}{state} );
 
     my $o = "";
@@ -6515,19 +6520,44 @@ sub mpi_watch_load {
 #
 # * - error.
 
+# Mpi watch mode.
+#
+# Report a single character for each process in the job, typically run
+# with --watch enabled.
+#
+# Take care here when looping, $list is the same each iteration so if we
+# store {gdb} in $list then it will be there next time round.  Fix this issue
+# by populating a new array @all with every process which is present.
+#
+# This way if we are watching a job and the job goes away we can exit nicely
+# rather than perpetually spew errors to the console.
+
 sub mpi_watch_all {
 
     my ( $carg, $list ) = @_;
     my $fns = mpi_watch_load($carg);
 
+    my @all;
+
     foreach my $proc ( @{$list} ) {
         my $vp  = $proc->{vp};
         my $pid = $proc->{pid};
 
+        my %p;
+        $p{vp}  = $vp;
+        $p{pid} = $pid;
+
         # Load the status now before we attach with GDB,
         # otherwise we'll just see it as "T" (Stopped).
         my $m = find_from_status( $pid, 'State' );
-        target_key_pair( $vp, 'proc_state', $m );
+        if ( not defined $m ) {
+            target_error( $vp, "No such process" );
+            target_key_pair( $vp, 'state', '*' );
+            next;
+        }
+
+        target_key_pair( $vp, "found", '1' );
+
         if ( $m eq 'R' ) {
             $m = ',';
         } elsif ( $m eq 'S' ) {
@@ -6535,28 +6565,25 @@ sub mpi_watch_all {
         } else {
             $m = '*';
         }
-        $proc->{state} = $m;
+        $p{state} = $m;
 
         my $gdb = gdb_start();
         if ( gdb_attach( $gdb, $pid ) ) {
-            $proc->{gdb} = $gdb;
+            $p{gdb} = $gdb;
         } else {
+            target_key_pair( $vp, 'state', $p{state} );
             if ( defined $gdb->{error} ) {
                 target_error( $vp, $gdb->{error} );
             } else {
                 target_error( $vp, 'Failed to attach to process' );
             }
         }
+        push @all, \%p;
     }
 
-    foreach my $proc ( @{$list} ) {
+    foreach my $proc (@all) {
         my $vp  = $proc->{vp};
         my $pid = $proc->{pid};
-
-        if ( not defined $proc->{gdb} ) {
-            target_key_pair( $vp, 'state', $proc->{state} );
-            next;
-        }
 
         my $gdb = $proc->{gdb};
 
