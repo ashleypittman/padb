@@ -382,12 +382,12 @@ $conf{verbose} = 0;
 $conf{check_signon} = 'all';
 
 # Output options.
-$conf{interval}            = '10';
-$conf{watch_clears_screen} = 1;
+$conf{interval}            = '10s';
+$conf{watch_clears_screen} = 'enabled';
 $conf{scripts}             = 'bash,sh,dash,ash,perl,xterm';
 $conf{lsf_job_offset}      = 1;
 $conf{local_fd_name}       = '/dev/null';
-$conf{inner_callback}      = 0;
+$conf{inner_callback}      = 'disabled';
 
 # These two are used by deadlock and QsNet group
 # code, they need migrating in the group code
@@ -396,14 +396,14 @@ $conf{inner_callback}      = 0;
 #$conf{"show-all-groups"}     = 0;
 
 # Tuning options.
-$conf{prun_timeout}     = '120';
-$conf{prun_exittimeout} = '120';
+$conf{prun_timeout}     = '2m';
+$conf{prun_exittimeout} = '2m';
 $conf{rmgr}             = undef;
 
 $conf{slurm_job_step} = 0;
 
 # These settings are passed onto inner only.
-$conf{edbopt} = "";
+$conf{edbopt} = undef;
 
 $conf{edb}   = find_edb();
 $conf{minfo} = find_minfo();
@@ -413,14 +413,70 @@ $conf{port_range} = undef;
 
 $conf{tree_width} = '4';
 
+# Config options which take boolean values.
+my @conf_bool = qw(watch_clears_screen inner_callback);
+
+# Config options which take a time value.
+my @conf_time = qw(prun_exittimeout prun_timeout interval);
+
+# Config options which take an integer.
+my @conf_int = qw(lsf_job_offset slurm_job_step tree_width);
+
 my $norc       = 0;
 my $configfile = '/etc/padb.conf';
 
-# Standard regexpes for splitting on comma, equals and spaces.  Note the 
+# Standard regexpes for splitting on comma, equals and spaces.  Note the
 # space regexp matches multiple whitespace characters.
 my $COMMA  = qr{,}x;
 my $EQUALS = qr{=}x;
 my $SPACE  = qr{\s+}x;
+
+sub check_and_convert_bool {
+    my ($str) = @_;
+    my @yes   = qw(1 yes on enabled);
+    my @no    = qw(0 no off disabled);
+    my %bool_table;
+    map { $bool_table{$_} = 1 } @yes;
+    map { $bool_table{$_} = 0 } @no;
+
+    if ( defined $bool_table{$str} ) {
+        return $bool_table{$str};
+    }
+    printf {*STDERR} ("Boolean value \"$str\" not recognised, aborting.\n");
+    exit 1;
+}
+
+sub check_and_convert_time {
+    my ($str) = @_;
+    if (
+        $str =~ m{\A      # Start of line
+                  (\d+)   # A number
+                  (s|m)?  # With an option s or m suffix.
+                  \z}x
+      )
+    {
+        if ( defined $2 and $2 eq 'm' ) {
+            return $1 * 60;
+        }
+        return $1;
+    }
+    printf {*STDERR} ("Time value \"$str\" not recognised, aborting.\n");
+    exit 1;
+}
+
+sub check_int {
+    my ($str) = @_;
+
+    return
+      if (
+        $str =~ m{\A     # Start of line
+                  \d+    # A number
+                  \z}x
+      );
+
+    printf {*STDERR} ("Integer value \"$str\" not recognised, aborting.\n");
+    exit 1;
+}
 
 # Look for edb in the default install location only.
 sub find_edb {
@@ -4486,6 +4542,18 @@ sub outer_main {
             exit 1;
         }
         config_set( $key, $val );
+    }
+
+    foreach my $co (@conf_bool) {
+        $conf{$co} = check_and_convert_bool( $conf{$co} );
+    }
+
+    foreach my $co (@conf_time) {
+        $conf{$co} = check_and_convert_time( $conf{$co} );
+    }
+
+    foreach my $co (@conf_int) {
+        check_int( $conf{$co} );
     }
 
     if ($list_rmgrs) {
