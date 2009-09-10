@@ -416,6 +416,12 @@ $conf{tree_width} = '4';
 my $norc       = 0;
 my $configfile = '/etc/padb.conf';
 
+# Standard regexpes for splitting on comma, equals and spaces.  Note the 
+# space regexp matches multiple whitespace characters.
+my $COMMA  = qr{,}x;
+my $EQUALS = qr{=}x;
+my $SPACE  = qr{\s+}x;
+
 # Look for edb in the default install location only.
 sub find_edb {
     return '/usr/lib/qsnet/elan4/bin/'
@@ -721,8 +727,8 @@ sub parse_args_outer {
     GetOptions(%optionhash) or exit 1;
 
     if ( defined $debugflag ) {
-        foreach my $f ( split ',', $debugflag ) {
-            my ( $name, $v ) = split( "=", $f );
+        foreach my $f ( split $COMMA, $debugflag ) {
+            my ( $name, $v ) = split $EQUALS, $f;
             if ( exists $debugModes{$name} ) {
                 $debugModes{$name} = defined $v ? $v : 'basic';
             } else {
@@ -1016,7 +1022,7 @@ my %stat_types2 = (
 
 sub parse_header {
     my ($block) = @_;
-    my @a = split( ",", $block );
+    my @a = split $COMMA, $block;
 
     my @header;
 
@@ -1127,7 +1133,7 @@ sub find_rail {
 
 sub parse_content {
     my ( $block, $header ) = @_;
-    my @a = split( ",", $block );
+    my @a = split $COMMA, $block;
     my $index = 0;
 
     my @raw_data;
@@ -2193,9 +2199,11 @@ sub rms_job_to_ncpus {
 
     my $ncpus = 0;
 
-    my @c = map { $_ =~ /(\d+)-(\d+)/ ? $2 - $1 + 1 : 1 } ( split " ", $cpus );
+    my @c =
+      map { $_ =~ /(\d+)-(\d+)/ ? $2 - $1 + 1 : 1 } ( split $SPACE, $cpus );
 
-    my @n = map { $_ =~ /(\d+)-(\d+)/ ? $2 - $1 + 1 : 1 } ( split " ", $nodes );
+    my @n =
+      map { $_ =~ /(\d+)-(\d+)/ ? $2 - $1 + 1 : 1 } ( split $SPACE, $nodes );
 
     for ( my $idx = 0 ; $idx <= $#n ; $idx++ ) {
         $ncpus += $n[$idx] * $c[$idx];
@@ -2217,12 +2225,12 @@ sub rms_job_to_nhosts {
     my $suffix;
 
     # deal with multiple entries
-    foreach ( split( " ", $nodespec ) ) {
+    foreach ( split $SPACE, $nodespec ) {
         if (m/([^\[]+)\[([0-9-,]+)\]([^\[]*)/) {
             $prefix = $1;
             $suffix = $3;
 
-            foreach ( split( ",", $2 ) ) {
+            foreach ( split $COMMA, $2 ) {
                 if ( !m/([0-9]+)-?([0-9]+)?/ ) {
                     print "malformed nodespec '$_'\n";
                     exit 1;
@@ -2294,7 +2302,7 @@ sub slurm_job_to_ncpus {
     my $tasks;
     my $have_tasks = 0;
     foreach my $step (@steps) {
-        my ( $step, $cpus ) = split( " ", $step );
+        my ( $step, $cpus ) = split $SPACE, $step;
         $tasks      = $cpus if ( $step eq $s );
         $have_tasks = 1     if ( $cpus eq 'TASKS' );
     }
@@ -2309,8 +2317,8 @@ sub slurm_job_to_nodecount {
     return if ( $? != 0 );
 
     foreach my $step (@jobs) {
-        my ( $left, $right ) = split( " ", $step );
-        return $right if ( $left eq $job );
+        my ( $sj, $ncount ) = split $SPACE, $step;
+        return $ncount if ( $sj eq $job );
     }
     return;
 }
@@ -2326,8 +2334,8 @@ sub slurm_job_to_nodelist {
     return if ( $? != 0 );
 
     foreach my $step (@steps) {
-        my ( $left, $right ) = split( " ", $step );
-        return $right if ( $left eq $s );
+        my ( $sj, $nlist ) = split $SPACE, $step;
+        return $nlist if ( $sj eq $s );
 
     }
     return;
@@ -2629,7 +2637,7 @@ sub lsf_get_jobs {
     my @out = slurp_cmd("bjobs -r -u $user");
     foreach my $l (@out) {
         my ( $job, $user, $stat, $queue, $from, $exec, $name, $time ) =
-          split( " ", $l );
+          split $SPACE, $l;
         next if ( $job eq 'JOBID' );
         next unless ( defined $time );
         push @jobs, $job;
@@ -2652,7 +2660,7 @@ sub lsf_setup_pcmd {
       "select name,ncpus from resources where batchid=\'$machine\@$job\'";
     my $result = `rmsquery "$query"`;
 
-    my ( $res, $ncpus ) = split( " ", $result );
+    my ( $res, $ncpus ) = split $SPACE, $result;
 
     my @out = slurp_cmd(
 "rmsquery \"select name from jobs where jobs.resource=\'$res\' and status = \'running\' order by name\""
@@ -2862,9 +2870,9 @@ sub strip_stack_traces {
     my %below;
 
     map { $above{$_}++ }
-      split( ",", $conf{mode_options}{stack}{stack_strip_above} );
+      split $COMMA, $conf{mode_options}{stack}{stack_strip_above};
     map { $below{$_}++ }
-      split( ",", $conf{mode_options}{stack}{stack_strip_below} );
+      split $COMMA, $conf{mode_options}{stack}{stack_strip_below};
 
     foreach my $tag ( keys %$lines ) {
 
@@ -3012,12 +3020,12 @@ sub show_proc_format {
 
     my $separator = $carg->{column_seperator};
 
-    my @columns = split( ",", $carg->{proc_format} );
+    my @columns = split $COMMA, $carg->{proc_format};
     foreach my $column (@columns) {
 
         $show_fields = 1 if ( $column eq 'fields' );
 
-        my ( $name, $desc ) = split( "=", $column );
+        my ( $name, $desc ) = split $EQUALS, $column;
         if ( defined $desc ) {
             push @proc_format_array, lc($name);
             $proc_format_header{ lc($name) }  = $desc;
@@ -3789,7 +3797,7 @@ sub hello_from_inner {
     my ( $comm_data, $cdata, $line ) = @_;
 
     # Children connect back with "Hello $outerkey $hostname $port $innernkey";
-    my @words = split( " ", $line );
+    my @words = split $SPACE, $line;
     if ( $#words != 4 or $words[0] ne 'Hello' or $words[1] ne $secret ) {
         print "Bad signon $line\n";
         return 0;
@@ -3809,7 +3817,7 @@ sub hello_from_inner {
 
 sub inner_stdout_cb {
     my ( $comm_data, $cdata, $line ) = @_;
-    my @words = split( " ", $line );
+    my @words = split $SPACE, $line;
     if ( $#words == 3 and $words[0] eq 'connect' ) {
 
         handle_signon( $comm_data, $words[1], $words[2], $words[3] );
@@ -3936,7 +3944,7 @@ sub rng_convert_from_user {
         confess("Failed to recognise $range as range\n");
     }
 
-    my @user_parts = split( ",", $newrange );
+    my @user_parts = split $COMMA, $newrange;
 
     my @parts;
 
@@ -4459,7 +4467,7 @@ sub outer_main {
     # -Oedbopt="--pagesize 8192 --pagesize-header 4096"
     foreach my $config_option (@config_options) {
 
-        my ( $key, $val ) = split( "=", $config_option );
+        my ( $key, $val ) = split $EQUALS, $config_option;
 
         my $name = $key;
 
@@ -4607,7 +4615,7 @@ sub outer_main {
     if ( defined $mode and ( $mode eq 'kill' ) ) {
         my $signal = uc $conf{mode_options}{kill}{signal};
         my %sig_names;
-        map { $sig_names{$_} = 1 } split( " ", $Config{sig_name} );
+        map { $sig_names{$_} = 1 } split $SPACE, $Config{sig_name};
 
         if ( not defined $sig_names{$signal} ) {
             cmdline_error("$prog: Error: signal \"$signal\" is invalid\n");
@@ -4886,52 +4894,52 @@ sub strip_first_quotes {
 sub extract_value_square {
     my $str = shift;
 
-    my $left   = "";
-    my $right  = $str;
+    my $value  = "";
+    my $rem    = $str;
     my $indent = 0;
 
-    while ( $right =~ /^([^\[\]]*)([\[\]])(.*)$/ ) {
+    while ( $rem =~ /^([^\[\]]*)([\[\]])(.*)$/ ) {
         if ( $2 eq "[" ) {
             $indent++;
-            $left  = "$left$1\[";
-            $right = $3;
+            $value = "$value$1\[";
+            $rem   = $3;
         } else {
             $indent--;
-            $left  = "$left$1\]";
-            $right = $3;
+            $value = "$value$1\]";
+            $rem   = $3;
             if ( $indent == 0 ) {
-                return ( strip_square($left), $right );
+                return ( strip_square($value), $rem );
             }
         }
 
     }
-    print "ident $indent\n";
+    croak("Failed to parse $str");
     return;
 }
 
 sub extract_value_soft {
     my $str = shift;
 
-    my $left   = "";
-    my $right  = $str;
+    my $value  = "";
+    my $rem    = $str;
     my $indent = 0;
 
-    while ( $right =~ /^([^\{\}]*)([\{\}])(.*)$/ ) {
+    while ( $rem =~ /^([^\{\}]*)([\{\}])(.*)$/ ) {
         if ( $2 eq "{" ) {
             $indent++;
-            $left  = "$left$1\{";
-            $right = $3;
+            $value = "$value$1\{";
+            $rem   = $3;
         } else {
             $indent--;
-            $left  = "$left$1\}";
-            $right = $3;
+            $value = "$value$1\}";
+            $rem   = $3;
             if ( $indent == 0 ) {
-                return ( strip_soft($left), $right );
+                return ( strip_soft($value), $rem );
             }
         }
 
     }
-    print "ident $indent\n";
+    croak("Failed to parse $str");
     return;
 }
 
@@ -5112,7 +5120,7 @@ sub gdb_func_addr {
     my %p = gdb_n_send( $gdb, "-data-evaluate-expression $func" );
     return unless ( $p{status} eq 'done' );
     my $value = gdb_strip_value( $p{reason} );
-    my @a     = split( " ", $value );
+    my @a     = split $SPACE, $value;
     my $hex   = $a[-2];
     return $hex;
 }
@@ -5162,7 +5170,9 @@ sub gdb_string {
 sub handle_query {
     my ( $gdb, $vp, $query, $stats ) = @_;
 
-    my @params = split( " ", $query );
+    # Shouldn't this be?
+    # my (undef,$cmd,@params) = split $SPACE, $query ;
+    my @params = split $SPACE, $query;
     my $b      = shift @params;
     my $cmd    = shift @params;
     my $res;
@@ -5971,7 +5981,7 @@ sub show_task_stat_file {
 
     foreach my $l ( slurp_file($file) ) {
         chomp $l;
-        my @stats = split( / /, $l );
+        my @stats = split $SPACE, $l;
         for ( my $i = 0 ; $i <= $#stats ; $i++ ) {
             proc_output( $vp, "stat.$stat_names[$i]", $stats[$i] );
         }
@@ -6000,7 +6010,7 @@ sub show_task_dir {
             my %totals;
             foreach my $rgn ( slurp_file("$dir/maps") ) {
                 my ( $area, $perm, $offset, $time, $inode, $file ) =
-                  split( " ", $rgn );
+                  split $SPACE, $rgn;
                 if ( $file =~ '/dev/elan4/sdram(\d+)' ) {
                     my $rail = $1;
                     my ( $start, $end ) = split( "-", $area );
@@ -6067,7 +6077,7 @@ sub show_task_dir {
 sub string_to_jiffies {
     my ($ps) = @_;
 
-    my @usecc = split( " ", $ps );
+    my @usecc = split $SPACE, $ps;
 
     my $jiffies = 0;
 
@@ -6084,15 +6094,15 @@ sub add_and_divide_jiffies {
 
     my $jiffies;
 
-    my @pre = split( " ", $pre );
+    my @pre = split $SPACE, $pre;
 
     return ( ( string_to_jiffies($pre) + string_to_jiffies($post) ) / 2 );
 }
 
 sub pcpu_user {
     my ( $cpucount, $elapsed, $start, $end ) = @_;
-    my @pre  = split( " ", $start );
-    my @post = split( " ", $end );
+    my @pre  = split $SPACE, $start;
+    my @post = split $SPACE, $end;
     my $jused = $post[13] - $pre[13];
     my $used  = ( $jused / $elapsed ) * $cpucount * 100;
     return sprintf "%d", $used;
@@ -6100,8 +6110,8 @@ sub pcpu_user {
 
 sub pcpu_sys {
     my ( $cpucount, $elapsed, $start, $end ) = @_;
-    my @pre  = split( " ", $start );
-    my @post = split( " ", $end );
+    my @pre  = split $SPACE, $start;
+    my @post = split $SPACE, $end;
     my $jused = $post[14] - $pre[14];
     my $used  = ( $jused / $elapsed ) * $cpucount * 100;
     return sprintf "%d", $used;
@@ -6109,8 +6119,8 @@ sub pcpu_sys {
 
 sub pcpu_total {
     my ( $cpucount, $elapsed, $start, $end ) = @_;
-    my @pre  = split( " ", $start );
-    my @post = split( " ", $end );
+    my @pre  = split $SPACE, $start;
+    my @post = split $SPACE, $end;
     my $jused = $post[13] - $pre[13] + $post[14] - $pre[14];
     my $used  = ( $jused / $elapsed ) * $cpucount * 100;
     return sprintf "%d", $used;
@@ -6136,9 +6146,9 @@ sub show_proc_all {
     %proc_keys = ();
 
     if ( defined $carg->{proc_format} ) {
-        my @columns = split( ",", $carg->{proc_format} );
+        my @columns = split $COMMA, $carg->{proc_format};
         foreach my $column (@columns) {
-            my ( $name, $desc ) = split( "=", $column );
+            my ( $name, $desc ) = split $EQUALS, $column;
             $proc_keys{ lc($name) } = 1;
         }
     }
@@ -6215,7 +6225,7 @@ sub show_proc_all {
 
         my $elapsed = $jiffies_end - $jiffies_start;
 
-        my ( $l1, $l5, $l15 ) = split( " ", $load_avg );
+        my ( $l1, $l5, $l15 ) = split $SPACE, $load_avg;
 
         foreach my $proc ( @{$list} ) {
             my $vp = $proc->{vp};
@@ -6322,11 +6332,11 @@ sub stack_trace_from_pids {
     my %below;
 
     if ( $carg->{strip_above_wait} ) {
-        map { $above{$_} = 1 } split qr{,}, $carg->{stack_strip_above};
+        map { $above{$_} = 1 } split $COMMA, $carg->{stack_strip_above};
     }
 
     if ( $carg->{strip_below_main} ) {
-        map { $below{$_} = 1 } split qr{,}, $carg->{stack_strip_below};
+        map { $below{$_} = 1 } split $COMMA, $carg->{stack_strip_below};
     }
 
     foreach my $proc ( @{$list} ) {
@@ -6562,7 +6572,7 @@ sub mpi_watch_load {
 
         foreach my $mode (@d) {
             chomp $mode;
-            my ( $name, $char, @fns ) = split( ",", $mode );
+            my ( $name, $char, @fns ) = split $COMMA, $mode;
             $fns{names}{$name} = $char;
             foreach my $fn (@fns) {
                 $fns{fns}{$fn} = $name;
@@ -6574,7 +6584,7 @@ sub mpi_watch_load {
     my %fns;
     foreach my $mode ( split( "\n", $mpi_watch_data ) ) {
         chomp $mode;
-        my ( $name, $char, @fns ) = split( ",", $mode );
+        my ( $name, $char, @fns ) = split $COMMA, $mode;
         $fns{names}{$name} = $char;
         foreach my $fn (@fns) {
             $fns{fns}{$fn} = $name;
@@ -6784,7 +6794,7 @@ sub slurm_find_pids {
       `scontrol listpids $jobid.$confInner{slurm_job_step} 2>/dev/null`;
     return if ( $? != 0 );
     foreach my $proc (@procs) {
-        my ( $pid, $job, $step, $local, $global ) = split( " ", $proc );
+        my ( $pid, $job, $step, undef, $global ) = split $SPACE, $proc;
         next if ( $global eq '-' );
         next unless ( $job eq $jobid );
         next unless ( $step == $confInner{slurm_job_step} );
@@ -7039,7 +7049,7 @@ sub convert_pids_to_child_pids {
     my @pids = get_process_list( getpwuid $< );
 
     my %scripts;
-    map { $scripts{$_}++ } split( ",", $confInner{scripts} );
+    map { $scripts{$_}++ } split $COMMA, $confInner{scripts};
 
     my $ipids = $confInner{rmpids};
 
