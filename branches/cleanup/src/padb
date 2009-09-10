@@ -3504,7 +3504,7 @@ sub next_command {
     }
 
     if ( $conf{verbose} and defined $req->{cargs} ) {
-        print "Mode '$req->{mode}' mode specific flags:\n";
+        print "Mode '$req->{mode}' mode specific options:\n";
         foreach my $arg ( sort keys %{ $req->{cargs} } ) {
             if ( defined $req->{cargs}{$arg} ) {
                 printf "%20s : '%s'\n", $arg, $req->{cargs}{$arg};
@@ -7155,7 +7155,7 @@ sub command_from_parent {
             my @e = split qr{\n}, $error;
             $netdata->{host_responce} = "error";
             foreach my $proc ( @{$pid_list} ) {
-                target_error( $proc->{vp}, "Critial error: ($e[0])" );
+                target_error( $proc->{vp}, "Critical error: ($e[0])" );
             }
           }
     } else {
@@ -7173,7 +7173,7 @@ sub command_from_parent {
                 my $error = $@;
                 my @e = split qr{\n}, $error;
                 $netdata->{host_responce} = "error";
-                target_error( $vp, "Critial error: ($e[0])" );
+                target_error( $vp, "Critical error: ($e[0])" );
               }
         }
 
