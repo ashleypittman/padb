@@ -1,19 +1,72 @@
 <div id="content">
 <h1>Job selection</h1>
 
-<a name=rmgr><h2>Selecting the Resource Manager (Job Launcher)</h2></a>
+<div class=mode>
+ <a name=rmgr></a>
+ <h2>Selecting the Resource Manager (Job Launcher)</h2>
+</div>
 <i>Padb</i> supports many resource managers and should select
 the appropriate one for your cluster, if you have more than
 one resource manager installed or <i>padb</i> can't detect
-the correct one use the <b>rmgr</b> <a href=#config>configuration option</a>.
+the correct one use the <b>rmgr</b> <a href=configuration.html>configuration option</a>.
 
 <p>If no resource manager is found you can use <b>-O rmgr=local</b> and process
 identifiers (pids) will be used instead of job ids.
 
+
+<center>
+<table class=rmgrs border=1 width=90%>
+ <tr>
+  <th>Resource&nbsp;manager</th>
+  <th>Name</th>
+  <th>Notes</th>
+ </tr>
+ <tr>
+  <td>Slurm</td>
+  <td>slurm</td>
+  <td>Fully supported</td>
+ </tr>
+ <tr>
+  <td>RMS</td>
+  <td>rms</td>
+  <td>Fully supported</td>
+ </tr>
+ <tr>
+  <td>OpenMPI orte</td>
+  <td>orte</td>
+  <td>Fully supported</td>
+ </tr>
+ <tr>
+  <td>MPICH2/mpd</td>
+  <td>mpd</td>
+  <td>Fully supported in 3.0 and above</td>
+ </tr>
+ <tr>
+  <td>None</td>
+  <td>local</td>
+  <td>allows process identifiers (pids) to be specified as jobids and treats that process
+as a single process job.</td>
+ </tr>
+ <tr>
+  <td>None</td>
+  <td>local-fd</td>
+  <td>as local but only selects processes which have a certain file open, use the "local-fd-name" configuration option to set the filename.</td>
+ </tr>
+ <tr>
+  <td>None</td>
+  <td>local-qsnet</td>
+  <td>as local-fd with local-fd-name set to /proc/qsnet/elan/user to automatially select network jobs on the local node.</td>
+ </tr>
+</table>
+</center>
+
 <p>The <b>--list-rmgrs</b> option can be used to show a list of detected
 resource managers and their active jobs.
 
-<a name=job><h2>Selecting the job(s) to target</h2></a>
+<div class=mode>
+ <a name=job></a>
+ <h2>Selecting the job(s) to target</h2>
+</div>
 <i>Padb</i> provides several ways for the user to select which jobs
 to target depending on requirements.  All jobs detected by padb are
 identified by a unique numeric "jobid", typically this maps directly
@@ -38,7 +91,10 @@ than one job is running.
 To target a specific job specify the jobid for the job on the command line,
 after all other options.
 
-<a name=full-report</a><h3>To target a specific job (Full report option)</h3>
+<div class=mode>
+ <a name=full-report</a></a>
+ <h3>To target a specific job (Full report option)</h3>
+</div>
 If trying to diagnose a problem or gather information there is another
 option, <b>--full-report=&lt;jobid&gt;</b>, this tells padb to target the job
 specified and to report all information about the job it knows how to
@@ -60,7 +116,10 @@ select jobs and it can present it in a number of different ways.  With
 the exception of Full Report only one mode can be selected, if you need
 more information about the program run <i>padb</i> more than once.
 
-<a name=full-report><h2>Full Report</h2></a>
+<div class=mode>
+ <a name=full-report></a>
+ <h2>Full Report</h2>
+</div>
 If you are just starting with <i>padb</i> or are creating an error
 report for somebody else then the <b>--full-report=&lt;jobid&gt;</b> option is a good place
 to start, this will complete a full diagnostic report for the job
@@ -69,44 +128,8 @@ generate a lot of output so redirecting to a file is recommended.
 
 <p>
 
-A list of avaliable modes and their descriptions can be found on the <a href=/modes>modes</a> page.
+A list of avaliable modes and their descriptions can be found on the <a href=modes.html>modes</a> page.
 
-<hr>
-
-<a name=config></a><h1>Configuration options</h1>
-<i>padb</i> has a number of extended configuration options for tuning
-it's behavior, these can be set in a number of ways.  All configuration
-options are key/value pairs.
-<ul>
-<li>Command line</li>
-Use the command-line option <b>--config-option &lt;key&gt;=&lt;value&gt;</b>.
-<b>-O</b> can be substituted for <b>--config-option</b>.
-<li>Environment</li>
-Set the environment variable <b>PADB_&lt;KEY&gt;=&lt;value&gt;</b>.  All 
-environment variables should be specified in upper case.
-<li>Config file</li>
-Config is also loaded from <b>/etc/padb.conf</b> and <b>~/.padbrc</b>.  Contact the
-<a href=/email>mailing lists</a> for help with these files.
-</ul>
-A list of configuration options along with their current values can be
-obtained by specifying a key of help with or without a value, i.e. <b>padb -Ohelp</b>
-
-<h2>Example</h2>
-<table border=1>
-<tr><td>
-<pre>
-ashley@alpha:~$ padb --show-jobs
-Error, multiple resource managers detected, use -Ormgr=<resource manager>
-orte slurm local-fd local
-ashley@alpha:~$ padb --show-jobs --config-option rmgr=orte
-59315
-ashley@alpha:~$ export PADB_RMGR=orte
-ashley@alpha:~$ padb --show-jobs
-59315
-ashley@alpha:~$ 
-</pre>
-</td></tr>
-</table>
 </div>
 <div id="footer">
  <hr>
