@@ -11,7 +11,7 @@ echo Uploading website to http://padb.pittman.org.uk
 # Load the password from a non-public file ;)
 . ~/padb-website-password.txt
 
-FILES="index usage download email extensions modes"
+FILES="index usage download email extensions modes configuration"
 
 ftp-upload --host padb.pittman.org.uk -u padb@pittman.co.uk --password $PASSWORD layout.css
 

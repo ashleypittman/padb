@@ -12,7 +12,7 @@ process in a parallel job, some modes collate information from multiple processe
 into a single status report for the job.  For modes where information is 
 process specific a number of options are offered to reduce the amount of
 information displayed to the screen.  Without any of these options specified
-<i>padb</i> will prefix each line of output with the vpid followed by a colon ": ".
+<i>padb</i> will prefix each line of output with the rank followed by a colon ":".
 The <b>--compress-long</b> option will print a header for each process and
 display the information for that rank below the header without any per-line prefix.
 The <b>--compress</b> option will do the same however will also attempt to merge
@@ -34,16 +34,24 @@ options, the default values for these options are 10 and 1 respectively.
 <p>
 
 All examples on this page show <i>padb</i> targeting a single specific job, either by providing a number <i>job identifier</i>
-on the command line or via the <b>--all</b> or <b>--any</b> options.  See <a href=/usage>usage</a> page for information
+on the command line or via the <b>--all</b> or <b>--any</b> options.  See <a href=usage.html>usage</a> page for information
 on selecting which jobs.
 
-<a name=proc-summary><h2>Process state</h2></a>
+<div class=mode>
+ <a name=proc-summary></a>
+ <h2>Process state</h2>
+</div>
 The <b>--proc-summary</b> mode shows basic information about running
 processes, presented one process per line.  Users can control which information
 is shown using the <b>--proc-format</b> option.
-<table border=1>
+<table class=example>
 <tr><td>
-<pre>
+<pre class=code>
+$ padb --all --proc-summary
+</pre>
+<tr/><td/>
+<tr><td>
+<pre class=code>
 vpid  hostname  pid   vmsize     vmrss    S  %cpu  command
    7        i3  2623  160336 kB  4464 kB  R    49    a.out
    6        i2  2616  160336 kB  4464 kB  R    48    a.out
@@ -59,15 +67,22 @@ vpid  hostname  pid   vmsize     vmrss    S  %cpu  command
 
 The config option <b>proc-sort-key</b> controls which column the table is sorted by, the default is vpid.
 
-<a name=proc-info><h3>Per-process process state</h3></a>
-
+<div class=mode>
+ <a name=proc-info></a>
+ <h3>Per-process process state</h3>
+</div>
 The <b>--proc-info</b> mode reports a much more complete report about the state of the process but doesn't easily reduce
 when run across multiple ranks.  It can be controlled by the <b>proc-shows-proc</b> (default: 1), <b>proc-shows-task</b>
 (default: 0), <b>proc-shows-fds</b> (default:1 ) and <b>proc-shows-maps</b> (default: 0) configuration options.  This output
 also shows possible columns when running in "Process state" mode.
-<table border=1>
+<table class=example>
 <tr><td>
-<pre>
+<pre class=code>
+$ padb --all --rank=0 --proc-info
+</pre>
+<tr/><td/>
+<tr><td>
+<pre class=code>
 hostname:fnarp
 exe:/home/ashley/IMB/imb/src/IMB-MPI1
 Name:	IMB-MPI1
@@ -126,14 +141,21 @@ pcpu: 47
 </tr></td>
 </table>
 
-
-<a name=stack-trace><h2>Stack traces</h2></a>
+<div class=mode>
+ <a name=stack-trace></a>
+ <h2>Stack traces</h2>
+</div>
 The <b>--stack-trace</b> option, best used as shown here with the <b>--tree</b> option
 shows stack traces for each process in the job.  Stack traces are shown "backwards" with main()
 at the top to facilitate the tree view shown here.
-<table border=1>
+<table class=example>
 <tr><td>
-<pre>
+<pre class=code>
+$ padb --all --stack-trace --tree
+</pre>
+<tr/><td/>
+<tr><td>
+<pre class=code>
 -----------------
 [0-1] (2 processes)
 -----------------
@@ -168,8 +190,78 @@ main() at IMB.c:276
 </table>
 
 The config options <b>stack-shows-locals</b> and <b>stack-shows-params</b> can be enabled to display more information in the stack
-trace, these are disabled by default and make the tree based reporting very difficult so are best used in conjunction with the
-<b>--rank</b> option.
+trace, these are disabled by default and make the tree based reporting very difficult so are best used in conjunction with the <b>--rank</b> option as shown here.
+
+<table class=example>
+<tr><td>
+<pre class=code>
+$ padb --any --stack-trace --rank 0 -O stack-shows-locals=1 -Ostack-shows-params=1
+</pre>
+<tr/><td/>
+<tr><td>
+<pre class=code>
+main() at ?:?
+PMPI_Barrier() at /mnt/home/ashley/mpich2/mpich2-1.1.1p1/src/mpi/coll/barrier.c:421
+  params:
+    MPI_Comm comm = -2080374780
+  locals:
+    MPICH_PerThread_t * MPIR_Thread = (MPICH_PerThread_t *) 0x80e9740
+    int                   mpi_errno = 10001568
+    MPID_Comm *            comm_ptr = (MPID_Comm *) 0x80da8e0
+MPIR_Barrier_or_coll_fn() at /mnt/home/ashley/mpich2/mpich2-1.1.1p1/src/mpi/coll/barrier.c:244
+  params:
+    MPID_Comm * comm_ptr = (MPID_Comm *) 0x198
+  locals:
+    int mpi_errno = 0
+MPIR_Barrier() at /mnt/home/ashley/mpich2/mpich2-1.1.1p1/src/mpi/coll/barrier.c:75
+  params:
+    MPID_Comm * comm_ptr = (MPID_Comm *) 0x80da9e8
+  locals:
+    int           size = 8
+    int           rank = 0
+    int           mask = 1
+    int      mpi_errno = &lt;value optimized out&gt;
+    MPI_Comm      comm = -2080374779
+MPIC_Sendrecv() at /mnt/home/ashley/mpich2/mpich2-1.1.1p1/src/mpi/coll/helper_fns.c:163
+  params:
+    void *         sendbuf = (void *) 0x0
+    int          sendcount = 0
+    MPI_Datatype  sendtype = 1275068685
+    int               dest = 1
+    int            sendtag = 1
+    void *         recvbuf = (void *) 0x0
+    int          recvcount = 0
+    MPI_Datatype  recvtype = 1275068685
+    int             source = 7
+    int            recvtag = 1
+    MPI_Comm          comm = -2080374779
+    MPI_Status *    status = (MPI_Status *) 0x1
+  locals:
+    MPID_Request * recv_req_ptr = (MPID_Request *) 0x80e9ac0
+    MPID_Request * send_req_ptr = (MPID_Request *) 0x80e9c94
+    int               mpi_errno = &lt;value optimized out&gt;
+    MPID_Comm *        comm_ptr = (MPID_Comm *) 0x80da9e8
+MPIC_Wait() at /mnt/home/ashley/mpich2/mpich2-1.1.1p1/src/mpi/coll/helper_fns.c:404
+  params:
+    MPID_Request * request_ptr = (MPID_Request *) 0x80e9ac0
+  locals:
+    MPID_Progress_state progress_state = {ch = {completion_count = 16}}
+    int                      mpi_errno = 134869472
+MPIDI_CH3I_Progress() at /mnt/home/ashley/mpich2/mpich2-1.1.1p1/src/mpid/ch3/channels/nemesis/nemesis/include/mpid_nem_inline.h:1088
+  params:
+    MPID_Progress_state * progress_state = (MPID_Progress_state *) 0xbfc69eec
+    int                      is_blocking = 1
+  locals:
+    MPID_nem_fbox_mpich2_t *        pbox = (MPID_nem_fbox_mpich2_t *) 0x80
+    unsigned int             completions = 16
+    int                        mpi_errno = &lt;value optimized out&gt;
+    int                         complete = -1077502728
+    int                        pollcount = 0
+sched_yield() at ?:?
+__kernel_vsyscall() at ?:?
+</pre>
+</tr></td>
+</table>
 
 <p>
 Stack traces on Linux often show functions below main(), these are automatically stripped unless the flag
@@ -179,17 +271,25 @@ taking a comma separated list of function names.
 
 <h2>MPI Specific modes</h3>
 
-<a name=mpi-queue><h3>MPI message queues</h3></a>
-<a name=message-queue></a>
+<div class=mode>
+ <a name=mpi-queue></a>
+ <a name=message-queue></a>
+ <h3>MPI message queues</h3>
+</div>
 The option <b>--mpi-queue</b> will tell <i>padb</i> to read the MPI message
 queues from your application if possible.  Here shown with the <b>--compress</b> option.
 
 <p>
 The option <b>--message-queue</b> shows the tport queues on QsNet systems.  On non-QsNet systems it automatically falls back
 to <b>--mpi-queue</b>.
-<table border=1>
+<table class=example>
 <tr><td>
-<pre>
+<pre class=code>
+$ padb --all --compress --mpi-queue
+</pre>
+<tr/><td/>
+<tr><td>
+<pre class=code>
 ----------------
 0
 ----------------
@@ -260,12 +360,20 @@ comm5: id: '0x1c'
 </tr></td>
 </table>
 
-<a name=deadlock><h3>Collective information</h3></a>
-If you are using a <a href=/extensions>patched MPI library</a> it's also possible for <i>padb</i> to 
+<div class=mode>
+ <a name=deadlock></a>
+ <h3>Collective information</h3>
+</div>
+If you are using a <a href=extensions.html>patched MPI library</a> it's also possible for <i>padb</i> to 
 display the state of collective operations across your job using the <b>--deadlock</b> mode.
-<table border=1>
+<table class=example>
 <tr><td>
-<pre>
+<pre class=code>
+$ padb --all --deadlock
+</pre>
+<tr/><td/>
+<tr><td>
+<pre class=code>
 Information for group '0x4' (MPI COMMUNICATOR 4 DUP FROM 0)
 Group members [1-3] (size 4) are in call 2 to Barrier.
 Group member 0 (size 4) has completed call 1 to Barrier.
@@ -279,7 +387,10 @@ Total: 6 groups of which 2 are in use.
 </tr></td>
 </table>
 
-<a name=kill><h3>Signal delivery</h2></a>
+<div class=mode>
+ <a name=kill></a>
+ <h3>Signal delivery</h2>
+</div>
 To deliver signals to processes in a job use the <b>--kill</b> mode together with the optional
 <b>--signal=&lt;name&gt;</b> option.  No output is produced by this mode.
 
@@ -287,7 +398,10 @@ To deliver signals to processes in a job use the <b>--kill</b> mode together wit
 The <b>--set-debug</b>, <b>--group</b> and <b>--statistics</b> modes are QsNet specific.  The <b>--deadlock</b> mode
 performs the same function as <b>--group</b> for MPI programs.
 
-<a name=mpi-watch><h2>Process watch</h2></a>
+<div class=mode>
+ <a name=mpi-watch></a>
+ <h2>Process watch</h2>
+</div>
 The <b>--mpi-watch</b> mode in <i>padb</i> will cause padb to inspect the parallel job and write a single
 line of output to the screen, each character representing a process in the parallel job.  Each character
 has a different value depending on the state of that process at the time of sampling.  This provides a quick
@@ -299,9 +413,14 @@ When used with the <b>--watch</b> and <b>--config-option=watch-clears-screen=0</
 to see progress of the application over time, this trace shows the popular IMB benchmarking application, those
 familiar with it will immediately see the different stages of benchmark and how each stage uses more and more processes
 over time with any unused ones blocking in MPI_Barrier.
-<table border=1>
+<table class=example>
 <tr><td>
-<pre>
+<pre class=code>
+$ padb --all --mpi-watch -Owatch-clears-screen=0 -Ointerval=5
+</pre>
+<tr/><td/>
+<tr><td>
+<pre class=code>
 u: unexpected messages U: unexpected and other messages
 s: sending messages r: receiving messages m: sending and receiving
 b: Barrier B: Broadcast g: Gather G: AllGather r: reduce: R: AllReduce

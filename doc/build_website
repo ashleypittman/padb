@@ -8,7 +8,7 @@ set -e
 
 echo Uploading website to http://padb.pittman.org.uk
 
-FILES="index usage download email extensions modes"
+FILES="index usage download email extensions modes configuration"
 
 TDIR=public
 
