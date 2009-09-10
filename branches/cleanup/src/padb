@@ -3260,6 +3260,7 @@ sub complex_output_handler {
     my ( $output, $lines ) = @_;
 
     if ( $output eq 'tree' ) {
+
         #print show_tree( make_tree($lines) );
         new_tree($lines);
     } elsif ( $output eq 'compress' ) {
@@ -3708,6 +3709,16 @@ sub command_from_inner {
     # The inner process is about to exit.
     if ( $comm_data->{current_req}->{mode} eq 'exit' ) {
         $comm_data->{state} = 'shutdown';
+        return;
+    }
+
+    # Check for all processes being found, or rather check for none being found.
+    # If there are none then we probably don't have any info from the so tell
+    # the inner to quit and don't process any data we have just received.
+    if ( not defined $d->{target_data}{found}{yes} ) {
+        printf("No remaining processes, is job dead?\n");
+        $comm_data->{current_req} = last_command();
+        issue_command_to_inner( $cdata, $comm_data->{current_req} );
         return;
     }
 
@@ -7218,6 +7229,14 @@ sub command_from_parent {
         }
     } else {
         $pid_list = $confInner{all_pids};
+    }
+
+    # Record that this processes is still here so the outer process can exit if
+    # there is nothing to target.
+    foreach my $proc ( @{$pid_list} ) {
+        if ( -d "/proc/$proc->{pid}" ) {
+            target_key_pair( $proc->{vp}, 'found', 'yes' );
+        }
     }
 
     # Now do the work by calling handler or handler_all.  Catch any exception
