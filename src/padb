@@ -3168,13 +3168,6 @@ sub default_output_handler {
     my $lines = $d->{target_output};
     my $mode  = $req->{mode};
 
-    # This is done internally by the node-agent now.
-    #if ( $mode eq 'stack' or $input_file ) {
-    #    if ( $cargs->{strip_below_main} or $cargs->{strip_above_wait} ) {
-    #        strip_stack_traces( $cargs, $lines );
-    #    }
-    #}
-
     if ( defined $req->{out_format} ) {
         complex_output_handler( $req->{out_format}, $lines );
     } else {
@@ -3193,11 +3186,82 @@ sub default_output_handler {
     return;
 }
 
+sub add_tag_to_tree {
+    my ( $tree, $tag, $output ) = @_;
+
+    my $line = shift( @{$output} );
+
+    if ( not defined $tree->{$line}{range} ) {
+        $tree->{$line}{range} = rng_create_empty();
+        $tree->{$line}{min}   = $tag;
+        $tree->{$line}{count} = 0;
+    }
+    rng_add_value( $tree->{$line}{range}, $tag );
+    if ( $tag < $tree->{$line}{min} ) {
+        $tree->{$line}{min} = $tag;
+    }
+    $tree->{$line}{count}++;
+    my $rem = $#{$output};
+    if ( $rem >= 0 ) {
+        add_tag_to_tree( \%{ $tree->{$line}{desc} }, $tag, $output );
+    }
+    return;
+}
+
+sub _display_tree {
+    my ( $tree, $parent, $indent ) = @_;
+
+    my $ret = "";
+
+    # Sort peers by lowest rank of each branch.
+    my @peers =
+      sort { $tree->{$a}->{min} <=> $tree->{$b}->{min} } keys %{$tree};
+
+    foreach my $peer (@peers) {
+
+        my $vpspec = rng_convert_to_user( $tree->{$peer}->{range} );
+        if ( $#peers != 0 or $parent ne $vpspec ) {
+            $ret .= "$indent-----------------\n";
+            $ret .= "$indent$vpspec ($tree->{$peer}->{count} processes)\n";
+            $ret .= "$indent-----------------\n";
+        }
+
+        $ret .= "$indent$peer\n";
+        if ( defined $tree->{$peer}->{desc} ) {
+            $ret .=
+              _display_tree( $tree->{$peer}->{desc}, $vpspec, "$indent  " );
+        }
+    }
+    return $ret;
+}
+
+sub display_tree {
+    my ($tree) = @_;
+    return _display_tree( $tree, "no-parent", "" );
+}
+
+# An experimental new tree format.
+sub new_tree {
+    my ($lines) = @_;
+    my %tree;
+    debug_log( 'tree', undef, 'Making the tree' );
+    foreach my $tag ( sort keys %$lines ) {
+        add_tag_to_tree( \%tree, $tag, $lines->{$tag} );
+    }
+    debug_log( 'tree', undef, 'Formatting the tree' );
+    my $t = display_tree( \%tree );
+    debug_log( 'tree', undef, 'Displaying the tree' );
+    print $t;
+    debug_log( 'tree', undef, 'Done' );
+    return;
+}
+
 sub complex_output_handler {
     my ( $output, $lines ) = @_;
 
     if ( $output eq 'tree' ) {
-        print show_tree( make_tree($lines) );
+        #print show_tree( make_tree($lines) );
+        new_tree($lines);
     } elsif ( $output eq 'compress' ) {
 
         foreach my $tag ( sort { $a <=> $b } ( keys %$lines ) ) {
