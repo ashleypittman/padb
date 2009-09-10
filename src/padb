@@ -6651,11 +6651,9 @@ sub mpi_watch_all {
         target_key_pair( $vp, 'state', $proc->{state} );
     }
 
-    foreach my $proc ( @{$list} ) {
-        if ( $proc->{gdb} ) {
-            gdb_detach( $proc->{gdb} );
-            gdb_quit( $proc->{gdb} );
-        }
+    foreach my $proc (@all) {
+        gdb_detach( $proc->{gdb} );
+        gdb_quit( $proc->{gdb} );
     }
     return;
 }
