@@ -2588,48 +2588,31 @@ sub open_get_data {
 
     }
 
-    my $job;
-
     my @out = slurp_cmd('ompi-ps');
-
-    # Handle being called multiple times, zero the hash every
-    # time we are called.  Of course we could just return the
-    # existing hash which might be quicker.
-    %open_jobs = ();
 
     foreach my $l (@out) {
         chomp $l;
         next if ( $l eq "" );
 
-        if ( $l =~ /Information from mpirun \[(\d+)\,0\]/ ) {
+        my @elems = split qr{\s*\|\s*}, $l;
 
-            $job = $1;
-        } else {
-            my @elems = split( /\|/, $l );
-
-            if ( $#elems == 4 ) {
-                my $nprocs = $elems[3];
-                $nprocs =~ s/ //g;
-                $open_jobs{$job}{nprocs} = $nprocs;
-            } elsif ( $#elems == 6 ) {
-
+        if ( $#elems == 3 ) {
+            my $nprocs = $elems[3];
+            my $name   = $elems[0];
+            if ( $name =~ m{\A\[(\d+)\,\d+]\z}x ) {
+                $open_jobs{$1}{nprocs} = $nprocs;
+            }
+        } elsif ( $#elems == 5 ) {
+            my $name = $elems[1];
+            if ( $name =~ m{\A\[\[(\d+)\,\d+\]\,(\d+)\]}x ) {
+                my $job  = $1;
+                my $rank = $2;
+                my $pid  = $elems[3];
                 my $host = $elems[4];
-                $host =~ s/ //g;
-                $host =~ s/\t//g;
-                next if $host eq 'Node';
                 $open_jobs{$job}{hosts}{$host}++;
-
-                my $name = $elems[1];
-                $name =~ /\[\[(\d+)\,(\d+)\]\,(\d+)\]/;
-                my $rank = $3;
-
-                my $pid = $elems[3];
-                $rank =~ s/ //g;
-                $pid  =~ s/ //g;
                 $open_jobs{$job}{ranks}{$host}{$rank} = $pid;
             }
         }
-
     }
     return;
 }
@@ -3044,11 +3027,6 @@ sub tree_from_namespace {
 sub show_mpi_watch {
     my ( $handle, $lines ) = @_;
 
-    if ( not defined $lines->{target_data}{found} ) {
-        printf("No processes!\n");
-        exit 0;
-    }
-
     my @all = array_from_target_namespace( $lines->{target_data}{state} );
 
     my $o = "";
@@ -3193,30 +3171,12 @@ sub show_results_from_file {
 sub process_line {
     my ( $line, $lines ) = @_;
 
-    if ( $line =~ / *([a-zA-Z]*)\.?([-\d]+):([^\n]+)\n/ ) {
-        if ( not $1 ) {
-            my $key   = $2;
-            my $value = $3;
-            if ( $value =~ /raw\:([A-Za-z0-9\+\/\=]*)/ ) {
-                push @{ $lines->{base64}{$key} }, $1;
-            } else {
-                push @{ $lines->{lines}{$key} }, $value;
-            }
-        } else {
-            print "debug $1.$2: $3\n";
-        }
+    if ( $line =~ m{\A(\d+):(.*)\n}x ) {
+        my $tag   = $1;
+        my $value = $2;
+        push @{ $lines->{lines}{$tag} }, $value;
     } else {
         print "malformed line: $line";
-    }
-    return;
-}
-
-sub post_process_lines {
-    my $lines = shift;
-    return unless exists $lines->{base64};
-    foreach my $tag ( keys %{ $lines->{base64} } ) {
-        $lines->{raw}{$tag} =
-          thaw( decode_base64( join( "\n", @{ $lines->{base64}{$tag} } ) ) );
     }
     return;
 }
@@ -3388,7 +3348,6 @@ sub load_and_display_from_file {
     foreach my $line (@data) {
         process_line( $line, \%lines );
     }
-    post_process_lines( \%lines );
     show_results_from_file( \%lines, $mode );
     return;
 }
@@ -3464,19 +3423,19 @@ sub extract_line {
 }
 
 # A simple "ladder" or 1-wide tree
-sub generate_comm_tree_ladder {
-    my ($a)  = @_;
-    my @b    = @{$a};
-    my $last = 'root';
-    my %comm_tree;
-    foreach my $c (@b) {
-        $comm_tree{$c}{parent} = $last;
-        push @{ $comm_tree{$last}{children} }, $c;
-        $last = $c;
-    }
-
-    return \%comm_tree;
-}
+#sub generate_comm_tree_ladder {
+#    my ($a)  = @_;
+#    my @b    = @{$a};
+#    my $last = 'root';
+#    my %comm_tree;
+#    foreach my $c (@b) {
+#        $comm_tree{$c}{parent} = $last;
+#        push @{ $comm_tree{$last}{children} }, $c;
+#        $last = $c;
+#    }
+#
+#    return \%comm_tree;
+#}
 
 # Fairly simple this, walk through the hosts keeping a list
 # of joints (Those able to accept children this iteration) and
@@ -3484,8 +3443,7 @@ sub generate_comm_tree_ladder {
 # loop until there are no more hosts left to add.
 sub generate_binary_tree {
     my ( $a, $width ) = @_;
-    my @b    = @{$a};
-    my $last = 'root';
+    my @b = @{$a};
     my %comm_tree;
 
     my @leaves;
@@ -3992,9 +3950,9 @@ sub rng_convert_from_user {
 
     my $newrange;
 
-    if ( $range =~ m/^\[([\d\-\,]+)\]$/ ) {
+    if ( $range =~ m{\A\[([\d\-\,]+)\]\z}x ) {
         $newrange = $1;
-    } elsif ( $range =~ m/^(\d+)$/ ) {
+    } elsif ( $range =~ m{\A(\d+)\z}x ) {
         $newrange = $1;
     } else {
         confess("Failed to recognise $range as range\n");
@@ -4006,10 +3964,10 @@ sub rng_convert_from_user {
 
     foreach my $part (@user_parts) {
         my %part;
-        if ( $part =~ m/^(\d+)$/ ) {
+        if ( $part =~ m{\A(\d+)\z}x ) {
             $part{l} = $1;
             $part{u} = $1;
-        } elsif ( $part =~ m/^(\d+)\-(\d+)$/ ) {
+        } elsif ( $part =~ m{\A(\d+)-(\d+)\z}x ) {
             $part{l} = $1;
             $part{u} = $2;
         } else {
@@ -4306,7 +4264,7 @@ sub find_padb_secret {
     if ( $#l != 0 ) {
         return;
     }
-    if ( $l[0] =~ /^secret=(\w+)$/ ) {
+    if ( $l[0] =~ m{\Asecret=(\w+)\Z}x ) {
         return $1;
     }
 }
@@ -4421,10 +4379,19 @@ sub config_from_file {
     print "Loading config from \"$file\"\n" if ( $conf{verbose} );
 
     foreach my $line ( slurp_file($file) ) {
-        if ( $line =~ /^([\w-]+)\s*\=\s*(.*)/ ) {
+        if (
+            $line =~ m{\A       # Beginning of line.
+                        ([\w-]+) # Key.
+                        \s*\=\s* # Assignment.
+                        (\S+)    # Value.
+                        \s*      # Optional whitespace
+                        \Z}x
+          )
+        {
+
             my $key   = $1;
             my $value = $2;
-            $key =~ s/\-/\_/g;
+            $key =~ s{-}{_}gx;
             config_set( $key, $value );
         }
     }
@@ -4436,7 +4403,6 @@ sub config_from_env {
     print "Loading config from environment\n" if ( $conf{verbose} );
 
     foreach my $key ( keys %conf ) {
-        $key =~ s/\-/\_/g;
         my $name = 'PADB_' . uc($key);
         if ( defined $ENV{$name} ) {
             config_set( $key, $ENV{$name} );
@@ -4444,7 +4410,6 @@ sub config_from_env {
     }
 
     foreach my $key ( keys %{ $conf{mode_options_reverse} } ) {
-        $key =~ s/\-/\_/g;
         my $name = 'PADB_' . uc($key);
         if ( defined $ENV{$name} ) {
             config_set( $key, $ENV{$name} );
@@ -4468,7 +4433,7 @@ sub config_help {
     foreach my $key ( sort keys %conf ) {
         next if ( ref( $conf{$key} ) eq 'HASH' );
         my $name = $key;
-        $name =~ s/\_/\-/g;
+        $name =~ s{_}{-}gx;
         if ( defined $conf{$key} ) {
             printf " %$max_len" . "s = '$conf{$key}'\n", $name;
         } else {
@@ -4480,7 +4445,7 @@ sub config_help {
         print "\nOptions for mode '$allfns{$mode}{arg_long}'\n";
         foreach my $key ( sort keys %{ $conf{mode_options}{$mode} } ) {
             my $name = $key;
-            $name =~ s/\_/\-/g;
+            $name =~ s{_}{-}gx;
             if ( defined $conf{mode_options}{$mode}{$key} ) {
                 printf
                   " %$max_len" . "s = '$conf{mode_options}{$mode}{$key}'\n",
@@ -4527,7 +4492,7 @@ sub outer_main {
 
         my $name = $key;
 
-        $key =~ s/\-/\_/g;
+        $key =~ s{-}{_}gx;
 
         if (    not exists $conf{$key}
             and not exists $conf{mode_options_reverse}{$key} )
@@ -4933,16 +4898,12 @@ sub strip_soft {
     return $1;
 }
 
-sub strip_quotes {
-    my $str = shift;
-    $str =~ /^\"(.*)\"$/;    #"
-    return $1;
-}
-
 sub strip_leading_comma {
-    my $str = shift;
-    $str =~ /^,(.*)$/;
-    return $1;
+    my ($str) = @_;
+    if ( $str =~ m{\A,(.*)\z}x ) {
+        return $1;
+    }
+    return $str;
 }
 
 sub strip_first_quotes {
@@ -4960,7 +4921,7 @@ sub strip_first_quotes {
 
 # Has to return key (str) value (complex) extra(string)
 sub extract_value_square {
-    my $str = shift;
+    my ($str) = @_;
 
     my $value  = "";
     my $rem    = $str;
@@ -5011,9 +4972,19 @@ sub extract_value_soft {
     return;
 }
 
-sub new_parse {
-    my $str      = shift;
-    my $collapse = shift;
+# XXX: This function needs looking at.
+sub gdb_new_parse {
+    my ( $str, $collapse ) = @_;
+
+    #printf("Parsing $collapse $str\n");
+    my ( $a, $b, $c ) = _gdb_new_parse( $str, $collapse );
+
+    #printf("Returning $a $b $b\n");
+    return ( $a, $b, $c );
+}
+
+sub _gdb_new_parse {
+    my ( $str, $collapse ) = @_;
 
     my %res;
     my $key;
@@ -5039,7 +5010,7 @@ sub new_parse {
 
         my @b;
         while ( $l ne "" ) {
-            my ( $kk, $vv, $c ) = new_parse( $l, $collapse );
+            my ( $kk, $vv, $c ) = _gdb_new_parse( $l, $collapse );
 
             # Assert that $c is empty?
             $l = "";
@@ -5064,7 +5035,7 @@ sub new_parse {
 
         my @all;
         while ( $l ne "" ) {
-            my ( $kk, $vv, $c ) = new_parse( $l, $collapse );
+            my ( $kk, $vv, $c ) = _gdb_new_parse( $l, $collapse );
 
             $l = "";
             if ( $c ne "" ) {
@@ -5095,13 +5066,12 @@ sub new_parse {
 }
 
 sub gdb_parse_reason {
-    my $str      = shift;
-    my $collapse = shift;
+    my ( $str, $collapse ) = @_;
 
     my $leftover = $str;
     my %res;
     while ( $leftover ne "" ) {
-        my ( $key, $value, $l ) = new_parse( $leftover, $collapse );
+        my ( $key, $value, $l ) = gdb_new_parse( $leftover, $collapse );
         $leftover = "";
         if ( $l ne "" ) {
             $leftover = strip_leading_comma($l);
@@ -5113,59 +5083,58 @@ sub gdb_parse_reason {
 #########################################################################
 
 sub gdb_n_next_result {
-    my ($gdb) = shift;
+    my ($gdb) = @_;
     my $handle = $gdb->{rdr};
 
     my %res;
 
     while (<$handle>) {
+
+        #printf("Line $_\n");
         return %res if /^\(gdb\)/;
-        if (/\~\"(.*)\"\n/) {    #"
-            $res{raw} .= $1;
-        }
-        if (/\&\"(.*)\"\n/) {    #"
-            $res{debug} .= $1;
-        }
-        if (/^\^(done|error),?(.*)$/) {
+
+        #if (/\~\"(.*)\"\n/) {    #"
+        #    $res{raw} .= $1;
+        #}
+        #if (/\&\"(.*)\"\n/) {    #"
+        #    $res{debug} .= $1;
+        #}
+        if (m{\A\^(done|error),?(.*)\Z}x) {
             $res{status} = $1;
             if ( defined $2 and $2 ne "" ) {
                 $res{reason} = $2;
+            }
 
-                # $current_parsed = $2;
-            }
-            if ( defined $res{raw} ) {
-                $res{raw} =~ s/\\n/\n/g;
-                chomp $res{raw};
-            }
-            if ( defined $res{debug} ) {
-                $res{debug} =~ s/\\n/\n/g;
-                chomp $res{debug};
-            }
+            #if ( defined $res{raw} ) {
+            #    $res{raw} =~ s/\\n/\n/g;
+            #    chomp $res{raw};
+            #}
+            #if ( defined $res{debug} ) {
+            #    $res{debug} =~ s/\\n/\n/g;
+            #    chomp $res{debug};
+            #}
             return %res;
         }
     }
-    if ( defined $res{raw} ) {
-        $res{raw} =~ s/\\n/\n/g;
-        chomp $res{raw};
-    }
-    if ( defined $res{debug} ) {
-        $res{debug} =~ s/\\n/\n/g;
-        chomp $res{debug};
-    }
+
+    #if ( defined $res{raw} ) {
+    #    $res{raw} =~ s/\\n/\n/g;
+    #    chomp $res{raw};
+    #}
+    #if ( defined $res{debug} ) {
+    #    $res{debug} =~ s/\\n/\n/g;
+    #    chomp $res{debug};
+    #}
 
     return %res;
 }
 
 sub gdb_strip_value {
-    my $str = shift;
-    $str =~ /value=\"(.+)\"$/;    #"
-    return $1;
-}
-
-sub gdb_strip_quotes {
-    my $str = shift;
-    $str =~ /^\"(.*)\"$/;         #"
-    return $1;
+    my ($str) = @_;
+    if ( $str =~ m{\Avalue="([^"]+)"\z}x ) {
+        return $1;
+    }
+    return;
 }
 
 sub gdb_type_size {
@@ -5197,8 +5166,7 @@ sub gdb_var_addr {
     my ( $gdb, $var ) = @_;
     my %p = gdb_n_send( $gdb, "-data-evaluate-expression &$var" );
     return unless ( $p{status} eq 'done' );
-    $p{reason} =~ /value=\"(.+)\"$/;    #"
-    return $1;
+    return gdb_strip_value( $p{reason} );
 }
 
 sub gdb_read_raw {
@@ -5235,14 +5203,11 @@ sub gdb_string {
     return $str;
 }
 
-sub handle_query {
+sub minfo_handle_query {
     my ( $gdb, $vp, $query, $stats ) = @_;
 
     # Shouldn't this be?
-    # my (undef,$cmd,@params) = split $SPACE, $query ;
-    my @params = split $SPACE, $query;
-    my $b      = shift @params;
-    my $cmd    = shift @params;
+    my ( undef, $cmd, @params ) = split $SPACE, $query;
     my $res;
     return 'fail' unless defined $cmd;
     if ( $cmd eq 'size' ) {
@@ -5289,7 +5254,7 @@ sub handle_query {
     return 'fail';
 }
 
-sub launch_h {
+sub run_minfo {
     my ( $gdb, $vp ) = @_;
 
     my $h = {
@@ -5315,8 +5280,8 @@ sub launch_h {
     while (<$handle>) {
         my $r = $_;
         chomp $r;
-        if ( $r =~ /^req:/ ) {
-            my $res = handle_query( $gdb, $vp, $r, \%stats );
+        if ( $r =~ m{\Areq:}x ) {
+            my $res = minfo_handle_query( $gdb, $vp, $r, \%stats );
             if ( defined $res ) {
                 print {$out} "$res\n";
             }
@@ -5396,7 +5361,7 @@ sub fetch_mpi_queue {
         }
     }
 
-    my @mq = launch_h( $g, $vp );
+    my @mq = run_minfo( $g, $vp );
     gdb_detach($g);
     gdb_quit($g);
     return @mq;
@@ -5421,7 +5386,7 @@ sub fetch_mpi_queue_gdb {
         }
     }
 
-    my @mq = launch_h( $g, $vp );
+    my @mq = run_minfo( $g, $vp );
     return @mq;
 }
 
@@ -5774,9 +5739,9 @@ sub gdb_dump_frames {
 
             my %s = gdb_n_send( $gdb, '-stack-list-locals --simple-values' );
             if ( $s{status} eq 'done' ) {
-                my $args = gdb_parse_reason( $s{reason}, 'name' );
-                if ( defined $args->{locals} ) {
-                    $frame->{locals} = $args->{locals};
+                my $flocals = gdb_parse_reason( $s{reason}, 'name' );
+                if ( defined $flocals->{locals} ) {
+                    $frame->{locals} = $flocals->{locals};
                     gdb_expand_vars( $gdb, $frame, 'locals' );
                 }
             }
@@ -5814,36 +5779,7 @@ sub gdb_dump_frames_per_thread {
     return @th;
 }
 
-# I'm not sure what this is trying to do.
-# sub gdb_try_args {
-#    my ( $gdb, @frames ) = @_;
-#    my %result = gdb_n_send( $gdb, "-stack-list-arguments 0" );
-#
-#    my $result = $result{reason};
-#
-#    my ($stack) = ( $result =~ /stack=\[(.+)\]/ );
-#    for ( ( $stack =~ /frame=\{([^\}]+)\}/g ) ) {
-#        my %d = ();
-#        s/\"//g;    #"
-#        map { $d{ $$_[0] } = $$_[1] } map { [ split /=/ ] } split(/,/);
-#
-#        push( @frames, \%d );
-#    }
-#
-#    return @frames;
-#}
-
-sub gdb_next_result {
-    my ($gdb) = shift;
-    my $handle = $gdb->{rdr};
-
-    while (<$handle>) {
-        return "" if /^\(gdb\)/;
-        return $_ if /^\^(done|error)/;
-    }
-    return "";
-}
-
+# I've not run this function for a while, it would probably benefit form re-writing from scratch.
 sub stack_from_core {
     my $exe  = shift;
     my $core = shift;
@@ -6028,9 +5964,9 @@ sub show_task_file {
         if ( defined $prefix ) {
             proc_output( $vp, $prefix, $l );
         } else {
-            my ( $key, $value ) = split( ":", $l );
-            $value =~ s/^[ \t]+//g;
-            proc_output( $vp, $key, $value );
+            if ( $l =~ m{\A(\w+):\s*(.+)}x ) {
+                proc_output( $vp, $1, $2 );
+            }
         }
     }
     return;
@@ -6115,12 +6051,10 @@ sub show_task_dir {
             # if requested by -O proc-shows-fds=full
             if ( $carg->{proc_shows_fds} eq 'full' ) {
                 if ( -f "$dir/fdinfo/$fd" ) {
-                    my @fdi = slurp_file("$dir/fdinfo/$fd");
-                    foreach my $fdi (@fdi) {
-                        chomp $fdi;
-                        my ( $key, $value ) = split( ":", $fdi );
-                        $value =~ s/\t//g;
-                        $fdhash{$key} = $value;
+                    foreach my $fdi ( slurp_file("$dir/fdinfo/$fd") ) {
+                        if ( $fdi =~ m{\A(\w+):\s*(\d+)\Z}x ) {
+                            $fdhash{$1} = $2;
+                        }
                     }
                 }
             }
@@ -6283,7 +6217,7 @@ sub show_proc_all {
 
         my $cpucount = 0;
         while (<$SFD>) {
-            if ( $_ =~ /^cpu\d/ ) {
+            if ( $_ =~ m{\Acpu\d}x ) {
                 $cpucount++;
             }
         }
@@ -6365,12 +6299,12 @@ sub show_stack_vars {
         $l{t} = length( $arg->{type} ) if ( length( $arg->{type} ) > $l{t} );
         $l{n} = length( $arg->{name} ) if ( length( $arg->{name} ) > $l{n} );
     }
-    my $header = sprintf "  $type:";
+    my $header = "  $type:";
     output( $vp, $header );
     foreach my $arg ( @{ $frame->{$type} } ) {
         my $value = ( defined $arg->{value} ? $arg->{value} : '??' );
-        my $output = sprintf "  %-$l{t}s %$l{n}s = $value", $arg->{type},
-          $arg->{name};
+        my $output = sprintf "    %-$l{t}s %$l{n}s = %s", $arg->{type},
+          $arg->{name}, $value;
         output( $vp, $output );
     }
     return;
@@ -6400,11 +6334,15 @@ sub stack_trace_from_pids {
     my %below;
 
     if ( $carg->{strip_above_wait} ) {
-        map { $above{$_} = 1 } split $COMMA, $carg->{stack_strip_above};
+        foreach ( split $COMMA, $carg->{stack_strip_above} ) {
+            $above{$_} = 1;
+        }
     }
 
     if ( $carg->{strip_below_main} ) {
-        map { $below{$_} = 1 } split $COMMA, $carg->{stack_strip_below};
+        foreach ( split $COMMA, $carg->{stack_strip_below} ) {
+            $below{$_} = 1;
+        }
     }
 
     foreach my $proc ( @{$list} ) {
@@ -6576,8 +6514,11 @@ sub show_queue {
         $ENV{LD_LIBRARY_PATH} = "$remote_env{LD_LIBRARY_PATH}:$confInner{myld}";
     }
 
-    my $lines = run_ptrack_cmd( $vp, $pid,
-        "$confInner{edb} --queues --pid=$pid $confInner{edbopt}" );
+    my $cmd = "$confInner{edb} --queues --pid=$pid";
+    if ( defined $confInner{edbopt} ) {
+        $cmd .= " $confInner{edbopt}";
+    }
+    my $lines = run_ptrack_cmd( $vp, $pid, "cmd" );
 
     return if ( $lines != 0 );
 
@@ -6709,7 +6650,8 @@ sub mpi_watch_all {
             next;
         }
 
-        target_key_pair( $vp, "found", '1' );
+        # Convert the string we get from find_from_status into a single letter.
+        $m = substr $m, 0, 1;
 
         if ( $m eq 'R' ) {
             $m = ',';
@@ -6821,12 +6763,11 @@ sub maybe_show_pid {
 }
 
 sub find_from_status {
-    my $pid = shift;
-    my $key = shift;
+    my ( $pid, $key ) = @_;
 
     foreach my $l ( slurp_file("/proc/$pid/status") ) {
-        if ( $l =~ /$key:\t+(\w+)/ ) {
-            return $1;
+        if ( $l =~ m{\A(\w+):\s*(.+)}x ) {
+            if ( $1 eq $key ) { return $2; }
         }
     }
     return;
@@ -7338,7 +7279,7 @@ sub command_from_parent {
             1;
         } or do {
             my $error = $@;
-            my @e = split qr{\n}, $error;
+            my @e = split qr{\n}x, $error;
             $netdata->{host_responce} = "error";
             foreach my $proc ( @{$pid_list} ) {
                 target_error( $proc->{vp}, "Critical error: ($e[0])" );
@@ -7357,7 +7298,7 @@ sub command_from_parent {
                 1;
             } or do {
                 my $error = $@;
-                my @e = split qr{\n}, $error;
+                my @e = split qr{\n}x, $error;
                 $netdata->{host_responce} = "error";
                 target_error( $vp, "Critical error: ($e[0])" );
               }
@@ -7475,7 +7416,7 @@ sub inner_loop_for_comms {
             Proto    => 'tcp',
         ) or confess('Failed to connect to outer');
         my $sec = find_padb_secret();
-        die 'No secret' if not defined $sec;
+        croak 'No secret' if not defined $sec;
         $os->print("Hello $sec $hostname $lport $key\n");
         $os->close();
     } else {
@@ -7611,7 +7552,7 @@ sub inner_main {
 sub to_arg {
     my $arg = shift;
     my $res = "$arg->{arg_long}";
-    $res =~ s/\_/-/g;
+    $res =~ s{_}{-}gx;
     if ( defined $arg->{arg_short} ) {
         $res .= "|$arg->{arg_short}";
     }
