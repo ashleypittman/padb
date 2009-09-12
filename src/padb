@@ -616,7 +616,7 @@ sub usage {
 #
 ###############################################################################
 
-my $user = getpwuid $<;
+my $target_user = getpwuid $<;
 my $rank_rng;
 
 my @target_groups;
@@ -637,9 +637,9 @@ my $core_name;
 my $exe_name;
 
 my $input_file;
-my $compress;
-my $compress_c;
-my $tree;
+my $output_compress;
+my $output_compress_long;
+my $output_tree;
 
 my @config_options;
 
@@ -733,16 +733,16 @@ sub parse_args_outer {
 
     my %optionhash = (
         'verbose|v+'          => \$conf{verbose},
-        'user|u=s'            => \$user,
+        'user|u=s'            => \$target_user,
         'rank|r=s'            => \@ranks,
         'group-id=s'          => \@target_groups,
         'help|h'              => \&usage,
         'all|a'               => \$all,
         'any|A'               => \$any,
         'version|V'           => \&show_version,
-        'compress|c'          => \$compress,
-        'compress-long|C'     => \$compress_c,
-        'tree|t'              => \$tree,
+        'compress|c'          => \$output_compress,
+        'compress-long|C'     => \$output_compress_long,
+        'tree|t'              => \$output_tree,
         'input-file|file|i=s' => \$input_file,
         'config-option|O=s'   => \@config_options,
         'full-report=s'       => \$full_report,
@@ -2783,6 +2783,7 @@ sub find_rmgr {
 # manager use that one, if there are zero or many exit with an
 # error.
 sub find_any_rmgr {
+    my ($user) = @_;
 
 # If it's been set on the command line and it's valid then just use what we are given.
 # Do sanity checks here but only warn on the result to cope with non-default installs.
@@ -2859,7 +2860,7 @@ sub get_all_jobids {
 }
 
 sub job_is_running {
-    my $job = shift;
+    my ( $job, $user ) = @_;
 
     if ( defined $rmgr{ $conf{rmgr} }{job_is_running} ) {
         return $rmgr{ $conf{rmgr} }{job_is_running}($job);
@@ -2867,7 +2868,7 @@ sub job_is_running {
 
     my @jobs = $rmgr{ $conf{rmgr} }{get_active_jobs}($user);
     my %j;
-    map { $j{$_}++ } @jobs;
+    map { $j{$_} = 1; } @jobs;
     return defined $j{$job};
 }
 
@@ -3145,9 +3146,9 @@ sub show_results_from_file {
     }
 
     my $of = 'raw';
-    $of = 'tree'       if $tree;
-    $of = 'compress'   if $compress;
-    $of = 'compress_c' if $compress_c;
+    $of = 'tree'       if $output_tree;
+    $of = 'compress'   if $output_compress;
+    $of = 'compress_c' if $output_compress_long;
 
     if ( $mode eq 'stack' ) {
         if (   $conf{mode_options}{stack}{strip_above_wait}
@@ -4230,7 +4231,7 @@ sub go_parallel {
 
     if ( $res != 0 ) {
         my %status = rc_status($res);
-        if ( job_is_running($jobid) ) {
+        if ( job_is_running( $jobid, $target_user ) ) {
             print
               "Bad exit code from parallel command (exit_code=$status{rc})\n";
         } else {
@@ -4460,6 +4461,8 @@ sub outer_main {
 
     my $mode = parse_args_outer();
 
+    my $user = $target_user;
+
     if ( getpwnam $user eq "" ) {
         print {*STDERR} "$prog: Error: no such user as '$user'\n";
         exit 1;
@@ -4568,7 +4571,7 @@ sub outer_main {
 
         find_rmgr();
 
-        if ( not job_is_running($full_report) ) {
+        if ( not job_is_running( $full_report, $user ) ) {
             print {*STDERR}
 "Job $full_report is not active, use --show-jobs to see active jobs\n";
             exit 1;
@@ -4627,7 +4630,7 @@ sub outer_main {
         );
     }
 
-    my $style_count = ( grep { $_ } ( $compress, $compress_c, $tree ) );
+    my $style_count = ( grep { $_ } ( $output_compress, $output_compress_long, $output_tree ) );
     if ( $style_count > 1 ) {
         cmdline_error(
 "$prog: Error: only specify one of --compress, --compress-long or --tree\n"
@@ -4653,7 +4656,7 @@ sub outer_main {
         }
     }
 
-    if ( $tree
+    if ( $output_tree
         and not( ( defined $mode and $mode eq 'stack' ) or $input_file ) )
     {
         cmdline_error("$prog: Error: --tree only works with --stack-trace\n");
@@ -4672,7 +4675,7 @@ sub outer_main {
 
     if ( $any or $all ) {
 
-        find_any_rmgr();
+        find_any_rmgr($user);
 
         @jobids = get_all_jobids($user);
         printf "Active jobs (%d) are @jobids\n", $#jobids + 1
@@ -4689,7 +4692,7 @@ sub outer_main {
         find_rmgr();
 
         foreach my $jobid (@ARGV) {
-            if ( job_is_running($jobid) ) {
+            if ( job_is_running( $jobid, $user ) ) {
                 push @jobids, $jobid;
             } else {
                 print {*STDERR} "Job $jobid is not active\n";
@@ -4708,9 +4711,9 @@ sub outer_main {
           if ( $conf{verbose} or ( $#jobids > 0 ) );
 
         my $of;
-        $of = 'tree'       if $tree;
-        $of = 'compress'   if $compress;
-        $of = 'compress_c' if $compress_c;
+        $of = 'tree'       if $output_tree;
+        $of = 'compress'   if $output_compress;
+        $of = 'compress_c' if $output_compress_long;
         push_command( $mode, $of, $conf{mode_options}{$mode} );
         go_job($jobid);
     }
