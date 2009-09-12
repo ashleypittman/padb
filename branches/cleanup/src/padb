@@ -430,6 +430,7 @@ my $configfile = '/etc/padb.conf';
 my $COMMA  = qr{,}x;
 my $EQUALS = qr{=}x;
 my $SPACE  = qr{\s+}x;
+my $COLON  = qr{:}x;
 
 sub check_and_convert_bool {
     my ($str) = @_;
@@ -2166,7 +2167,7 @@ sub show_tree {
 
 sub find_exe {
     my $name = shift;
-    foreach my $dir ( split( ":", $ENV{PATH} ) ) {
+    foreach my $dir ( split $COLON, $ENV{PATH} ) {
         return 1 if ( -x "$dir/$name" );
     }
     return 0;
@@ -2552,7 +2553,7 @@ sub mpd_setup_pcmd {
 }
 
 sub mpd_cleanup_pcmd {
-    unlink($mpd_dfile) if ( defined $mpd_dfile );
+    unlink $mpd_dfile if ( defined $mpd_dfile );
     return;
 }
 
@@ -2564,7 +2565,7 @@ sub mpd_cleanup_pcmd {
 
 sub find_ompi_prefix {
     my $name = "ompi-ps";
-    foreach my $dir ( split( ":", $ENV{PATH} ) ) {
+    foreach my $dir ( split $COLON, $ENV{PATH} ) {
         next unless ( -x "$dir/$name" );
         my @d = split( "/", $dir );
         pop @d;
@@ -2651,7 +2652,7 @@ sub open_setup_pcmd {
 }
 
 sub open_cleanup_pcmd {
-    unlink($open_dfile) if ( defined $open_dfile );
+    unlink $open_dfile if ( defined $open_dfile );
     return;
 }
 
@@ -3406,7 +3407,7 @@ sub extract_line {
     $str =~ s/\r//g;
 
     # Allow multi-line output here, making sure we process each line.
-    while ( $str =~ m{\A(.+)\Z}x ) {
+    while ( $str =~ m{\A(.+)\n}x ) {
         $sd->{line_cb}( $handle, $sd, $1 );
         my $len  = length $1;
         my $flen = length $str;
@@ -3687,7 +3688,7 @@ sub format_target_data {
     my $ret = "\n";
     foreach my $name ( sort keys %{$td} ) {
         $ret .= "Namespace: \"$name\"\n";
-        foreach my $value ( sort( keys %{ $td->{$name} } ) ) {
+        foreach my $value ( sort keys %{ $td->{$name} } ) {
             $ret .= "    $value\t";
             $ret .= rng_convert_to_user( $td->{$name}{$value} ) . "\n";
         }
@@ -5380,7 +5381,7 @@ sub run_minfo {
 # stopped so always deliver this signal before and after attaching.
 sub send_cont_signal {
     my $pid = shift;
-    kill( 'CONT', $pid );
+    kill 'CONT', $pid;
     return;
 }
 
@@ -6190,7 +6191,7 @@ sub pcpu_user {
     my @post = split $SPACE, $end;
     my $jused = $post[13] - $pre[13];
     my $used  = ( $jused / $elapsed ) * $cpucount * 100;
-    return sprintf "%d", $used;
+    return sprintf '%d', $used;
 }
 
 sub pcpu_sys {
@@ -6199,7 +6200,7 @@ sub pcpu_sys {
     my @post = split $SPACE, $end;
     my $jused = $post[14] - $pre[14];
     my $used  = ( $jused / $elapsed ) * $cpucount * 100;
-    return sprintf "%d", $used;
+    return sprintf '%d', $used;
 }
 
 sub pcpu_total {
@@ -6208,7 +6209,7 @@ sub pcpu_total {
     my @post = split $SPACE, $end;
     my $jused = $post[13] - $pre[13] + $post[14] - $pre[14];
     my $used  = ( $jused / $elapsed ) * $cpucount * 100;
-    return sprintf "%d", $used;
+    return sprintf '%d', $used;
 }
 
 my %proc_keys;
@@ -6574,7 +6575,7 @@ sub stack_trace_from_pids {
 sub kill_proc {
     my ( $cargs, $vp, $pid ) = @_;
     my $signal = uc $cargs->{signal};
-    kill( $signal, $pid );
+    kill $signal, $pid;
     return;
 }
 
@@ -6599,7 +6600,7 @@ sub show_queue {
     if ( defined $confInner{edbopt} ) {
         $cmd .= " $confInner{edbopt}";
     }
-    my $lines = run_ptrack_cmd( $vp, $pid, "cmd" );
+    my $lines = run_ptrack_cmd( $vp, $pid, $cmd );
 
     return if ( $lines != 0 );
 
@@ -6625,7 +6626,7 @@ sub show_full_stacks {
         show_full_stack( $proc->{vp}, $proc->{pid}, $file );
     }
 
-    unlink($file);
+    unlink $file;
     return;
 }
 
@@ -6726,7 +6727,7 @@ sub mpi_watch_all {
         # otherwise we'll just see it as "T" (Stopped).
         my $m = find_from_status( $pid, 'State' );
         if ( not defined $m ) {
-            target_error( $vp, "No such process" );
+            target_error( $vp, 'No such process' );
             target_key_pair( $vp, 'state', '*' );
             next;
         }
@@ -7252,7 +7253,7 @@ sub inner_find_pids {
 sub command_from_parent {
     my ( $netdata, $cmd ) = @_;
 
-    $netdata->{host_responce} = "ok";
+    $netdata->{host_responce} = 'ok';
 
     if ( $cmd->{mode} eq 'signon' ) {
         $netdata->{signon_cmd} = my_encode($cmd);
@@ -7361,7 +7362,7 @@ sub command_from_parent {
         } or do {
             my $error = $@;
             my @e = split qr{\n}x, $error;
-            $netdata->{host_responce} = "error";
+            $netdata->{host_responce} = 'error';
             foreach my $proc ( @{$pid_list} ) {
                 target_error( $proc->{vp}, "Critical error: ($e[0])" );
             }
@@ -7380,7 +7381,7 @@ sub command_from_parent {
             } or do {
                 my $error = $@;
                 my @e = split qr{\n}x, $error;
-                $netdata->{host_responce} = "error";
+                $netdata->{host_responce} = 'error';
                 target_error( $vp, "Critical error: ($e[0])" );
               }
         }
@@ -7490,7 +7491,7 @@ sub inner_loop_for_comms {
     my $key      = rand;
 
     if ( defined $outerloc ) {
-        my ( $ohost, $oport ) = split( ":", $outerloc );
+        my ( $ohost, $oport ) = split $COLON, $outerloc;
         my $os = IO::Socket::INET->new(
             PeerAddr => $ohost,
             PeerPort => $oport,
