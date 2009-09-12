@@ -2675,7 +2675,7 @@ sub lsf_get_jobs {
 
     my @out = slurp_cmd("bjobs -r -u $user");
     foreach my $l (@out) {
-        my ( $job, $user, $stat, $queue, $from, $exec, $name, $time ) =
+        my ( $job, $juser, $stat, $queue, $from, $exec, $name, $time ) =
           split $SPACE, $l;
         next if ( $job eq 'JOBID' );
         next unless ( defined $time );
@@ -3406,7 +3406,7 @@ sub extract_line {
     $str =~ s/\r//g;
 
     # Allow multi-line output here, making sure we process each line.
-    while ( $str =~ /^([^\n]+)\n/ ) {
+    while ( $str =~ m{\A(.+)\Z}x ) {
         $sd->{line_cb}( $handle, $sd, $1 );
         my $len  = length($1);
         my $flen = length($str);
@@ -5542,7 +5542,35 @@ sub show_mpi_queue_for_deadlock_all {
     return $ret;
 }
 
-sub go_deadlock_detect {
+sub mpi_go_deadlock_detect_helper {
+    my $str        = shift;    # tagged onto the end of the line.
+    my $possessive = shift;    # syntax to use (possessive/attributive)
+    my $size       = shift;    # size of the group
+    my @identical  = (@_);     # member list
+    my $ret;
+    my $sstr = defined $size ? " (size $size)" : "";
+
+    my $members = 'members';
+    my $are     = 'are';
+    my $have    = 'have';
+
+    if ( $#identical == 0 ) {
+        $members = 'member';
+        $are     = 'is';
+        $have    = 'has';
+    }
+
+    if ($possessive) {
+        $are = $have;
+    }
+
+    $ret .= sprintf "Group $members %s$sstr $are $str.\n",
+      rng_convert_to_user( rng_create_from_array(@identical) );
+
+    return $ret;
+}
+
+sub mpi_go_deadlock_detect {
     my ( $carg, $cd ) = @_;
 
     my %ad;
@@ -5634,13 +5662,13 @@ sub go_deadlock_detect {
                 }
                 foreach my $number ( sort keys %active ) {
                     $ret .= $gstr
-                      . group_status_helper( "in call $number to $s",
+                      . mpi_go_deadlock_detect_helper( "in call $number to $s",
                         0, $ad{$gid}{size}, @{ $active{$number} } );
                     $gstr = "";
 
                 }
                 foreach my $number ( sort keys %inactive ) {
-                    $ret .= group_status_helper( "completed call $number to $s",
+                    $ret .= mpi_go_deadlock_detect_helper( "completed call $number to $s",
                         1, $ad{$gid}{size}, @{ $inactive{$number} } );
                 }
             }
@@ -5659,7 +5687,7 @@ sub go_deadlock_detect {
             }
             if ( $#inactive != -1 ) {
                 $ret .= $gstr
-                  . group_status_helper( 'not in a call to the collectives',
+                  . mpi_go_deadlock_detect_helper( 'not in a call to the collectives',
                     0, $ad{$gid}{size}, @inactive );
                 $gstr = "";
             }
@@ -5679,7 +5707,7 @@ sub go_deadlock_detect {
     return $ret;
 }
 
-sub deadlock_detect {
+sub mpi_deadlock_detect {
     my ( $carg, $lines ) = @_;
     my $data;
 
@@ -5719,7 +5747,7 @@ sub deadlock_detect {
         $coll_data{$rank} = \%lid;
     }
 
-    my $r = go_deadlock_detect( $carg, \%coll_data );
+    my $r = mpi_go_deadlock_detect( $carg, \%coll_data );
     print $r;
     return;
 }
@@ -7672,7 +7700,7 @@ sub common_main {
         arg_long    => 'deadlock',
         arg_short   => 'j',
         help        => 'Run deadlock detection algorithm',
-        out_handler => \&deadlock_detect,
+        out_handler => \&mpi_deadlock_detect,
         options_i   => {
             mpi_dll            => undef,
             show_group_members => 0,
