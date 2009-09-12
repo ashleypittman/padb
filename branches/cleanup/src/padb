@@ -2980,7 +2980,7 @@ EOF
     my $l = '0';
     for ( my $i = 1 ; $i < $nprocs ; $i++ ) {
         if ( $i % 10 == 0 ) {
-            $l .= substr( $i, 0, 1 );
+            $l .= substr $i, 0, 1;
         } elsif ( $i % 5 == 0 ) {
             $l .= '5';
         } else {
@@ -3410,7 +3410,7 @@ sub extract_line {
         my $len  = length($1);
         my $flen = length($str);
         if ( ( $len + 1 ) != $flen ) {
-            $str = substr( $str, $len + 1, $flen - $len );
+            $str = substr $str, $len + 1, $flen - $len;
         } else {
             $str = "";
 
@@ -4296,8 +4296,6 @@ sub go_job {
     # involve setting environment variables.
     my ( $cmd, $ncpus, $hosts ) = setup_pcmd($jobid);
 
-    return 1 unless ($cmd);
-
     $conf{verbose} && defined $ncpus && print "Job has $ncpus process(es)\n";
     $conf{verbose} && defined $hosts && print "Job spans $hosts host(s)\n";
 
@@ -4809,7 +4807,7 @@ sub gdb_start {
 
 sub gdb_quit {
     my ($gdb) = @_;
-    my $result = gdb_send( $gdb, 'quit' );
+    gdb_send( $gdb, 'quit' );
     waitpid( $gdb->{gdbpid}, 0 );
     foreach my $fdname (qw(rdr wtr err)) {
         next unless exists $gdb->{$fdname};
@@ -4888,196 +4886,249 @@ sub gdb_send {
 
 sub strip_square {
     my $str = shift;
-    $str =~ /^\[(.*)\]$/;
-    return $1;
-}
-
-sub strip_soft {
-    my $str = shift;
-    $str =~ /^\{(.*)\}$/;
-    return $1;
-}
-
-sub strip_leading_comma {
-    my ($str) = @_;
-    if ( $str =~ m{\A,(.*)\z}x ) {
+    if ( $str =~ m{\A\[(.*)\]\z}x ) {
         return $1;
     }
-    return $str;
+    croak "Cannot strip square braces from $str";
 }
 
-sub strip_first_quotes {
-    my $str = shift;
-    $str =~ s/\\\"/REALLYBAD/g;      #"
-    $str =~ /^\"([^\"]*)\"(.*)$/;    #"
-    my $val      = $1;
-    my $leftover = $2;
-
-    $val      =~ s/REALLYBAD/\"/g;      #"
-    $leftover =~ s/REALLYBAD/\\\"/g;    #"
-    return ( $val, $leftover );
-
+sub gdb_strip_braces {
+    my ($str) = @_;
+    if ( $str =~ m{\A{(.*)}\z}x ) {
+        return $1;
+    }
+    croak "Cannot strip curly braces from $str";
 }
 
-# Has to return key (str) value (complex) extra(string)
-sub extract_value_square {
+sub gdb_strip_first_quotes {
+    my ($str) = @_;
+    my $a;
+    my $b;
+
+    # This is in part stolen from the "match a double-quoted string" section of
+    # http://perldoc.perl.org/perlre.html
+    if (
+        $str =~ m{\A                   # Start of str.
+                   "                    # Quote
+                   ((?:[^"\\]++|\\.)*+) # Anyting which isn't \"
+                   "                    # Close quote
+                   ,?                   # An optional comma.
+                   (.*)                 # Rest of line
+                   \z                   # end.
+                   }xms
+      )
+    {
+        $a = $1;
+        $a =~ s{\\\\}{\\}xg;
+        $a =~ s{\\"}{"}xg;
+        $b = $2;
+        if ( not defined $b or $b eq "" ) {
+            return $a;
+        } else {
+            return ( $a, $b );
+        }
+
+    } else {
+        croak("Failed to strip quotes from $str");
+    }
+    return;
+}
+
+# Has to return key (str) value (string) extra(string)
+sub gdb_extract_value_square {
     my ($str) = @_;
 
     my $value  = "";
     my $rem    = $str;
     my $indent = 0;
 
-    while ( $rem =~ /^([^\[\]]*)([\[\]])(.*)$/ ) {
-        if ( $2 eq "[" ) {
+    # Walk through the string matching [ and ] until the number
+    # of ] matches the number of [.
+    while (
+        $rem =~ m{\A          # Start of line.
+                  ([^\[\]]*)  # Not a square brace.
+                  ([\[\]])    # A Square brace.
+                  ,?          # An optional comma
+                  (.*)        # The rest of the line.
+                  \z          # End of line.
+                 }x
+      )
+    {
+        my $br = $2;
+        $rem = $3;
+        $value .= $1 . $br;
+        if ( $br eq "[" ) {
             $indent++;
-            $value = "$value$1\[";
-            $rem   = $3;
         } else {
             $indent--;
-            $value = "$value$1\]";
-            $rem   = $3;
             if ( $indent == 0 ) {
-                return ( strip_square($value), $rem );
+                if ( $rem eq "" ) {
+                    return ( strip_square($value) );
+                } else {
+                    return ( strip_square($value), $rem );
+                }
             }
         }
 
     }
-    croak("Failed to parse $str");
+    croak("Failed to extrace square braces from $str");
     return;
 }
 
-sub extract_value_soft {
+sub gdb_extract_value_braces {
     my $str = shift;
 
     my $value  = "";
     my $rem    = $str;
     my $indent = 0;
 
-    while ( $rem =~ /^([^\{\}]*)([\{\}])(.*)$/ ) {
-        if ( $2 eq "{" ) {
+    while (
+        $rem =~ m{
+                      \A
+                      ([^\{\}]*)
+                      ([\{\}])
+                      ,?
+                      (.*)
+                      \z
+                     }x
+      )
+    {
+        my $br = $2;
+        $value .= $1 . $br;
+        $rem = $3;
+        if ( $br eq "{" ) {
             $indent++;
-            $value = "$value$1\{";
-            $rem   = $3;
         } else {
             $indent--;
-            $value = "$value$1\}";
-            $rem   = $3;
             if ( $indent == 0 ) {
-                return ( strip_soft($value), $rem );
+                if ( $rem eq "" ) {
+                    return ( gdb_strip_braces($value) );
+                } else {
+                    return ( gdb_strip_braces($value), $rem );
+                }
             }
         }
 
     }
-    croak("Failed to parse $str");
+    croak("Failed to extrace square braces from $str");
     return;
 }
 
-# XXX: This function needs looking at.
+# Take a string (from gdb) and a optional field to "collapse on", return
+# a key, a value and a left-over string.  See comment and start of
+# gdb_parse_reason for documentation.
 sub gdb_new_parse {
     my ( $str, $collapse ) = @_;
 
-    #printf("Parsing $collapse $str\n");
+    # All strings here start with a string.
+
     my ( $a, $b, $c ) = _gdb_new_parse( $str, $collapse );
 
-    #printf("Returning $a $b $b\n");
     return ( $a, $b, $c );
 }
 
 sub _gdb_new_parse {
     my ( $str, $collapse ) = @_;
 
-    my %res;
     my $key;
     my $value;
 
-    if ( $str =~ /^([\w\-\?]+)\=(.*)$/ ) {
+    # Strings here start with a string, " or {
+
+    if ( $str =~ m{\A([\w\-\?]+)\=(.*)\z}x ) {
         $key   = $1;
         $value = $2;
-    } else {
-        $key   = 'tuple';
+    } elsif ( $str =~ m{\A\{}x ) {
         $value = $str;
+    } elsif ( $str =~ m{\A"}x ) {
+        $value = $str;
+    } else {
+        croak("Cannot parse gdb values from $str");
     }
-    my $leftover;
 
-    my $type = substr( $value, 0, 1 );
+    my $type = substr $value, 0, 1;
     if ( $type eq "[" ) {
         if ( $value eq "[]" ) {
             my @e;
-            return ( $key, \@e, "" );
+            return ( $key, \@e );
         }
-        my ( $l, $r ) = extract_value_square($value);
-        $leftover = $r;
+        my ( $l, $r ) = gdb_extract_value_square($value);
 
         my @b;
-        while ( $l ne "" ) {
-            my ( $kk, $vv, $c ) = _gdb_new_parse( $l, $collapse );
+        while ( defined $l ) {
+            my ( $kk, $vv );
+            ( $kk, $vv, $l ) = _gdb_new_parse( $l, $collapse );
 
-            # Assert that $c is empty?
-            $l = "";
-            if ( $c ne "" ) {
-                $c = strip_leading_comma($c);
-                $l = $c;
-            }
-            my %q;
-            if ( $kk eq 'tuple' or defined $collapse and $kk eq $collapse ) {
+            if (   ( not defined $kk )
+                or ( ( defined $collapse ) and ( $kk eq $collapse ) ) )
+            {
                 push @b, $vv;
             } else {
-                $q{$kk} = $vv;
-
-                # push @b,$vv;
-                push @b, \%q;
+                push @b, { $kk => $vv };
             }
         }
         return ( $key, \@b, $r );
     } elsif ( $type eq "{" ) {
-        my ( $l, $r ) = extract_value_soft($value);
-        $leftover = $r;
+        my ( $l, $r ) = gdb_extract_value_braces($value);
 
         my @all;
-        while ( $l ne "" ) {
-            my ( $kk, $vv, $c ) = _gdb_new_parse( $l, $collapse );
+        my %res;
+        while ( defined $l ) {
+            my ( $kk, $vv );
+            ( $kk, $vv, $l ) = _gdb_new_parse( $l, $collapse );
 
-            $l = "";
-            if ( $c ne "" ) {
-                $c = strip_leading_comma($c);
-                $l = $c;
-            }
-            if ( defined $collapse and $key eq 'thread-ids' ) {
-                my %r;
-                $r{$kk} = $vv;
-                push @all, \%r;
+            if (    defined $key
+                and defined $collapse
+                and $collapse eq 'thread-ids' )
+            {
+                push @all, { $kk => $vv };
             } else {
                 $res{$kk} = $vv;
             }
         }
-        if ( defined $collapse and $key eq 'thread-ids' ) {
-            return ( $key, \@all, $r );
-        } else {
-            return ( $key, \%res, $r );
+        if ( defined $key and defined $collapse ) {
+            if ( $collapse eq 'thread-ids' ) {
+                return ( $key, \@all, $r );
+            }
         }
+        return ( $key, \%res, $r );
     } elsif ( $type eq "\"" ) {
-        my ( $this, $l ) = strip_first_quotes($value);
+        my ( $this, $l ) = gdb_strip_first_quotes($value);
         return ( $key, $this, $l );
     } else {
         confess("unknown type '$type' str '$str'");
     }
 
-    return ( $key, \%res, $leftover );
+    return;
 }
+
+# Convert from the single-line string gdb gives back to a abstract perl datatype.
+# The format gdb uses is documented here:
+# http://sources.redhat.com/gdb/current/onlinedocs/gdb_26.html#SEC275
+#
+# The options $collapse argunment here is for element names that should be collapsed
+# into an array, for example in the following example each instance if thread-id would
+# over-write the previous one with it's own value so to avoid this thread-ids (note the
+# extra "s" here is passed as collapse to force them into an array.
+
+# thread-ids={thread-id="6",thread-id="5",thread-id="4",thread-id="3",thread-id="2",thread
+# -id="1"},current-thread-id="1",number-of-threads="6"
+
+# $collapse is also specified for "frame" in a number of cases, this is to make the
+# resulting datatype easier to parse rather than to prevent losing data as in the
+# above case.
 
 sub gdb_parse_reason {
     my ( $str, $collapse ) = @_;
 
     my $leftover = $str;
     my %res;
-    while ( $leftover ne "" ) {
-        my ( $key, $value, $l ) = gdb_new_parse( $leftover, $collapse );
-        $leftover = "";
-        if ( $l ne "" ) {
-            $leftover = strip_leading_comma($l);
-        }
+    while ( defined $leftover ) {
+        my ( $key, $value );
+        ( $key, $value, $leftover ) = gdb_new_parse( $leftover, $collapse );
         $res{$key} = $value;
     }
+
     return \%res;
 }
 #########################################################################
@@ -5728,7 +5779,7 @@ sub gdb_dump_frames {
 
             my %r = gdb_n_send( $gdb,
                 "-stack-list-arguments 2 $frame->{level} $frame->{level}" );
-            my $args = gdb_parse_reason( $r{reason}, 'name' );
+            my $args = gdb_parse_reason( $r{reason} );
 
             if ( defined $args->{'stack-args'}[0]{frame}{args} ) {
                 my @names = @{ $args->{'stack-args'}[0]{frame}{args} };
@@ -5739,7 +5790,7 @@ sub gdb_dump_frames {
 
             my %s = gdb_n_send( $gdb, '-stack-list-locals --simple-values' );
             if ( $s{status} eq 'done' ) {
-                my $flocals = gdb_parse_reason( $s{reason}, 'name' );
+                my $flocals = gdb_parse_reason( $s{reason} );
                 if ( defined $flocals->{locals} ) {
                     $frame->{locals} = $flocals->{locals};
                     gdb_expand_vars( $gdb, $frame, 'locals' );
@@ -7680,7 +7731,7 @@ sub common_main {
             gdb_retry_count    => 3,
             stack_strip_above =>
 'elan_waitWord,elan_pollWord,elan_deviceCheck,opal_condition_wait,opal_progress',
-            stack_strip_below => 'main,__libc_start_main',
+            stack_strip_below => 'main,__libc_start_main,start_thread',
         },
         secondary => [
             {
