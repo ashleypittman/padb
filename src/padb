@@ -1514,7 +1514,7 @@ sub show_name {
     foreach my $name2 ( sort keys %{ $stats->{subsystems} } ) {
         my $name = $stats->{subsystems}{$name2};
 
-        next unless ( lc($name2) eq lc( $req[0] ) );
+        next unless ( lc $name2 eq lc $req[0] );
 
         foreach my $id2 ( sort { $a <=> $b } keys %{$name} ) {
             my $sis = $name->{$id2};
@@ -1534,7 +1534,7 @@ sub show_name {
                     foreach
                       my $s_name ( sort keys %{ $sis->{statistics}{$type} } )
                     {
-                        next if ( $#req > 1 and lc($s_name) ne lc( $req[2] ) );
+                        next if ( $#req > 1 and lc $s_name ne lc $req[2] );
                         $ret .= "@{$sis->{statistics}{$type}{$s_name}{raw}}\n";
                     }
                 } else {
@@ -1930,7 +1930,7 @@ sub local_stats_from_job {
     }
 
     my @data;
-    open( my $PCMD, '-|', "edb -k $key --stats-raw 2>/dev/null" )
+    open my $PCMD, '-|', "edb -k $key --stats-raw 2>/dev/null"
       or confess "$prog: cant open file: $!\n";
     local $/ = "\n\n";
     while (<$PCMD>) {
@@ -3062,14 +3062,14 @@ sub show_proc_format {
 
         my ( $name, $desc ) = split $EQUALS, $column;
         if ( defined $desc ) {
-            push @proc_format_array, lc($name);
-            $proc_format_header{ lc($name) }  = $desc;
-            $proc_format_lengths{ lc($name) } = length($desc);
-            $proc_header_reverse{ lc($desc) } = lc($name);
+            push @proc_format_array, lc $name;
+            $proc_format_header{ lc $name }  = $desc;
+            $proc_format_lengths{ lc $name } = length $desc;
+            $proc_header_reverse{ lc $desc } = lc $name;
         } else {
-            push @proc_format_array, lc($column);
-            $proc_format_header{ lc($column) }  = $column;
-            $proc_format_lengths{ lc($column) } = length($column);
+            push @proc_format_array, lc $column;
+            $proc_format_header{ lc $column }  = $column;
+            $proc_format_lengths{ lc $column } = length $column;
         }
     }
 
@@ -3084,8 +3084,8 @@ sub show_proc_format {
             my $value = $lines->{$tag}{$key};
             next unless defined $proc_format_lengths{$key} or $show_fields;
 
-            if ( length($value) > $proc_format_lengths{$key} ) {
-                $proc_format_lengths{$key} = length($value);
+            if ( length $value > $proc_format_lengths{$key} ) {
+                $proc_format_lengths{$key} = length $value;
             }
 
             $hash{$key} = $value;
@@ -3100,7 +3100,7 @@ sub show_proc_format {
     }
 
     # Allow sort keys to be based on column names as well as real keys.
-    my $key = lc( $carg->{proc_sort_key} );
+    my $key = lc $carg->{proc_sort_key};
     if ( defined $proc_header_reverse{$key} ) {
         $key = $proc_header_reverse{$key};
     }
@@ -3340,9 +3340,9 @@ sub load_and_display_from_file {
     #    return;
     #}
 
-    open( my $PCMD, '<', "$file" ) or die "$prog: cant open file $file: $!\n";
+    open my $PCMD, '<', "$file" or die "$prog: cant open file $file: $!\n";
     my @data = <$PCMD>;
-    close($PCMD);
+    close $PCMD;
 
     my %lines;    # A hash of arrays.
 
@@ -3408,8 +3408,8 @@ sub extract_line {
     # Allow multi-line output here, making sure we process each line.
     while ( $str =~ m{\A(.+)\Z}x ) {
         $sd->{line_cb}( $handle, $sd, $1 );
-        my $len  = length($1);
-        my $flen = length($str);
+        my $len  = length $1;
+        my $flen = length $str;
         if ( ( $len + 1 ) != $flen ) {
             $str = substr $str, $len + 1, $flen - $len;
         } else {
@@ -3517,7 +3517,7 @@ sub issue_command_to_inner {
     my ( $cdata, $cmd ) = @_;
     my $str = my_encode($cmd);
     debug_log( 'full_duplex', $cmd, 'Sending command to inner, %d bytes',
-        length($str) );
+        length $str );
     $cdata->{socket}->print("$str\n");
     return;
 }
@@ -3613,7 +3613,7 @@ sub next_command {
 sub report_failed_signon {
     my ( $key, $data ) = @_;
     my %c;
-    $c{i} = length($key);
+    $c{i} = length $key;
     print "$key : ranks\n";
     foreach my $value ( sort keys %{$data} ) {
         printf "%$c{i}s : %s\n", $value, rng_convert_to_user( $data->{$value} );
@@ -3709,7 +3709,7 @@ sub command_from_inner {
     # A reply from inner.
     my $d = my_decode($line);
 
-    debug_log( 'full_duplex', $d, 'Reply from inner, %d bytes', length($line) );
+    debug_log( 'full_duplex', $d, 'Reply from inner, %d bytes', length $line );
 
     # The inner process has signed on.
     if ( $comm_data->{current_req}->{mode} eq 'signon' ) {
@@ -3788,7 +3788,7 @@ sub command_from_inner {
     $comm_data->{current_req} = $req;
 
     if ($watch) {
-        sleep( $conf{interval} );
+        sleep $conf{interval};
         issue_command_to_inner( $cdata, $req );
     }
 
@@ -4402,14 +4402,14 @@ sub config_from_env {
     print "Loading config from environment\n" if ( $conf{verbose} );
 
     foreach my $key ( keys %conf ) {
-        my $name = 'PADB_' . uc($key);
+        my $name = 'PADB_' . uc $key;
         if ( defined $ENV{$name} ) {
             config_set( $key, $ENV{$name} );
         }
     }
 
     foreach my $key ( keys %{ $conf{mode_options_reverse} } ) {
-        my $name = 'PADB_' . uc($key);
+        my $name = 'PADB_' . uc $key;
         if ( defined $ENV{$name} ) {
             config_set( $key, $ENV{$name} );
         }
@@ -4604,7 +4604,7 @@ sub outer_main {
             while (1) {
                 maybe_clear_screen();
                 local_stats();
-                sleep( $conf{interval} );
+                sleep $conf{interval};
             }
         } else {
             local_stats();
@@ -4630,7 +4630,8 @@ sub outer_main {
         );
     }
 
-    my $style_count = ( grep { $_ } ( $output_compress, $output_compress_long, $output_tree ) );
+    my $style_count =
+      ( grep { $_ } ( $output_compress, $output_compress_long, $output_tree ) );
     if ( $style_count > 1 ) {
         cmdline_error(
 "$prog: Error: only specify one of --compress, --compress-long or --tree\n"
@@ -4649,9 +4650,9 @@ sub outer_main {
     if ( defined $mode and ( $mode eq 'kill' ) ) {
         my $signal = uc $conf{mode_options}{kill}{signal};
         my %sig_names;
-	foreach (split $SPACE, $Config{sig_name}) {
-	    $sig_names{$_} = 1;
-	}
+        foreach ( split $SPACE, $Config{sig_name} ) {
+            $sig_names{$_} = 1;
+        }
 
         if ( not defined $sig_names{$signal} ) {
             cmdline_error("$prog: Error: signal \"$signal\" is invalid\n");
@@ -4816,7 +4817,7 @@ sub gdb_quit {
     waitpid( $gdb->{gdbpid}, 0 );
     foreach my $fdname (qw(rdr wtr err)) {
         next unless exists $gdb->{$fdname};
-        close( $gdb->{$fdname} );
+        close $gdb->{$fdname};
     }
     return;
 }
@@ -4922,10 +4923,10 @@ sub gdb_strip_first_quotes {
       )
     {
         my $value = $1;
-	my $rem = $2;
+        my $rem   = $2;
         $value =~ s{\\\\}{\\}xg;
         $value =~ s{\\"}{"}xg;
-	if ( not defined $rem or $rem eq "" ) {
+        if ( not defined $rem or $rem eq "" ) {
             return $value;
         } else {
             return ( $value, $rem );
@@ -5351,9 +5352,9 @@ sub run_minfo {
     my $sc = keys %stats;
 
     waitpid( $h->{hpid}, 0 );
-    close( $h->{rdr} );
-    close( $h->{wtr} );
-    close( $h->{err} );
+    close $h->{rdr};
+    close $h->{wtr};
+    close $h->{err};
 
     if ( $sc == 0 ) {
 
@@ -5668,7 +5669,8 @@ sub mpi_go_deadlock_detect {
 
                 }
                 foreach my $number ( sort keys %inactive ) {
-                    $ret .= mpi_go_deadlock_detect_helper( "completed call $number to $s",
+                    $ret .= mpi_go_deadlock_detect_helper(
+                        "completed call $number to $s",
                         1, $ad{$gid}{size}, @{ $inactive{$number} } );
                 }
             }
@@ -5687,7 +5689,8 @@ sub mpi_go_deadlock_detect {
             }
             if ( $#inactive != -1 ) {
                 $ret .= $gstr
-                  . mpi_go_deadlock_detect_helper( 'not in a call to the collectives',
+                  . mpi_go_deadlock_detect_helper(
+                    'not in a call to the collectives',
                     0, $ad{$gid}{size}, @inactive );
                 $gstr = "";
             }
@@ -5958,8 +5961,8 @@ sub run_ptrack_cmd {
     my $lines = 0;
 
     send_cont_signal($pid);
-    open( my $CMD, '-|', "$cmd 2>/dev/null" )
-      || p_die( $vp, "cant start command $cmd" );
+    open my $CMD, '-|', "$cmd 2>/dev/null"
+      or p_die( $vp, "cant start command $cmd" );
     while (<$CMD>) {
         chomp $_;
         output $vp, $_;
@@ -5973,7 +5976,7 @@ sub run_ptrack_cmd {
 sub run_command {
     my ( $vp, $cmd ) = @_;
     debug $vp, "running $cmd";
-    open( my $CMDS, '-|', "$cmd" ) || p_die $vp, 'cant fork subcommand';
+    open my $CMDS, '-|', "$cmd" or p_die $vp, 'cant fork subcommand';
     while (<$CMDS>) {
         chomp $_;
         output $vp, $_;
@@ -5989,7 +5992,7 @@ sub get_remote_env {
     my %env;
 
     local $/ = "\0";
-    open( my $FD, '<', "/proc/$pid/environ" ) or return;
+    open my $FD, '<', "/proc/$pid/environ" or return;
     while (<$FD>) {
         chomp;
         my @f   = split "=";
@@ -6013,7 +6016,7 @@ sub load_rms_procs {
     #
     # Of course it could mean that whatever jobs were supposed
     # to be running on this node aren't.
-    open( my $PIDFILE, '<', "/proc/rms/programs/$job/pids" ) or return;
+    open my $PIDFILE, '<', "/proc/rms/programs/$job/pids" or return;
 
     my @procs;
 
@@ -6031,7 +6034,7 @@ sub load_rms_procs {
         }
         push @procs, \%process;
     }
-    close($PIDFILE);
+    close $PIDFILE;
     return @procs;
 }
 
@@ -6213,8 +6216,8 @@ my %proc_keys;
 sub proc_output {
     my ( $vp, $key, $value ) = @_;
     if ( $confInner{mode} eq 'proc_summary' ) {
-        if ( defined $proc_keys{ lc($key) } ) {
-            target_key_pair( $vp, lc($key), $value );
+        if ( defined $proc_keys{ lc $key } ) {
+            target_key_pair( $vp, lc $key, $value );
         }
     } else {
         output( $vp, "$key: $value" );
@@ -6231,7 +6234,7 @@ sub show_proc_all {
         my @columns = split $COMMA, $carg->{proc_format};
         foreach my $column (@columns) {
             my ( $name, $desc ) = split $EQUALS, $column;
-            $proc_keys{ lc($name) } = 1;
+            $proc_keys{ lc $name } = 1;
         }
     }
 
@@ -6243,10 +6246,10 @@ sub show_proc_all {
     if ( $carg->{proc_shows_proc} ) {
         foreach my $proc ( @{$list} ) {
             my $pid = $proc->{pid};
-            open( $proc->{handle}, '<', "/proc/$pid/stat" );
+            open $proc->{handle}, '<', "/proc/$pid/stat";
         }
 
-        open( $SFD, '<', '/proc/stat' );
+        open $SFD, '<', '/proc/stat';
 
         # Begin critical path.
         my $stat = <$SFD>;
@@ -6255,16 +6258,16 @@ sub show_proc_all {
             my $pid = $proc->{pid};
             my $h   = $proc->{handle};
             $proc->{stat_start} = <$h>;
-            seek( $proc->{handle}, 0, 0 );
+            seek $proc->{handle}, 0, 0;
         }
 
-        seek( $SFD, 0, 0 );
+        seek $SFD, 0, 0;
         my $stat2 = <$SFD>;
 
         # End critical path.
 
         $jiffies_start = add_and_divide_jiffies( $stat, $stat2 );
-        open( my $LFD, '<', '/proc/loadavg' );
+        open my $LFD, '<', '/proc/loadavg';
         $load_avg = <$LFD>;
         close $LFD;
     }
@@ -6276,9 +6279,9 @@ sub show_proc_all {
     }
 
     if ( $carg->{proc_shows_proc} ) {
-        sleep(1);
+        sleep 1;
 
-        seek( $SFD, 0, 0 );
+        seek $SFD, 0, 0;
 
         # Begin critical path.
         my $stat = <$SFD>;
@@ -6287,10 +6290,10 @@ sub show_proc_all {
             my $pid = $proc->{pid};
             my $h   = $proc->{handle};
             $proc->{stat_end} = <$h>;
-            close( $proc->{handle} );
+            close $proc->{handle};
         }
 
-        seek( $SFD, 0, 0 );
+        seek $SFD, 0, 0;
         my $stat2 = <$SFD>;
 
         # End critical path.
@@ -6301,7 +6304,7 @@ sub show_proc_all {
                 $cpucount++;
             }
         }
-        close($SFD);
+        close $SFD;
 
         my $jiffies_end = add_and_divide_jiffies( $stat, $stat2 );
 
@@ -6370,14 +6373,12 @@ sub show_proc {
 
 sub show_stack_vars {
     my ( $vp, $frame, $type ) = @_;
-    my %l;
-    $l{t} = 0;
-    $l{n} = 0;
     return unless defined $frame->{$type};
     return if ( @{ $frame->{$type} } == 0 );
+    my %l = { t => 0, n => 0 };
     foreach my $arg ( @{ $frame->{$type} } ) {
-        $l{t} = length( $arg->{type} ) if ( length( $arg->{type} ) > $l{t} );
-        $l{n} = length( $arg->{name} ) if ( length( $arg->{name} ) > $l{n} );
+        $l{t} = length $arg->{type} if ( length $arg->{type} > $l{t} );
+        $l{n} = length $arg->{name} if ( length $arg->{name} > $l{n} );
     }
     my $header = "  $type:";
     output( $vp, $header );
@@ -6572,7 +6573,7 @@ sub stack_trace_from_pids {
 
 sub kill_proc {
     my ( $cargs, $vp, $pid ) = @_;
-    my $signal = uc( $cargs->{signal} );
+    my $signal = uc $cargs->{signal};
     kill( $signal, $pid );
     return;
 }
