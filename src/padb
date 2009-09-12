@@ -4649,7 +4649,9 @@ sub outer_main {
     if ( defined $mode and ( $mode eq 'kill' ) ) {
         my $signal = uc $conf{mode_options}{kill}{signal};
         my %sig_names;
-        map { $sig_names{$_} = 1 } split $SPACE, $Config{sig_name};
+	foreach (split $SPACE, $Config{sig_name}) {
+	    $sig_names{$_} = 1;
+	}
 
         if ( not defined $sig_names{$signal} ) {
             cmdline_error("$prog: Error: signal \"$signal\" is invalid\n");
@@ -4905,8 +4907,6 @@ sub gdb_strip_braces {
 
 sub gdb_strip_first_quotes {
     my ($str) = @_;
-    my $a;
-    my $b;
 
     # This is in part stolen from the "match a double-quoted string" section of
     # http://perldoc.perl.org/perlre.html
@@ -4921,14 +4921,14 @@ sub gdb_strip_first_quotes {
                    }xms
       )
     {
-        $a = $1;
-        $a =~ s{\\\\}{\\}xg;
-        $a =~ s{\\"}{"}xg;
-        $b = $2;
-        if ( not defined $b or $b eq "" ) {
-            return $a;
+        my $value = $1;
+	my $rem = $2;
+        $value =~ s{\\\\}{\\}xg;
+        $value =~ s{\\"}{"}xg;
+	if ( not defined $rem or $rem eq "" ) {
+            return $value;
         } else {
-            return ( $a, $b );
+            return ( $value, $rem );
         }
 
     } else {
@@ -4975,7 +4975,6 @@ sub gdb_extract_value_square {
 
     }
     croak("Failed to extrace square braces from $str");
-    return;
 }
 
 sub gdb_extract_value_braces {
@@ -5014,7 +5013,6 @@ sub gdb_extract_value_braces {
 
     }
     croak("Failed to extrace square braces from $str");
-    return;
 }
 
 # Take a string (from gdb) and a optional field to "collapse on", return
