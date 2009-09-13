@@ -6375,7 +6375,7 @@ sub show_stack_vars {
     my ( $vp, $frame, $type ) = @_;
     return unless defined $frame->{$type};
     return if ( @{ $frame->{$type} } == 0 );
-    my %l = { t => 0, n => 0 };
+    my %l = ( t => 0, n => 0 );
     foreach my $arg ( @{ $frame->{$type} } ) {
         $l{t} = length $arg->{type} if ( length $arg->{type} > $l{t} );
         $l{n} = length $arg->{name} if ( length $arg->{name} > $l{n} );
