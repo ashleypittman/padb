@@ -432,6 +432,8 @@ my $EQUALS = qr{=}x;
 my $SPACE  = qr{\s+}x;
 my $COLON  = qr{:}x;
 
+my $EMPTY_STRING = q{};
+
 sub check_and_convert_bool {
     my ($str) = @_;
     my @yes   = qw(1 yes on enabled);
@@ -443,7 +445,7 @@ sub check_and_convert_bool {
     if ( defined $bool_table{$str} ) {
         return $bool_table{$str};
     }
-    printf {*STDERR} ("Boolean value \"$str\" not recognised, aborting.\n");
+    printf {*STDERR} "Boolean value \"%s\" not recognised, aborting.\n", $str;
     exit 1;
 }
 
@@ -461,7 +463,7 @@ sub check_and_convert_time {
         }
         return $1;
     }
-    printf {*STDERR} ("Time value \"$str\" not recognised, aborting.\n");
+    printf {*STDERR} "Time value \"%s\" not recognised, aborting.\n", $str;
     exit 1;
 }
 
@@ -475,7 +477,7 @@ sub check_int {
                   \z}x
       );
 
-    printf {*STDERR} ("Integer value \"$str\" not recognised, aborting.\n");
+    printf {*STDERR} "Integer value \"%s\" not recognised, aborting.\n", $str;
     exit 1;
 }
 
@@ -575,7 +577,7 @@ EOF
 sub usage {
     chomp $usage;
 
-    my $extra = "";
+    my $extra = $EMPTY_STRING;
     $extra .= "Modes of operation\n";
     foreach my $arg ( sort keys %allfns ) {
         next unless ( defined $allfns{$arg}{help} );
@@ -583,7 +585,7 @@ sub usage {
         if ( defined $allfns{$arg}{arg_short} ) {
             $extra .= "-$allfns{$arg}{arg_short}";
         } else {
-            $extra .= "  ";
+            $extra .= '  ';
         }
         $extra .= sprintf " --%-18s%s.\n",
           $allfns{$arg}{arg_long},
@@ -597,7 +599,7 @@ sub usage {
         if ( defined $allfns{$arg}{arg_short} ) {
             $extra .= "-$allfns{$arg}{arg_short}";
         } else {
-            $extra .= "  ";
+            $extra .= '  ';
         }
         $extra .= sprintf " --%-18s%s.\n",
           $allfns{$arg}{arg_long},
@@ -651,19 +653,19 @@ my %ic_names_cmd;
 # a mode, an abritary ref and a string, it can either print simply
 # the string or call dumper on the ref as well.
 # Enable with --debug=type1,type2=all
-my %debugModes;
+my %debug_modes;
 my $start_time = time;
 
 sub debug_log {
     my ( $type, $handle, $str, @params ) = @_;
-    if ( not exists $debugModes{$type} ) {
+    if ( not exists $debug_modes{$type} ) {
         print "Unknown debug mode: $type\n";
         exit 1;
     }
-    return unless $debugModes{$type};
+    return unless $debug_modes{$type};
     my $time = time - $start_time;
     printf "DEBUG ($type): %3d: $str\n", $time, @params;
-    return if $debugModes{$type} eq 'basic';
+    return if $debug_modes{$type} eq 'basic';
     return unless defined $handle;
     print Dumper($handle);
     return;
@@ -671,15 +673,15 @@ sub debug_log {
 
 # Valid debug modes, a full list is maintained here so using unexpected
 # ones can generate warnings.
-$debugModes{full_duplex} = undef;
-$debugModes{show_cmd}    = undef;
-$debugModes{all}         = undef;
-$debugModes{tree}        = undef;
-$debugModes{verbose}     = undef;
-$debugModes{signon}      = undef;
-$debugModes{rmgr}        = undef;
-$debugModes{ctree}       = undef;
-$debugModes{tdata}       = undef;
+$debug_modes{full_duplex} = undef;
+$debug_modes{show_cmd}    = undef;
+$debug_modes{all}         = undef;
+$debug_modes{tree}        = undef;
+$debug_modes{verbose}     = undef;
+$debug_modes{signon}      = undef;
+$debug_modes{rmgr}        = undef;
+$debug_modes{ctree}       = undef;
+$debug_modes{tdata}       = undef;
 
 sub slurp_file {
     my ($file) = @_;
@@ -786,16 +788,16 @@ sub parse_args_outer {
     if ( defined $debugflag ) {
         foreach my $f ( split $COMMA, $debugflag ) {
             my ( $name, $v ) = split $EQUALS, $f;
-            if ( exists $debugModes{$name} ) {
-                $debugModes{$name} = defined $v ? $v : 'basic';
+            if ( exists $debug_modes{$name} ) {
+                $debug_modes{$name} = defined $v ? $v : 'basic';
             } else {
                 print "Attempt to set unknown debug flag \"$name\".\n";
             }
         }
-        if ( $debugModes{all} ) {
-            foreach my $mode ( keys %debugModes ) {
-                if ( not defined $debugModes{$mode} ) {
-                    $debugModes{$mode} = $debugModes{all};
+        if ( $debug_modes{all} ) {
+            foreach my $mode ( keys %debug_modes ) {
+                if ( not defined $debug_modes{$mode} ) {
+                    $debug_modes{$mode} = $debug_modes{all};
                 }
             }
         }
@@ -957,7 +959,7 @@ my @bin_names = (
 sub show_counter {
     my ($d) = @_;
 
-    my $ret = "";
+    my $ret = $EMPTY_STRING;
     my $toshow;
     foreach my $counter ( sort keys %{$d} ) {
 
@@ -984,7 +986,7 @@ sub show_attr {
     # Hopefully have an array at this point.
     my ($d) = @_;
 
-    my $ret = "";
+    my $ret = $EMPTY_STRING;
     my $toshow;
     foreach my $attr ( sort keys %{$d} ) {
         next unless defined $d->{$attr}{raw}[0];
@@ -1008,7 +1010,7 @@ sub show_attr {
 sub show_tally {
     my ($d) = @_;
 
-    my $ret = "";
+    my $ret = $EMPTY_STRING;
     foreach my $tally ( sort keys %{$d} ) {
         if ( $d->{$tally}{raw}[0] or $conf{show_all_stats} ) {
             $ret .= sprintf
@@ -1023,7 +1025,7 @@ sub show_tally {
 sub show_bin {
     my ($d) = @_;
 
-    my $ret = "";
+    my $ret = $EMPTY_STRING;
     foreach my $bin ( sort keys %{$d} ) {
 
         if ( ( $d->{$bin}{raw}[0] || $d->{$bin}{raw}[34] )
@@ -1482,7 +1484,7 @@ $hash->{Counter}, $hash->{Tally}, $hash->{Bin}
 
 sub display_hashes {
     my ( $hashes, $sort, $reverse ) = @_;
-    my $ret = '';
+    my $ret = $EMPTY_STRING;
 
     my $rev = $reverse;
 
@@ -1493,7 +1495,9 @@ sub display_hashes {
             $ret .= display_hash($e);
         }
     } else {
-        foreach my $e ( sort { $b->{$sort} <=> $a->{$sort} } ( @{$hashes} ) ) {
+        foreach
+          my $e ( reverse sort { $a->{$sort} <=> $b->{$sort} } ( @{$hashes} ) )
+        {
             $ret .= display_hash($e);
         }
     }
@@ -1510,7 +1514,7 @@ sub show_name {
 
     my @req = split( "\\.", $des );
 
-    my $ret = "";
+    my $ret = $EMPTY_STRING;
 
     foreach my $name2 ( sort keys %{ $stats->{subsystems} } ) {
         my $name = $stats->{subsystems}{$name2};
@@ -1620,7 +1624,7 @@ sub show_stats {
     # vp's only, if it's not set then display a total for everyone.
 
     if ( not $d ) {
-        print("QsNet Statistics not valid\n");
+        print "QsNet Statistics not valid\n";
         return;
     }
 
@@ -1684,7 +1688,7 @@ sub group_status_helper {
     my $size       = shift;    # size of the group
     my @identical  = (@_);     # member list
     my $ret;
-    my $sstr = defined $size ? " (size $size)" : "";
+    my $sstr = defined $size ? " (size $size)" : $EMPTY_STRING;
 
     my $members = 'members';
     my $are     = 'are';
@@ -1769,7 +1773,7 @@ sub group_status {
         }
     }
 
-    my $ret = "";
+    my $ret = $EMPTY_STRING;
     my $missing_self;
     my $i_count = 0;    # Interesting groups.
     my $d_count = 0;    # Destroyed groups.
@@ -1806,7 +1810,7 @@ sub group_status {
                     $ret .= $gstr
                       . group_status_helper( 'showing the group as removed',
                         0, $ad{$gid}{size}, @invalid );
-                    $gstr = "";
+                    $gstr = $EMPTY_STRING;
                 }
                 if ( $#invalid == ( $ad{$gid}{size} - 1 ) ) {
                     $gone++;
@@ -1830,7 +1834,7 @@ sub group_status {
                       . group_status_helper(
                         'no statistics for this group *(1)',
                         1, $ad{$gid}{size}, @identical );
-                    $gstr = "";
+                    $gstr = $EMPTY_STRING;
                 } else {
                     $gstr .=
                       group_status_helper( 'no statistics for this group *(1)',
@@ -1862,7 +1866,7 @@ sub group_status {
                     $ret .= $gstr
                       . group_status_helper( "in call $number to $s",
                         0, $ad{$gid}{size}, @{ $active{$number} } );
-                    $gstr = "";
+                    $gstr = $EMPTY_STRING;
 
                 }
                 foreach my $number ( sort keys %inactive ) {
@@ -1887,7 +1891,7 @@ sub group_status {
                 $ret .= $gstr
                   . group_status_helper( 'not in a call to the collectives',
                     0, $ad{$gid}{size}, @inactive );
-                $gstr = "";
+                $gstr = $EMPTY_STRING;
             }
         }
     }
@@ -1895,7 +1899,7 @@ sub group_status {
     my $count = keys %ad;
 
     if ( $count == 1 ) {
-        my $use_str = ( $i_count == 1 ) ? "" : ' not';
+        my $use_str = ( $i_count == 1 ) ? $EMPTY_STRING : ' not';
         $ret .= "Total: $count group which is$use_str in use.\n";
     } else {
         my $d_str = ( $d_count == 1 ) ? 'is' : 'are';
@@ -2120,7 +2124,7 @@ sub _make_tree {
 # Convert the rank output into a tree based form suitable for use with show_tree.
 sub make_tree {
     my ($lines) = @_;
-    my $rng = rng_create_from_array( keys(%$lines) );
+    my $rng = rng_create_from_array( keys %{$lines} );
     return _make_tree( 0, $lines, $rng );
 }
 
@@ -2129,7 +2133,7 @@ sub _show_tree {
 
     my ( $ref, $parent, $indent ) = @_;
 
-    my $ret = "";
+    my $ret = $EMPTY_STRING;
 
     # Don't need to sort the peers here because make_tree ensures
     # the are sorted.
@@ -2156,7 +2160,7 @@ sub _show_tree {
 sub show_tree {
     my $ref = shift;
     debug_log( 'tree', $ref, 'Complete tree' );
-    return _show_tree( $ref, "no-parent", "" );
+    return _show_tree( $ref, "no-parent", $EMPTY_STRING );
 }
 
 ###############################################################################
@@ -2206,7 +2210,7 @@ sub rms_setup_pcmd {
 
     my $nhosts = rms_job_to_nhosts($job);
 
-    if ( $res eq "" ) {
+    if ( $res eq $EMPTY_STRING ) {
         print "Job '$job' doesn't have a associated resource\n";
         return;
     }
@@ -2434,7 +2438,7 @@ sub local_fd_get_jobs_real {
     foreach my $pid (@pids) {
         my @fds = slurp_dir("/proc/$pid/fd");
         foreach my $fd (@fds) {
-            my $target = readlink("/proc/$pid/fd/$fd");
+            my $target = readlink "/proc/$pid/fd/$fd";
             next unless $target;
             if ( $target eq $file ) {
                 push @jobs, $pid;
@@ -2466,7 +2470,7 @@ sub local_job_is_running {
 }
 
 sub local_setup_pcmd {
-    return ( "", 1, 1 );
+    return ( $EMPTY_STRING, 1, 1 );
 }
 
 ###############################################################################
@@ -2486,12 +2490,12 @@ sub mpd_get_data {
     my $host;
     my $pid;
     foreach my $l (@out) {
-        my ( $key, $value ) = split( "= ", $l );
+        my ( $key, $value ) = split "= ", $l;
         next unless $value;
         $key =~ s/ //g;
         chomp $value;
         if ( $key eq 'jobid' ) {
-            my ( $j, $host ) = split( "@", $value );
+            my ( $j, $host ) = split "@", $value;
             $job = $j;
         }
         if ( $key eq 'username' ) {
@@ -2567,12 +2571,12 @@ sub find_ompi_prefix {
     my $name = "ompi-ps";
     foreach my $dir ( split $COLON, $ENV{PATH} ) {
         next unless ( -x "$dir/$name" );
-        my @d = split( "/", $dir );
+        my @d = split "/", $dir;
         pop @d;
         my $prefix = join q{/}, @d;
         return "--prefix $prefix";
     }
-    return "";
+    return $EMPTY_STRING;
 }
 
 sub open_is_installed {
@@ -2593,7 +2597,7 @@ sub open_get_data {
 
     foreach my $l (@out) {
         chomp $l;
-        next if ( $l eq "" );
+        next if ( $l eq $EMPTY_STRING );
 
         my @elems = split qr{\s*\|\s*}, $l;
 
@@ -2915,7 +2919,7 @@ sub strip_stack_traces {
     map { $below{$_}++ }
       split $COMMA, $conf{mode_options}{stack}{stack_strip_below};
 
-    foreach my $tag ( keys %$lines ) {
+    foreach my $tag ( keys %{$lines} ) {
 
         # There was a subtle bug here, functions from the @above_list
         # often appear below main which this code doesn't handle all that
@@ -2944,11 +2948,6 @@ sub strip_stack_traces {
             my $start =
               ( $cargs->{strip_below_main} and $main_idx ) ? $main_idx : 0;
 
-            printf 'Stripping 0..'
-              . $#{ $lines->{$tag} }
-              . " to $start..$end for $tag\n"
-              if $conf{verbose} > 1;
-
             my @new = @{ $lines->{$tag} };
             @new = @new[ $start .. $end ];
             $lines->{$tag} = \@new;
@@ -2963,7 +2962,7 @@ sub sort_proc_hashes {
     my @all  = (@_);
 
     if ( $carg->{reverse_sort_order} ) {
-        return ( reverse( sort { $a->{$key} <=> $b->{$key} } @all ) );
+        return ( reverse sort { $a->{$key} <=> $b->{$key} } @all );
     } else {
         return ( sort { $a->{$key} <=> $b->{$key} } @all );
     }
@@ -2978,7 +2977,7 @@ b: Barrier B: Broadcast g: Gather G: AllGather r: reduce: R: AllReduce
 a: alltoall A: alltoalls w: waiting
 .: consuming CPU cycles ,: using CPU but no queue data -: sleeping *: error
 EOF
-    print($header);
+    print $header ;
     my $l = '0';
     for ( my $i = 1 ; $i < $nprocs ; $i++ ) {
         if ( $i % 10 == 0 ) {
@@ -3031,11 +3030,11 @@ sub show_mpi_watch {
 
     my @all = array_from_target_namespace( $lines->{target_data}{state} );
 
-    my $o = "";
+    my $o = $EMPTY_STRING;
     while ( defined( my $v = shift @all ) ) {
         $o .= $v;
     }
-    print("$o\n");
+    print "$o\n";
     return;
 }
 
@@ -3077,7 +3076,7 @@ sub show_proc_format {
     my @all;
 
     my $lines = tree_from_namespace( $nlines->{target_data} );
-    foreach my $tag ( sort keys %$lines ) {
+    foreach my $tag ( sort keys %{$lines} ) {
         my %hash;
         $hash{vp} = $tag;
         foreach my $key ( keys %{ $lines->{$tag} } ) {
@@ -3237,7 +3236,7 @@ sub add_tag_to_tree {
 sub _display_tree {
     my ( $tree, $parent, $indent ) = @_;
 
-    my $ret = "";
+    my $ret = $EMPTY_STRING;
 
     # Sort peers by lowest rank of each branch.
     my @peers =
@@ -3263,7 +3262,7 @@ sub _display_tree {
 
 sub display_tree {
     my ($tree) = @_;
-    return _display_tree( $tree, "no-parent", "" );
+    return _display_tree( $tree, "no-parent", $EMPTY_STRING );
 }
 
 # An experimental new tree format.
@@ -3271,7 +3270,7 @@ sub new_tree {
     my ($lines) = @_;
     my %tree;
     debug_log( 'tree', undef, 'Making the tree' );
-    foreach my $tag ( sort keys %$lines ) {
+    foreach my $tag ( sort keys %{$lines} ) {
         add_tag_to_tree( \%tree, $tag, $lines->{$tag} );
     }
     debug_log( 'tree', undef, 'Formatting the tree' );
@@ -3291,35 +3290,35 @@ sub complex_output_handler {
         new_tree($lines);
     } elsif ( $output eq 'compress' ) {
 
-        foreach my $tag ( sort { $a <=> $b } ( keys %$lines ) ) {
+        foreach my $tag ( sort { $a <=> $b } ( keys %{$lines} ) ) {
             next if ( not defined $lines->{$tag} );
             my $rng = rng_create_empty();
             rng_add_value( $rng, $tag );
-            foreach my $tag2 ( keys %$lines ) {
+            foreach my $tag2 ( keys %{$lines} ) {
                 next if ( $tag2 eq $tag );
                 if ( cmp_list( \@{ $lines->{$tag} }, \@{ $lines->{$tag2} } ) ) {
                     rng_add_value( $rng, $tag2 );
                     delete( $lines->{$tag2} );
                 }
             }
-            print("----------------\n");
+            print "----------------\n";
             printf "%s\n", rng_convert_to_user($rng);
-            print("----------------\n");
+            print "----------------\n";
             foreach my $data ( @{ $lines->{$tag} } ) {
                 print("$data\n");
             }
         }
     } elsif ( $output eq 'compress_c' ) {
-        foreach my $tag ( sort { $a <=> $b } ( keys %$lines ) ) {
-            print("----------------\n");
-            print("$tag\n");
-            print("----------------\n");
+        foreach my $tag ( sort { $a <=> $b } ( keys %{$lines} ) ) {
+            print "----------------\n";
+            print "$tag\n";
+            print "----------------\n";
             foreach my $data ( @{ $lines->{$tag} } ) {
-                print("$data\n");
+                print "$data\n";
             }
         }
     } else {
-        die("Unexpected output mode $output");
+        die "Unexpected output mode $output";
     }
     return;
 }
@@ -3381,7 +3380,7 @@ sub connect_to_child {
         PeerAddr => $host,
         PeerPort => $port,
         Proto    => 'tcp',
-    ) or die("Failed to connect to child ($host:$port)");
+    ) or die "Failed to connect to child ($host:$port)";
 
     print $socket "hello $word\n";
 
@@ -3389,7 +3388,7 @@ sub connect_to_child {
 }
 
 sub my_encode {
-    return encode_base64( nfreeze(shift), "" );
+    return encode_base64( nfreeze(shift), $EMPTY_STRING );
 }
 
 sub my_decode {
@@ -3414,7 +3413,7 @@ sub extract_line {
         if ( ( $len + 1 ) != $flen ) {
             $str = substr $str, $len + 1, $flen - $len;
         } else {
-            $str = "";
+            $str = $EMPTY_STRING;
 
         }
         $sd->{str} = $str;
@@ -3459,7 +3458,7 @@ sub generate_binary_tree {
 
     while ( @{$a} ) {
         foreach my $joint (@joints) {
-            my @children = splice( @{$a}, 0, $width );
+            my @children = splice @{$a}, 0, $width;
             if ( $#children > -1 ) {
                 push @leaves, @children;
                 @{ $comm_tree{$joint}{children} } = @children;
@@ -3503,7 +3502,7 @@ sub connect_to_children {
         $comm_data->{remote}{$td}{key}
     );
     $cdata->{active}   = 1;
-    $cdata->{str}      = "";
+    $cdata->{str}      = $EMPTY_STRING;
     $cdata->{fd_desc}  = 'child socket';
     $cdata->{line_cb}  = \&command_from_inner;
     $cdata->{eof_cb}   = \&eof_from_fd;
@@ -3613,11 +3612,11 @@ sub next_command {
 
 sub report_failed_signon {
     my ( $key, $data ) = @_;
-    my %c;
-    $c{i} = length $key;
+    my $length = length $key;
     print "$key : ranks\n";
     foreach my $value ( sort keys %{$data} ) {
-        printf "%$c{i}s : %s\n", $value, rng_convert_to_user( $data->{$value} );
+        printf "%$length" . "s : %s\n", $value,
+          rng_convert_to_user( $data->{$value} );
     }
     return;
 }
@@ -3740,7 +3739,7 @@ sub command_from_inner {
     # If there are none then we probably don't have any info from the so tell
     # the inner to quit and don't process any data we have just received.
     if ( not defined $d->{target_data}{found}{yes} ) {
-        printf("No remaining processes, is job dead?\n");
+        print "No remaining processes, is job dead?\n";
         $comm_data->{current_req} = last_command();
         issue_command_to_inner( $cdata, $comm_data->{current_req} );
         return;
@@ -3840,16 +3839,16 @@ sub inner_stdout_cb {
         return;
     } elsif ( $words[0] eq 'debug' ) {
         my $count = $comm_data->{sel}->count();
-        print("There are $count sockets\n");
+        print "There are $count sockets\n";
         return;
     }
-    print("inner: $line\n");
+    print "inner: $line\n";
     return;
 }
 
 sub inner_stderr_cb {
     my ( $comm_data, $cdata, $line ) = @_;
-    print("einner: $line\n");
+    print "einner: $line\n";
     return;
 }
 
@@ -3869,7 +3868,7 @@ sub handle_event_from_socket {
     my $cdata = $comm_data->{sockets}{$h};
 
     my $data;
-    my $nb = sysread( $h, $data, 65536 );
+    my $nb = sysread $h, $data, 65536;
 
     if ( $nb == 0 ) {
         if ( defined $cdata->{eof_cb} ) {
@@ -3890,7 +3889,7 @@ sub handle_event_from_port {
     my $new = $h->accept();
     $comm_data->{sel}->add($new);
     my %cdata;
-    $cdata{str}                 = "";
+    $cdata{str}                 = $EMPTY_STRING;
     $cdata{line_cb}             = \&hello_from_inner;
     $cdata{event_cb}            = \&handle_event_from_socket;
     $comm_data->{sockets}{$new} = \%cdata;
@@ -3947,7 +3946,7 @@ sub rng_convert_from_user {
     my ($range) = @_;
 
     return unless defined $range;
-    return if $range eq "";
+    return if $range eq $EMPTY_STRING;
     return if $range eq "[]";
 
     my $newrange;
@@ -4011,7 +4010,7 @@ sub rng_shift {
 sub rng_add_value {
     my ( $rg, $value ) = @_;
 
-    if ( ref( $rg->[0] ) eq "" ) {
+    if ( ref( $rg->[0] ) eq $EMPTY_STRING ) {
         push @{$rg}, { l => $value, u => $value };
         return;
     }
@@ -4039,7 +4038,7 @@ sub rng_add_value {
         } elsif ( $value < $part->{l} ) {
 
             # If it's before the current entry then insert it.
-            splice( @{$rg}, $idx, 0, { l => $value, u => $value } );
+            splice @{$rg}, $idx, 0, { l => $value, u => $value };
             return;
         } elsif ( $value == $part->{u} + 1 ) {
 
@@ -4051,7 +4050,7 @@ sub rng_add_value {
                 and $part->{u} + 1 == $rg->[ $idx + 1 ]->{l} )
             {
                 $part->{u} = $rg->[ $idx + 1 ]->{u};
-                splice( @{$rg}, $idx + 1, 1 );
+                splice @{$rg}, $idx + 1, 1;
             }
             return;
         } elsif ( $value >= $part->{l} and $value <= $part->{u} ) {
@@ -4098,7 +4097,7 @@ sub rng_create_empty {
 sub rng_empty {
     my ($rg) = @_;
 
-    return ( ref( $rg->[0] ) eq "" );
+    return ( ref( $rg->[0] ) eq $EMPTY_STRING );
 }
 
 sub create_local_port {
@@ -4124,7 +4123,7 @@ sub create_local_port {
         return $sl if defined $sl;
     }
 
-    die("Failed to create local port, no free ports in range \"$range\"\n");
+    die "Failed to create local port, no free ports in range \"$range\"\n";
 }
 
 sub go_parallel {
@@ -4182,7 +4181,7 @@ sub go_parallel {
     my $start = time;
 
     my %op;
-    $op{str}                              = "";
+    $op{str}                              = $EMPTY_STRING;
     $op{line_cb}                          = \&inner_stdout_cb;
     $op{eof_cb}                           = \&eof_from_fd;
     $op{fd_desc}                          = 'Inner stdout';
@@ -4190,7 +4189,7 @@ sub go_parallel {
     $comm_data->{sockets}{ $pcmd->{out} } = \%op;
 
     my %ep;
-    $ep{str}                              = "";
+    $ep{str}                              = $EMPTY_STRING;
     $ep{line_cb}                          = \&inner_stderr_cb;
     $ep{eof_cb}                           = \&eof_from_fd;
     $ep{fd_desc}                          = 'Inner stderr';
@@ -4215,12 +4214,12 @@ sub go_parallel {
 
             if ( $comm_data->{signons} != $comm_data->{nhosts} ) {
                 my $missing = $comm_data->{nhosts} - $comm_data->{signons};
-                print("Waiting for signon from $missing hosts.\n");
+                print "Waiting for signon from $missing hosts.\n";
             }
         }
     }
 
-    waitpid( $pcmd->{pid}, 0 );
+    waitpid $pcmd->{pid}, 0;
     my $res = $?;
 
     if ( $comm_data->{state} ne 'shutdown' ) {
@@ -4254,7 +4253,7 @@ sub find_padb_secret {
     my (
         $dev,  $ino,   $mode,  $nlink, $uid,     $gid, $rdev,
         $size, $atime, $mtime, $ctime, $blksize, $blocks
-    ) = stat($file);
+    ) = stat $file;
 
     # Check that the file is mode 100600 (Octal)
     if ( $mode != 33152 ) {
@@ -4448,8 +4447,8 @@ sub config_help {
             $name =~ s{_}{-}gx;
             if ( defined $conf{mode_options}{$mode}{$key} ) {
                 printf
-                  " %$max_len" . "s = '$conf{mode_options}{$mode}{$key}'\n",
-                  $name;
+                  " %$max_len" . "s = '%s'\n",
+                  $name, $conf{mode_options}{$mode}{$key};
             } else {
                 printf " %$max_len" . "s = undef\n", $name;
             }
@@ -4464,7 +4463,7 @@ sub outer_main {
 
     my $user = $target_user;
 
-    if ( getpwnam $user eq "" ) {
+    if ( getpwnam $user eq $EMPTY_STRING ) {
         print {*STDERR} "$prog: Error: no such user as '$user'\n";
         exit 1;
     }
@@ -4595,7 +4594,7 @@ sub outer_main {
     if ($show_jobs) {
         find_rmgr();
         my @jobids = get_all_jobids($user);
-        print("@jobids\n");
+        print "@jobids\n";
         exit 0;
     }
 
@@ -4735,13 +4734,13 @@ sub outer_main {
 # is self-contained in one file.  Now we just have a big switch on ARGV[0]
 # and either run the inner or outer code depending on if it's set or not.
 
-my %confInner;
+my %inner_conf;
 
 sub debug {
     my ( $vp, $str ) = @_;
-    $confInner{verbose} or return;
+    $inner_conf{verbose} or return;
     $vp = -1 unless defined $vp;
-    print "$confInner{hostname}.$vp:$str\n";
+    print "$inner_conf{hostname}.$vp:$str\n";
     return;
 }
 
@@ -4815,7 +4814,7 @@ sub gdb_start {
 sub gdb_quit {
     my ($gdb) = @_;
     gdb_send( $gdb, 'quit' );
-    waitpid( $gdb->{gdbpid}, 0 );
+    waitpid $gdb->{gdbpid}, 0;
     foreach my $fdname (qw(rdr wtr err)) {
         next unless exists $gdb->{$fdname};
         close $gdb->{$fdname};
@@ -4927,7 +4926,7 @@ sub gdb_strip_first_quotes {
         my $rem   = $2;
         $value =~ s{\\\\}{\\}xg;
         $value =~ s{\\"}{"}xg;
-        if ( not defined $rem or $rem eq "" ) {
+        if ( not defined $rem or $rem eq $EMPTY_STRING ) {
             return $value;
         } else {
             return ( $value, $rem );
@@ -4943,7 +4942,7 @@ sub gdb_strip_first_quotes {
 sub gdb_extract_value_square {
     my ($str) = @_;
 
-    my $value  = "";
+    my $value  = $EMPTY_STRING;
     my $rem    = $str;
     my $indent = 0;
 
@@ -4967,7 +4966,7 @@ sub gdb_extract_value_square {
         } else {
             $indent--;
             if ( $indent == 0 ) {
-                if ( $rem eq "" ) {
+                if ( $rem eq $EMPTY_STRING ) {
                     return ( strip_square($value) );
                 } else {
                     return ( strip_square($value), $rem );
@@ -4982,7 +4981,7 @@ sub gdb_extract_value_square {
 sub gdb_extract_value_braces {
     my $str = shift;
 
-    my $value  = "";
+    my $value  = $EMPTY_STRING;
     my $rem    = $str;
     my $indent = 0;
 
@@ -5005,7 +5004,7 @@ sub gdb_extract_value_braces {
         } else {
             $indent--;
             if ( $indent == 0 ) {
-                if ( $rem eq "" ) {
+                if ( $rem eq $EMPTY_STRING ) {
                     return ( gdb_strip_braces($value) );
                 } else {
                     return ( gdb_strip_braces($value), $rem );
@@ -5155,7 +5154,7 @@ sub gdb_n_next_result {
         #}
         if (m{\A\^(done|error),?(.*)\Z}x) {
             $res{status} = $1;
-            if ( defined $2 and $2 ne "" ) {
+            if ( defined $2 and $2 ne $EMPTY_STRING ) {
                 $res{reason} = $2;
             }
 
@@ -5203,7 +5202,7 @@ sub gdb_type_offset {
     my %p =
       gdb_n_send( $gdb, "-data-evaluate-expression \"&(($type *)0)->$field\"" );
     return unless ( $p{status} eq 'done' );
-    return hex( gdb_strip_value( $p{reason} ) );
+    return hex gdb_strip_value( $p{reason} );
 }
 
 sub gdb_func_addr {
@@ -5246,11 +5245,11 @@ sub gdb_read_raw {
 sub gdb_string {
     my ( $gdb, $strp ) = @_;
     my $offset = 0;
-    my $str    = "";
+    my $str    = $EMPTY_STRING;
     my @s      = gdb_read_raw( $gdb, $strp, 128 );
     return if ( not defined $s[0] );
     foreach my $d (@s) {
-        my $v = hex($d);
+        my $v = hex $d;
         return $str if ( $v == 0 );
         $str .= sprintf '%c', $v;
     }
@@ -5293,7 +5292,7 @@ sub minfo_handle_query {
         $res = $vp;
         $stats->{rank}++;
     } elsif ( $cmd eq 'image' ) {
-        my $image = readlink("/proc/$gdb->{tracepid}/exe");
+        my $image = readlink "/proc/$gdb->{tracepid}/exe";
         if ( defined $image ) {
             $res = $image;
         }
@@ -5321,7 +5320,7 @@ sub run_minfo {
     };
     my @mq;
 
-    my $cmd = $confInner{minfo};
+    my $cmd = $inner_conf{minfo};
     $h->{hpid} = open3( $h->{wtr}, $h->{rdr}, $h->{err}, $cmd )
       or confess "Unable to popen() h: $!\n";
 
@@ -5352,7 +5351,7 @@ sub run_minfo {
 
     my $sc = keys %stats;
 
-    waitpid( $h->{hpid}, 0 );
+    waitpid $h->{hpid}, 0;
     close $h->{rdr};
     close $h->{wtr};
     close $h->{err};
@@ -5360,7 +5359,7 @@ sub run_minfo {
     if ( $sc == 0 ) {
 
         # No interaction was had with minfo, abort with nothing.
-        target_error( $vp, "Error running $confInner{minfo}: No contact" );
+        target_error( $vp, "Error running $inner_conf{minfo}: No contact" );
         return;
     }
 
@@ -5368,7 +5367,7 @@ sub run_minfo {
 
         # Bad exit code but we did talk to it so run with what we have.
         target_error( $vp,
-            "Error running $confInner{minfo}: Bad exit code $?" );
+            "Error running $inner_conf{minfo}: Bad exit code $?" );
     }
 
     return @mq;
@@ -5550,7 +5549,7 @@ sub mpi_go_deadlock_detect_helper {
     my $size       = shift;    # size of the group
     my @identical  = (@_);     # member list
     my $ret;
-    my $sstr = defined $size ? " (size $size)" : "";
+    my $sstr = defined $size ? " (size $size)" : $EMPTY_STRING;
 
     my $members = 'members';
     my $are     = 'are';
@@ -5619,9 +5618,9 @@ sub mpi_go_deadlock_detect {
         }
     }
 
-    my $ret     = "";
-    my $i_count = 0;    # Interesting groups.
-                        #foreach my $gid ( sort { $a <=> $b } keys %ad ) {
+    my $ret     = $EMPTY_STRING;
+    my $i_count = 0;               # Interesting groups.
+         #foreach my $gid ( sort { $a <=> $b } keys %ad ) {
 
     foreach my $gid ( sort keys %ad ) {
 
@@ -5666,7 +5665,7 @@ sub mpi_go_deadlock_detect {
                     $ret .= $gstr
                       . mpi_go_deadlock_detect_helper( "in call $number to $s",
                         0, $ad{$gid}{size}, @{ $active{$number} } );
-                    $gstr = "";
+                    $gstr = $EMPTY_STRING;
 
                 }
                 foreach my $number ( sort keys %inactive ) {
@@ -5678,7 +5677,7 @@ sub mpi_go_deadlock_detect {
         } else {
             next unless ( $carg->{show_all_groups} );
             $ret .= $gstr;
-            $gstr = "";
+            $gstr = $EMPTY_STRING;
         }
 
         {
@@ -5693,7 +5692,7 @@ sub mpi_go_deadlock_detect {
                   . mpi_go_deadlock_detect_helper(
                     'not in a call to the collectives',
                     0, $ad{$gid}{size}, @inactive );
-                $gstr = "";
+                $gstr = $EMPTY_STRING;
             }
         }
     }
@@ -5701,7 +5700,7 @@ sub mpi_go_deadlock_detect {
     my $count = keys %ad;
 
     if ( $count == 1 ) {
-        my $use_str = ( $i_count == 1 ) ? "" : ' not';
+        my $use_str = ( $i_count == 1 ) ? $EMPTY_STRING : ' not';
         $ret .= "Total: $count group which is$use_str in use.\n";
     } else {
         my $i_str = ( $i_count == 1 ) ? 'is' : 'are';
@@ -5739,13 +5738,13 @@ sub mpi_deadlock_detect {
               )
             {
                 $lid{$1}{coll}{$2}{count} = $3;
-                if ( $4 eq "" ) {
+                if ( $4 eq $EMPTY_STRING ) {
                     $lid{$1}{coll}{$2}{active} = 1;
                 }
             } elsif ( $line =~ /^msg\d+/ ) {
                 ;    # nop
             } else {
-                print("Failed to match minfo output: $line\n");
+                print "Failed to match minfo output: $line\n";
             }
         }
         $coll_data{$rank} = \%lid;
@@ -5878,9 +5877,9 @@ sub stack_from_core {
     $r =~ s/\\"/\"/g;    #"
     $r =~ s/\\\\/\\/g;
 
-    my @r = split( "\n", $r );
+    my @r = split "\n", $r;
 
-    foreach my $l ( split( "\n", $r ) ) {
+    foreach my $l ( split "\n", $r ) {
         next if ( $l =~ m/^done/ );
         next if ( $l =~ m/^Loaded/ );
         next if ( $l =~ m/^Reading/ );
@@ -5935,9 +5934,9 @@ sub stack_from_core {
                 if ( $conf{stack_shows_locals} ) {
                     foreach my $arg ( @{ $frame->{locals} } ) {
                         if ( defined $frame->{vals}{$arg} ) {
-                            print("  $arg = $frame->{vals}{$arg}\n");
+                            print "  $arg = $frame->{vals}{$arg}\n";
                         } else {
-                            print("  $arg = ??\n");
+                            print "  $arg = ??\n";
                         }
                     }
                 }
@@ -6101,7 +6100,7 @@ sub show_task_dir {
                   split $SPACE, $rgn;
                 if ( $file =~ '/dev/elan4/sdram(\d+)' ) {
                     my $rail = $1;
-                    my ( $start, $end ) = split( "-", $area );
+                    my ( $start, $end ) = split "-", $area;
                     my $s     = _hex("0x$start");
                     my $e     = _hex("0x$end");
                     my $delta = $e - $s;
@@ -6216,7 +6215,7 @@ my %proc_keys;
 
 sub proc_output {
     my ( $vp, $key, $value ) = @_;
-    if ( $confInner{mode} eq 'proc_summary' ) {
+    if ( $inner_conf{mode} eq 'proc_summary' ) {
         if ( defined $proc_keys{ lc $key } ) {
             target_key_pair( $vp, lc $key, $value );
         }
@@ -6350,7 +6349,7 @@ sub show_proc {
     my ( $carg, $vp, $pid ) = @_;
 
     if ( $carg->{proc_shows_proc} ) {
-        proc_output( $vp, 'hostname', $confInner{hostname} );
+        proc_output( $vp, 'hostname', $inner_conf{hostname} );
     }
 
     if ( -d "/proc/$pid/task" and $carg->{proc_shows_proc} ) {
@@ -6593,12 +6592,13 @@ sub show_queue {
     my %remote_env = get_remote_env($pid);
 
     if ( defined $remote_env{LD_LIBRARY_PATH} ) {
-        $ENV{LD_LIBRARY_PATH} = "$remote_env{LD_LIBRARY_PATH}:$confInner{myld}";
+        $ENV{LD_LIBRARY_PATH} =
+          "$remote_env{LD_LIBRARY_PATH}:$inner_conf{myld}";
     }
 
-    my $cmd = "$confInner{edb} --queues --pid=$pid";
-    if ( defined $confInner{edbopt} ) {
-        $cmd .= " $confInner{edbopt}";
+    my $cmd = "$inner_conf{edb} --queues --pid=$pid";
+    if ( defined $inner_conf{edbopt} ) {
+        $cmd .= " $inner_conf{edbopt}";
     }
     my $lines = run_ptrack_cmd( $vp, $pid, $cmd );
 
@@ -6633,7 +6633,7 @@ sub show_full_stacks {
 sub set_debug {
     my ( $carg, $vp, $pid ) = @_;
     run_command( $vp,
-        "edb --key $confInner{key} --debug=$carg->{dflag} --target-vp=$vp" );
+        "edb --key $inner_conf{key} --debug=$carg->{dflag} --target-vp=$vp" );
     return;
 }
 
@@ -6673,7 +6673,7 @@ sub mpi_watch_load {
     }
 
     my %fns;
-    foreach my $mode ( split( "\n", $mpi_watch_data ) ) {
+    foreach my $mode ( split "\n", $mpi_watch_data ) {
         chomp $mode;
         my ( $name, $char, @fns ) = split $COMMA, $mode;
         $fns{names}{$name} = $char;
@@ -6840,7 +6840,7 @@ sub maybe_show_pid {
 
     debug( $vp, "maybe_show_pid vp $vp, pid: $pid" );
 
-    $confInner{rmpids}{$pid}{rank} = $vp;
+    $inner_conf{rmpids}{$pid}{rank} = $vp;
     return;
 }
 
@@ -6882,13 +6882,13 @@ sub slurm_find_pids {
     my $jobid = shift;
 
     my @procs =
-      `scontrol listpids $jobid.$confInner{slurm_job_step} 2>/dev/null`;
+      `scontrol listpids $jobid.$inner_conf{slurm_job_step} 2>/dev/null`;
     return if ( $? != 0 );
     foreach my $proc (@procs) {
         my ( $pid, $job, $step, undef, $global ) = split $SPACE, $proc;
         next if ( $global eq '-' );
         next unless ( $job eq $jobid );
-        next unless ( $step == $confInner{slurm_job_step} );
+        next unless ( $step == $inner_conf{slurm_job_step} );
         maybe_show_pid( $global, $pid );
     }
     return;
@@ -6907,7 +6907,7 @@ sub mpd_find_pids {
     my $job = shift;
     my $d   = mpd_get_data();
 
-    my $j = $d->{$job}{pids}{ $confInner{hostname} };
+    my $j = $d->{$job}{pids}{ $inner_conf{hostname} };
 
     foreach my $pid ( keys %{$j} ) {
         maybe_show_pid( $j->{$pid}, $pid );
@@ -6918,10 +6918,10 @@ sub mpd_find_pids {
 sub open_find_pids {
     my $job = shift;
 
-    my $hostname = $confInner{hostname};
+    my $hostname = $inner_conf{hostname};
 
-    foreach my $rank ( keys %{ $confInner{orte_data}{$hostname} } ) {
-        maybe_show_pid( $rank, $confInner{orte_data}{$hostname}{$rank} );
+    foreach my $rank ( keys %{ $inner_conf{orte_data}{$hostname} } ) {
+        maybe_show_pid( $rank, $inner_conf{orte_data}{$hostname}{$rank} );
     }
     return;
 }
@@ -6997,7 +6997,7 @@ sub inner_show_stats {
     my $jobid = shift;
     my $key   = ( $jobid << 9 ) - 1;
     run_command( undef,
-        "$confInner{edb} --stats-raw --parallel --key=$key $confInner{edbopt}"
+        "$inner_conf{edb} --stats-raw --parallel --key=$key $inner_conf{edbopt}"
     );
     return;
 }
@@ -7123,7 +7123,7 @@ sub reply_from_child {
 # so if that yeilds nothing then load the name from the status file.
 sub pid_to_name {
     my $pid = shift;
-    my $exe = readlink("/proc/$pid/exe");
+    my $exe = readlink "/proc/$pid/exe";
     my $cmd;
     if ( defined $exe ) {
         return basename($exe);
@@ -7140,9 +7140,9 @@ sub convert_pids_to_child_pids {
     my @pids = get_process_list( getpwuid $< );
 
     my %scripts;
-    map { $scripts{$_}++ } split $COMMA, $confInner{scripts};
+    map { $scripts{$_}++ } split $COMMA, $inner_conf{scripts};
 
-    my $ipids = $confInner{rmpids};
+    my $ipids = $inner_conf{rmpids};
 
     foreach my $pid (@pids) {
 
@@ -7215,7 +7215,7 @@ sub convert_pids_to_child_pids {
     }
 
     # Sort local pids by order of increasing rank.
-    @{ $confInner{all_pids} } = sort { $a->{vp} <=> $b->{vp} } @apids;
+    @{ $inner_conf{all_pids} } = sort { $a->{vp} <=> $b->{vp} } @apids;
     return;
 }
 
@@ -7224,17 +7224,17 @@ sub convert_pids_to_child_pids {
 sub inner_find_pids {
     my ( $netdata, $cmd ) = @_;
 
-    if ( $confInner{rmgr} eq 'orte' ) {
-        $confInner{orte_data} = $cmd->{orte_data};
+    if ( $inner_conf{rmgr} eq 'orte' ) {
+        $inner_conf{orte_data} = $cmd->{orte_data};
     }
 
     # Query the resource manager to find the pids,
     # they'll be added to the "all_pids" array.
-    $rmgr{ $confInner{rmgr} }{find_pids}( $confInner{jobid} );
+    $rmgr{ $inner_conf{rmgr} }{find_pids}( $inner_conf{jobid} );
 
     convert_pids_to_child_pids();
 
-    foreach my $proc ( @{ $confInner{all_pids} } ) {
+    foreach my $proc ( @{ $inner_conf{all_pids} } ) {
         my $pid = $proc->{pid};
         my $vp  = $proc->{vp};
         target_key_pair( $vp, 'found', 'yes' );
@@ -7260,12 +7260,12 @@ sub command_from_parent {
 
         # Setup the environment.
         foreach my $key ( keys %{ $cmd->{cinner} } ) {
-            $confInner{$key} = $cmd->{cinner}{$key};
+            $inner_conf{$key} = $cmd->{cinner}{$key};
         }
 
         if (
             not
-            exists $cmd->{connection_tree}{ $confInner{hostname} }{children} )
+            exists $cmd->{connection_tree}{ $inner_conf{hostname} }{children} )
         {
             $netdata->{children} = 0;
             inner_find_pids( $netdata, $cmd );
@@ -7273,7 +7273,7 @@ sub command_from_parent {
         }
 
         my @children =
-          @{ $cmd->{connection_tree}{ $confInner{hostname} }{children} };
+          @{ $cmd->{connection_tree}{ $inner_conf{hostname} }{children} };
         $netdata->{children} = $#children + 1;
 
         # Only one child is tested so far.
@@ -7310,7 +7310,7 @@ sub command_from_parent {
         return;
     }
 
-    $confInner{mode} = $cmd->{mode};
+    $inner_conf{mode} = $cmd->{mode};
 
     my $pid_list;
 
@@ -7321,7 +7321,7 @@ sub command_from_parent {
 
         # Loop over ranks first as there are potentially more of them.
         while ( defined( my $rank = rng_shift($rng) ) ) {
-            foreach my $proc ( @{ $confInner{all_pids} } ) {
+            foreach my $proc ( @{ $inner_conf{all_pids} } ) {
                 my $vp = $proc->{vp};
                 if ( $vp == $rank ) {
                     push @{$pid_list}, $proc;
@@ -7329,7 +7329,7 @@ sub command_from_parent {
             }
         }
     } else {
-        $pid_list = $confInner{all_pids};
+        $pid_list = $inner_conf{all_pids};
     }
 
     # Record that this processes is still here so the outer process can exit if
@@ -7410,8 +7410,8 @@ sub inner_cleanup_and_exit {
 sub reply_to_parent {
     my ( $netdata, $cmd ) = @_;
 
-    $cmd->{host_responce}{ $netdata->{host_responce} }{ $confInner{hostname} } =
-      1;
+    $cmd->{host_responce}{ $netdata->{host_responce} }
+      { $inner_conf{hostname} } = 1;
 
     my $reply = my_encode($cmd);
     $netdata->{parent}->{socket}->print("$reply\n");
@@ -7429,7 +7429,7 @@ sub command_from_outer {
         if ( $line eq "hello $netdata->{key}" ) {
 
             $cdata->{trusted} = 1;
-            $cdata->{str}     = "";
+            $cdata->{str}     = $EMPTY_STRING;
             $s->printf("Welcome\n");
             $netdata->{parent} = $cdata;
         } elsif ( $line eq 'debug' ) {
@@ -7484,10 +7484,10 @@ sub command_from_outer {
 sub inner_loop_for_comms {
     my ($outerloc) = @_;
 
-    my $server = create_local_port( $confInner{port_range} );
+    my $server = create_local_port( $inner_conf{port_range} );
 
     my $lport    = $server->sockport();
-    my $hostname = $confInner{hostname};
+    my $hostname = $inner_conf{hostname};
     my $key      = rand;
 
     if ( defined $outerloc ) {
@@ -7578,7 +7578,7 @@ sub inner_loop_for_comms {
 
 sub inner_main {
 
-    $confInner{hostname} = hostname();
+    $inner_conf{hostname} = hostname();
 
     # Load the inner config options, the defaults are the same
     # as the outer config options so just load them as they are
@@ -7587,28 +7587,28 @@ sub inner_main {
     # If any of these options are set then the outer process
     # will forward on any changes as part of the setup procedure.
     foreach my $conf (@inner_conf) {
-        $confInner{$conf} = $conf{$conf};
+        $inner_conf{$conf} = $conf{$conf};
     }
 
     foreach my $conf (@inner_conf_cmd) {
-        $confInner{$conf} = $conf{$conf};
+        $inner_conf{$conf} = $conf{$conf};
     }
 
     # Over-ride the defaults for these two as minfo might not
     # exist on the front end.
-    $confInner{edb}   = find_edb();
-    $confInner{minfo} = find_minfo();
+    $inner_conf{edb}   = find_edb();
+    $inner_conf{minfo} = find_minfo();
 
     # Load the command line options.
     my %optionhash;
 
-    map { $optionhash{"$_=s"} = \$confInner{$_} } @inner_conf_cmd;
+    map { $optionhash{"$_=s"} = \$inner_conf{$_} } @inner_conf_cmd;
 
     GetOptions(%optionhash) or confess("could not parse options\n");
 
-    $confInner{myld} = $ENV{LD_LIBRARY_PATH};
+    $inner_conf{myld} = $ENV{LD_LIBRARY_PATH};
 
-    inner_loop_for_comms( $confInner{outer} );
+    inner_loop_for_comms( $inner_conf{outer} );
     exit 0;
 
 }
