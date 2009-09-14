@@ -258,7 +258,7 @@ my %conf;
 my $secret;
 
 # Config options the inner knows about, only forward options if they are in this list.
-my @inner_conf = qw(edb edbopt minfo rmgr scripts slurm_job_step verbose);
+my @inner_conf = qw(edb edbopt minfo rmgr scripts slurm_job_step);
 
 # More config options the inner knows about, these are forwarded on the command line
 # rather than over the sockets.
@@ -2547,7 +2547,7 @@ sub mpd_get_data {
         $key =~ s/ //g;
         chomp $value;
         if ( $key eq 'jobid' ) {
-            my ( $j, $host ) = split "@", $value;
+            my ( $j, undef ) = split "@", $value;
             $job = $j;
         }
         if ( $key eq 'username' ) {
@@ -4806,14 +4806,6 @@ sub outer_main {
 
 my %inner_conf;
 
-sub debug {
-    my ( $vp, $str ) = @_;
-    $inner_conf{verbose} or return;
-    $vp = -1 unless defined $vp;
-    print "$inner_conf{hostname}.$vp:$str\n";
-    return;
-}
-
 my %inner_output;
 my %local_target_data;
 
@@ -5400,13 +5392,10 @@ sub run_minfo {
         if ( $r =~ m{\Areq:}x ) {
             my $res = minfo_handle_query( $gdb, $vp, $r, \%stats );
 
-            print {$out} "$res\n";
-
             # Some things *do* fail here, symbol lookups for example.
             # and we don't need to report it.
-            if ( $res eq 'fail' ) {
-                debug( $vp, "Failed dll request $r\n" );
-            }
+
+            print {$out} "$res\n";
         } else {
             push @mq, $r;
         }
@@ -6901,8 +6890,6 @@ sub mpi_watch_all {
 sub maybe_show_pid {
     my ( $vp, $pid ) = @_;
 
-    debug( $vp, "maybe_show_pid vp $vp, pid: $pid" );
-
     $inner_conf{rmpids}{$pid}{rank} = $vp;
     return;
 }
@@ -7029,15 +7016,9 @@ sub rms_find_pids {
             } elsif ( defined $env{SLURM_PROCID} ) {
                 $vp = $env{SLURM_PROCID};
             } else {
-
-                debug( undef,
-                    "Could not extract vp for process, $proc->{pid} "
-                      . ( readlink "/proc/$proc->{pid}/exe" ) );
                 next;
             }
         }
-
-        debug( $vp, "Found $found vp $vp, pid: $proc->{pid}" );
 
         push @{ $vps{$vp}{$found} }, $proc->{pid};
     }
