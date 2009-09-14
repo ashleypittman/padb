@@ -1985,7 +1985,7 @@ sub cmp_list {
         return 0;
     }
 
-    for ( my $i = 0 ; $i <= $#{$l1} ; $i++ ) {
+    foreach my $i ( 0 .. $#{$l1} ) {
         if ( !defined( ${$l2}[$i] ) || ${$l1}[$i] ne ${$l2}[$i] ) {
             return 0;
         }
@@ -2926,7 +2926,7 @@ sub strip_stack_traces {
         # well.
         my $main_idx;
         my $wait_idx = 0;
-        for ( my $l = 0 ; $l < $#{ $lines->{$tag} } ; $l++ ) {
+        for my $l ( 0 .. $#{ $lines->{$tag} } ) {
             if ( $lines->{$tag}->[$l] =~ /(\w*)\(/ ) {
                 if ( defined $below{$1} ) {
                     $main_idx = $l;
@@ -2977,9 +2977,11 @@ b: Barrier B: Broadcast g: Gather G: AllGather r: reduce: R: AllReduce
 a: alltoall A: alltoalls w: waiting
 .: consuming CPU cycles ,: using CPU but no queue data -: sleeping *: error
 EOF
-    print $header ;
+
+    print $header;
     my $l = '0';
-    for ( my $i = 1 ; $i < $nprocs ; $i++ ) {
+
+    for my $i ( 1 .. $nprocs - 1 ) {
         if ( $i % 10 == 0 ) {
             $l .= substr $i, 0, 1;
         } elsif ( $i % 5 == 0 ) {
@@ -3642,7 +3644,7 @@ sub check_signon {
     }
     my $rng = rng_create_empty();
 
-    for ( my $proc = 0 ; $proc < $comm_data->{nprocesses} ; $proc++ ) {
+    foreach my $proc ( 0 .. $comm_data->{nprocesses} - 1 ) {
         if ( not defined $here{$proc} ) {
             rng_add_value( $rng, $proc );
         }
@@ -6061,8 +6063,8 @@ sub show_task_stat_file {
     foreach my $l ( slurp_file($file) ) {
         chomp $l;
         my @stats = split $SPACE, $l;
-        for ( my $i = 0 ; $i <= $#stats ; $i++ ) {
-            proc_output( $vp, "stat.$stat_names[$i]", $stats[$i] );
+        foreach my $stat ( 0 .. $#stats ) {
+            proc_output( $vp, "stat.$stat_names[$stat]", $stats[$stat] );
         }
 
     }
@@ -6524,7 +6526,7 @@ sub stack_trace_from_pids {
                 }
             }
 
-            for ( my $i = $#frames ; $i >= 0 ; $i-- ) {
+            foreach my $i ( reverse 0 .. $#frames ) {
                 my $frame = $frames[$i];
 
                 target_error( $vp, "error from gdb: $frame->{error}" )
@@ -6801,7 +6803,7 @@ sub mpi_watch_all {
 
         foreach my $thread ( sort { $a->{id} <=> $b->{id} } @threads ) {
             my @frames = @{ $thread->{frames} };
-            for ( my $i = $#frames ; $i >= 0 ; $i-- ) {
+            foreach my $i ( reverse 0 .. $#frames ) {
                 my $frame = $frames[$i];
                 if ( defined $fns->{fns}{ $frame->{func} } ) {
                     $fnmode = $fns->{fns}{ $frame->{func} };
