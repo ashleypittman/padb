@@ -545,8 +545,8 @@ Usage: padb [-hv] [-c|-C|-t] -g|-q|-s|-x|-X [-O <opt>=<val>
 XXXX
    --full-report=<JOBID> Generate a full report of job state.
 
-   --nostrip-below-main Don't strip stack traces below main.
-   --nostrip-above-wait Don't strip stack traces about elan_waitWord.
+   --no-strip-below-main Don't strip stack traces below main.
+   --no-strip-above-wait Don't strip stack traces about elan_waitWord.
 
    --proc-format       Specify information to show about processes.
 
@@ -853,6 +853,14 @@ sub parse_args_outer {
             foreach my $o ( keys %{ $allfns{$arg}{options_i} } ) {
                 $conf{mode_options}{$arg}{$o} = $allfns{$arg}{options_i}{$o};
                 $conf{mode_options_reverse}{$o}{$arg} = 1;
+            }
+        }
+
+        if ( defined $allfns{$arg}{options_bool} ) {
+            foreach my $o ( keys %{ $allfns{$arg}{options_bool} } ) {
+                $conf{mode_options}{$arg}{$o} = $allfns{$arg}{options_bool}{$o};
+                $conf{mode_options_reverse}{$o}{$arg} = 1;
+                $conf{options_verify}{$arg}{$o} = \&check_and_convert_bool;
             }
         }
 
@@ -5515,7 +5523,6 @@ sub show_mpi_queue_all {
         my $vp  = $proc->{vp};
         my $pid = $proc->{pid};
 
-        debug $vp, "Attaching to $pid";
         my $gdb = gdb_start();
         if ( gdb_attach( $gdb, $pid ) ) {
             $proc->{gdb} = $gdb;
@@ -5563,7 +5570,6 @@ sub show_mpi_queue_for_deadlock_all {
         my $vp  = $proc->{vp};
         my $pid = $proc->{pid};
 
-        debug $vp, "Attaching to $pid";
         my $gdb = gdb_start();
         if ( gdb_attach( $gdb, $pid ) ) {
             $proc->{gdb} = $gdb;
@@ -6009,7 +6015,6 @@ sub stack_from_core {
 sub run_ptrack_cmd {
     my ( $vp, $pid, $cmd ) = @_;
 
-    debug $vp, "running (p) $cmd";
     my $lines = 0;
 
     send_cont_signal($pid);
@@ -6027,14 +6032,12 @@ sub run_ptrack_cmd {
 
 sub run_command {
     my ( $vp, $cmd ) = @_;
-    debug $vp, "running $cmd";
     open my $CMDS, '-|', "$cmd" or p_die $vp, 'cant fork subcommand';
     while (<$CMDS>) {
         chomp $_;
         output $vp, $_;
     }
     close $CMDS;
-    debug $vp, "Finished $cmd";
     return;
 }
 
@@ -6182,14 +6185,10 @@ sub show_task_dir {
             $fdhash{target} = $target;
             $fdhash{fd}     = $fd;
 
-            # New fdinfo data, it's verbose so only enable it
-            # if requested by -O proc-shows-fds=full
-            if ( $carg->{proc_shows_fds} eq 'full' ) {
-                if ( -f "$dir/fdinfo/$fd" ) {
-                    foreach my $fdi ( slurp_file("$dir/fdinfo/$fd") ) {
-                        if ( $fdi =~ m{\A(\w+):\s*(\d+)\Z}x ) {
-                            $fdhash{$1} = $2;
-                        }
+            if ( -f "$dir/fdinfo/$fd" ) {
+                foreach my $fdi ( slurp_file("$dir/fdinfo/$fd") ) {
+                    if ( $fdi =~ m{\A(\w+):\s*(\d+)\Z}x ) {
+                        $fdhash{$1} = $2;
                     }
                 }
             }
@@ -6482,7 +6481,6 @@ sub stack_trace_from_pids {
         my $vp  = $proc->{vp};
         my $pid = $proc->{pid};
 
-        debug $vp, "Attaching to $pid";
         my $gdb = gdb_start();
         if ( gdb_attach( $gdb, $pid ) ) {
             $proc->{gdb} = $gdb;
@@ -6507,11 +6505,9 @@ sub stack_trace_from_pids {
 
         my $ok;
         do {
-            debug $vp, "try $tries";
             my $gdb;
 
             if ($tries) {
-                debug $vp, "Re-attaching to $pid, $tries";
                 send_cont_signal($pid);
                 my $g = gdb_start();
                 if ( gdb_attach( $g, $pid ) ) {
@@ -6990,12 +6986,6 @@ sub rms_find_pids {
         # With any luck we have a new RMS and vp is extracted from /proc
         # Otherwise try and pick it out of the environment in a sane way
         # if that fails report errors for any process with isn't rmsloader
-
-        if ( defined $vp ) {
-            debug $vp, "Maybe looking at vp: $vp, pid: $proc->{pid}";
-        } else {
-            debug undef, "Maybe looking at pid: $proc->{pid}";
-        }
 
         # Strip or rmsloader and slurm[step]d;
         next if ( is_resmgr_process( $proc->{pid} ) );
@@ -7743,28 +7733,28 @@ sub common_main {
     };
 
     $allfns{deadlock} = {
-        handler_all => \&show_mpi_queue_for_deadlock_all,
-        arg_long    => 'deadlock',
-        arg_short   => 'j',
-        help        => 'Run deadlock detection algorithm',
-        out_handler => \&mpi_deadlock_detect,
-        options_i   => {
-            mpi_dll            => undef,
-            show_group_members => 0,
-            show_all_groups    => 0,
-          }
+        handler_all  => \&show_mpi_queue_for_deadlock_all,
+        arg_long     => 'deadlock',
+        arg_short    => 'j',
+        help         => 'Run deadlock detection algorithm',
+        out_handler  => \&mpi_deadlock_detect,
+        options_i    => { mpi_dll => undef, },
+        options_bool => {
+            show_group_members => 'no',
+            show_all_groups    => 'no',
+        },
 
     };
 
     $allfns{pinfo} = {
-        handler_all => \&show_proc_all,
-        arg_long    => 'proc-info',
-        help        => 'Show process information',
-        options_i   => {
-            proc_shows_proc => 1,
-            proc_shows_fds  => 1,
-            proc_shows_maps => 0,
-            proc_shows_stat => 0
+        handler_all  => \&show_proc_all,
+        arg_long     => 'proc-info',
+        help         => 'Show process information',
+        options_bool => {
+            proc_shows_proc => 'yes',
+            proc_shows_fds  => 'no',
+            proc_shows_maps => 'no',
+            proc_shows_stat => 'no',
           }
 
     };
@@ -7775,15 +7765,18 @@ sub common_main {
         arg_long    => 'proc-summary',
         help        => 'Show process information in top format',
         options_i   => {
-            column_seperator   => '  ',
-            proc_shows_proc    => 1,
-            proc_shows_fds     => 0,
-            proc_shows_maps    => 0,
-            proc_shows_stat    => 1,
-            proc_sort_key      => 'vp',
-            proc_show_header   => 1,
-            reverse_sort_order => 0,
-            nprocs_output      => undef,
+            column_seperator => '  ',
+            proc_sort_key => 'vp',
+            nprocs_output => undef,
+        },
+        options_bool => {
+            proc_show_proc     => 'yes',
+            proc_shows_stat    => 'yes',
+            proc_shows_fds     => 'no',
+            proc_shows_maps    => 'no',
+            proc_show_header   => 'yes',
+            reverse_sort_order => 'no',
+
         },
         secondary => [
             {
@@ -7791,7 +7784,7 @@ sub common_main {
                 type     => '=s',
                 default =>
 'vp=vpid,hostname,pid,vmsize,vmrss,stat.state=S,load1=uptime,pcpu=%cpu,stat.processor=lcore,name=command'
-            }
+            },
           ]
 
     };
@@ -7802,12 +7795,14 @@ sub common_main {
         arg_short   => 'x',
         help        => 'Show stack trace (see also -t)',
         options_i   => {
-            stack_shows_params => 0,
-            stack_shows_locals => 0,
-            gdb_retry_count    => 3,
+            gdb_retry_count => 3,
             stack_strip_above =>
 'elan_waitWord,elan_pollWord,elan_deviceCheck,opal_condition_wait,opal_progress',
             stack_strip_below => 'main,__libc_start_main,start_thread',
+        },
+        options_bool => {
+            stack_shows_params => 'no',
+            stack_shows_locals => 'no',
         },
         secondary => [
             {
@@ -7881,21 +7876,25 @@ sub common_main {
         options_i   => {
             stats_name     => undef,
             stats_sort_key => 'vp',
-            stats_reverse  => 0,
-            stats_short    => 0,
-            show_all_stats => 0,
-        }
+
+        },
+        options_bool => {
+            stats_reverse  => 'no',
+            stats_short    => 'no',
+            show_all_stats => 'no',
+          }
+
     };
     $allfns{qsnet_groups} = {
-        handler_all => \&inner_show_stats,
-        out_handler => \&group_status,
-        qsnet       => 1,
-        arg_long    => 'group',
-        arg_short   => 'g',
-        help        => 'Show the state of collective operations (groups).',
-        options_i   => {
-            show_group_members => 0,
-            show_all_groups    => 0,
+        handler_all  => \&inner_show_stats,
+        out_handler  => \&group_status,
+        qsnet        => 1,
+        arg_long     => 'group',
+        arg_short    => 'g',
+        help         => 'Show the state of collective operations (groups).',
+        options_bool => {
+            show_group_members => 'no',
+            show_all_groups    => 'no',
         }
     };
 
