@@ -4471,9 +4471,18 @@ sub config_from_env {
 }
 
 sub _config_help {
-    my ( $max_len, $mode ) = @_;
+    my ($mode) = @_;
 
     print "\nOptions for mode '$allfns{$mode}{arg_long}'\n";
+
+    my $max_len = 0;
+
+    foreach my $key ( sort keys %{ $conf{mode_options}{$mode} } ) {
+        if ( length($key) > $max_len ) {
+            $max_len = length($key);
+        }
+    }
+
     foreach my $key ( sort keys %{ $conf{mode_options}{$mode} } ) {
         my $name = $key;
         $name =~ s{_}{-}gx;
@@ -4485,6 +4494,7 @@ sub _config_help {
             printf " %$max_len" . "s = undef\n", $name;
         }
     }
+    return;
 }
 
 sub config_help {
@@ -4512,10 +4522,10 @@ sub config_help {
     }
 
     if ( defined $mode ) {
-        _config_help( $max_len, $mode );
+        _config_help($mode);
     } else {
         foreach ( sort keys %{ $conf{mode_options} } ) {
-            _config_help( $max_len, $_ );
+            _config_help($_);
         }
     }
     return;
