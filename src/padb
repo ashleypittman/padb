@@ -4155,7 +4155,6 @@ sub go_parallel {
 
     my $pcmd = {
         pid => -1,
-        in  => "",
         out => *OUT,
         err => *ERR,
     };
@@ -5243,10 +5242,10 @@ sub gdb_read_raw {
 }
 
 sub gdb_string {
-    my ( $gdb, $strp ) = @_;
+    my ( $gdb, $len, $strp ) = @_;
     my $offset = 0;
     my $str    = $EMPTY_STRING;
-    my @s      = gdb_read_raw( $gdb, $strp, 128 );
+    my @s      = gdb_read_raw( $gdb, $strp, $len );
     return if ( not defined $s[0] );
     foreach my $d (@s) {
         my $v = hex $d;
@@ -5259,38 +5258,35 @@ sub gdb_string {
 sub minfo_handle_query {
     my ( $gdb, $vp, $query, $stats ) = @_;
 
-    # Shouldn't this be?
     my ( undef, $cmd, @params ) = split $SPACE, $query;
     my $res;
     return 'fail' unless defined $cmd;
-    if ( $cmd eq 'size' ) {
-        $res = gdb_type_size( $gdb, $params[0] );
-        $stats->{size}++;
-    } elsif ( $cmd eq 'offset' ) {
-        $res = gdb_type_offset( $gdb, $params[0], $params[1] );
-        $stats->{offset}++;
-    } elsif ( $cmd eq 'string' ) {
-        my $str = gdb_string( $gdb, $params[1] );
-        if ( defined $str ) {
-            $stats->{string}++;
-            $res = $str;
-        }
-    } elsif ( $cmd eq 'func' ) {
-        $res = gdb_func_addr( $gdb, $params[0] );
-        $stats->{function}++;
-    } elsif ( $cmd eq 'sym' ) {
-        $res = gdb_var_addr( $gdb, $params[0] );
-        $stats->{symbol}++;
+
+    $stats->{$cmd}++;
+
+    my %dispatch_1 = (
+        size => \&gdb_type_size,
+        func => \&gdb_func_addr,
+        sym  => \&gdb_var_addr,
+    );
+
+    my %dispatch_2 = (
+        offset => \&gdb_type_offset,
+        string => \&gdb_string,
+    );
+
+    if ( defined $dispatch_1{$cmd} ) {
+        $res = $dispatch_1{$cmd}( $gdb, $params[0] );
+    } elsif ( defined $dispatch_2{$cmd} ) {
+        $res = $dispatch_2{$cmd}( $gdb, $params[0], $params[1] );
     } elsif ( $cmd eq 'data' ) {
         my @r = gdb_read_raw( $gdb, $params[0], $params[1] );
         if ( defined $r[0] ) {
             $res = "@r";
-            $stats->{datareads}++;
             $stats->{databytes} += $params[1];
         }
     } elsif ( $cmd eq 'rank' ) {
         $res = $vp;
-        $stats->{rank}++;
     } elsif ( $cmd eq 'image' ) {
         my $image = readlink "/proc/$gdb->{tracepid}/exe";
         if ( defined $image ) {
@@ -5314,19 +5310,16 @@ sub run_minfo {
         hpid     => -1,
         tracepid => -1,
         attached => 0,
-        rdr      => "",
-        wtr      => "",
-        err      => "",
     };
     my @mq;
 
     my $cmd = $inner_conf{minfo};
-    $h->{hpid} = open3( $h->{wtr}, $h->{rdr}, $h->{err}, $cmd )
+    $h->{hpid} = open3( $h->{fd}{wtr}, $h->{fd}{rdr}, $h->{fd}{err}, $cmd )
       or confess "Unable to popen() h: $!\n";
 
-    my $handle = $h->{rdr};
+    my $handle = $h->{fd}{rdr};
 
-    my $out = $h->{wtr};
+    my $out = $h->{fd}{wtr};
 
     my %stats;
 
@@ -5335,11 +5328,10 @@ sub run_minfo {
         chomp $r;
         if ( $r =~ m{\Areq:}x ) {
             my $res = minfo_handle_query( $gdb, $vp, $r, \%stats );
-            if ( defined $res ) {
-                print {$out} "$res\n";
-            }
 
-            # Some things *do* fail here, symbol lookups
+            print {$out} "$res\n";
+
+            # Some things *do* fail here, symbol lookups for example.
             # and we don't need to report it.
             if ( $res eq 'fail' ) {
                 debug( $vp, "Failed dll request $r\n" );
@@ -5352,9 +5344,9 @@ sub run_minfo {
     my $sc = keys %stats;
 
     waitpid $h->{hpid}, 0;
-    close $h->{rdr};
-    close $h->{wtr};
-    close $h->{err};
+    foreach my $fd ( values %{ $h->{fd} } ) {
+        close $fd;
+    }
 
     if ( $sc == 0 ) {
 
