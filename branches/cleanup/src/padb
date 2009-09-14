@@ -883,7 +883,7 @@ sub _hex {
     }
 }
 
-sub sum_attr {
+sub estats_sum_attr {
     my ( $current, $sum_so_far ) = @_;
 
     if ( defined $sum_so_far->{raw}[0]
@@ -895,7 +895,7 @@ sub sum_attr {
     return $sum_so_far;
 }
 
-sub sum_bin {
+sub estats_sum_bin {
     my ( $current, $sum_so_far ) = @_;
 
     for ( my $j = 0 ; $j < 32 ; $j++ ) {
@@ -923,14 +923,14 @@ sub sum_bin {
     return $sum_so_far;
 }
 
-sub sum_counter {
+sub estats_sum_counter {
     my ( $current, $sum_so_far ) = @_;
 
     $sum_so_far->{raw}[0] += $current->{raw}[0];
     return $sum_so_far;
 }
 
-sub sum_tally {
+sub estats_sum_tally {
     my ( $current, $sum_so_far ) = @_;
 
     for ( my $j = 0 ; $j < 3 ; $j++ ) {
@@ -956,7 +956,7 @@ my @bin_names = (
     '128mb',     '256mb',     '512mb',     'overflow'
 );
 
-sub show_counter {
+sub estats_show_counter {
     my ($d) = @_;
 
     my $ret = $EMPTY_STRING;
@@ -981,7 +981,7 @@ sub show_counter {
     return $ret;
 }
 
-sub show_attr {
+sub estats_show_attr {
 
     # Hopefully have an array at this point.
     my ($d) = @_;
@@ -1007,7 +1007,7 @@ sub show_attr {
     return $ret;
 }
 
-sub show_tally {
+sub estats_show_tally {
     my ($d) = @_;
 
     my $ret = $EMPTY_STRING;
@@ -1022,7 +1022,7 @@ sub show_tally {
     return $ret;
 }
 
-sub show_bin {
+sub estats_show_bin {
     my ($d) = @_;
 
     my $ret = $EMPTY_STRING;
@@ -1072,14 +1072,29 @@ my @stat_types = qw(Counter Tally Bin Attribute);
 my @display_order = qw(Attribute Counter Tally Bin);
 
 my %stat_types2 = (
-    Counter =>
-      { size => '1', displayfn => \&show_counter, sumfn => \&sum_counter },
-    Tally => { size => '3',  displayfn => \&show_tally, sumfn => \&sum_tally },
-    Bin   => { size => '35', displayfn => \&show_bin,   sumfn => \&sum_bin },
-    Attribute => { size => '1', displayfn => \&show_attr, sumfn => \&sum_attr },
+    Counter => {
+        size      => '1',
+        displayfn => \&estats_show_counter,
+        sumfn     => \&estats_sum_counter
+    },
+    Tally => {
+        size      => '3',
+        displayfn => \&estats_show_tally,
+        sumfn     => \&estats_sum_tally
+    },
+    Bin => {
+        size      => '35',
+        displayfn => \&estats_show_bin,
+        sumfn     => \&estats_sum_bin
+    },
+    Attribute => {
+        size      => '1',
+        displayfn => \&estats_show_attr,
+        sumfn     => \&estats_sum_attr
+    },
 );
 
-sub parse_header {
+sub estats_parse_header {
     my ($block) = @_;
     my @a = split $COMMA, $block;
 
@@ -1103,7 +1118,7 @@ sub parse_header {
 }
 
 # Convert from subsystem ID to name.
-sub get_sub_name {
+sub estats_get_sub_name {
     my ( $id, $header ) = @_;
     $id *= 2;
     $id += 4;
@@ -1111,7 +1126,7 @@ sub get_sub_name {
 }
 
 # Convert from subsystem ID and stat type # to count.
-sub get_sub_stat_count {
+sub estats_get_sub_stat_count {
     my ( $id, $type, $header ) = @_;
 
     # Check for an invalid subsystem number.
@@ -1143,7 +1158,7 @@ sub get_sub_stat_count {
 # $id              Index of this subsystem.
 # $type            This stat type.
 # $idx             Number of this stat.
-sub get_sub_stat_name {
+sub estats_get_sub_stat_name {
     my ( $id, $type, $idx, $header ) = @_;
 
     # Check for an invalid subsystem number.
@@ -1178,7 +1193,7 @@ sub get_sub_stat_name {
     return $header->[ $id + $idx ];
 }
 
-sub find_rail {
+sub estats_find_rail {
     my $r = shift;
 
     my $rail = _hex $r;
@@ -1190,7 +1205,7 @@ sub find_rail {
     }
 }
 
-sub parse_content {
+sub estats_parse_content {
     my ( $block, $header ) = @_;
     my @a = split $COMMA, $block;
     my $index = 0;
@@ -1219,16 +1234,16 @@ sub parse_content {
 
     while ( $instbase != 0 ) {
         my $sysid = _hex( $raw_data[$instbase] );
-        my $sysname = get_sub_name( $sysid, $header );
+        my $sysname = estats_get_sub_name( $sysid, $header );
 
         my %inst;
 
         $inst{sysid}      = _hex( $raw_data[$instbase] );
-        $inst{name}       = get_sub_name( $sysid, $header );
+        $inst{name}       = estats_get_sub_name( $sysid, $header );
         $inst{id}         = _hex $raw_data[ $instbase + 1 ];
         $inst{handle}     = $raw_data[ $instbase + 2 ];
         $inst{stats}      = _hex $raw_data[ $instbase + 6 ];
-        $inst{rail}       = find_rail $raw_data[ $instbase + 4 ];
+        $inst{rail}       = estats_find_rail( $raw_data[ $instbase + 4 ] );
         $inst{next}       = _hex $raw_data[ $instbase + 5 ];
         $inst{valid}      = _hex $raw_data[ $instbase + 3 ];
         $inst{debugFlags} = $raw_data[ $instbase + 7 ];
@@ -1240,7 +1255,8 @@ sub parse_content {
 
             for ( my $type = 0 ; $type < $#stat_types + 1 ; $type++ ) {
                 my $typename = $stat_types[$type];
-                my $count = get_sub_stat_count( $inst{sysid}, $type, $header );
+                my $count =
+                  estats_get_sub_stat_count( $inst{sysid}, $type, $header );
 
                 next if $count == 0;
                 my %type;
@@ -1257,7 +1273,8 @@ sub parse_content {
                         $offset++;
                     }
                     $data{name} =
-                      get_sub_stat_name( $inst{sysid}, $type, $idx, $header );
+                      estats_get_sub_stat_name( $inst{sysid}, $type, $idx,
+                        $header );
                     $data{raw} = \@raw;
 
                     $type{ $data{name} } = \%data;
@@ -1299,7 +1316,7 @@ sub parse_content {
     return \%process_details;
 }
 
-sub total {
+sub estats_total {
     my ($data_structures_aref) = @_;
 
     # Make an initial total by just copying the first set of stats
@@ -1407,7 +1424,7 @@ sub total {
 }
 
 # Convert from long to terse stats.
-sub summarise {
+sub estats_summarise {
 
     my $datastructure = shift;
     my %ret           = (
@@ -1438,16 +1455,16 @@ sub summarise {
     return \%ret;
 }
 
-sub summarise_many {
+sub estats_summarise_many {
     my $many = shift;
     my @ret;
     foreach my $single ( @{$many} ) {
-        push @ret, summarise($single);
+        push @ret, estats_summarise($single);
     }
     return \@ret;
 }
 
-sub collapse_summaries {
+sub estats_collapse_summaries {
     my $summaries = shift;
     my %ret       = (
         Bin     => 0,
@@ -1462,7 +1479,7 @@ sub collapse_summaries {
     return \%ret;
 }
 
-sub display_hash {
+sub estats_display_hash {
     my $hash = shift;
     format WITH_VP =
 vp @>>>> Counter @>>>>>>>>> Tally @>>>>>>>>> Bin @>>>>>>>>>>>>>>
@@ -1482,7 +1499,7 @@ $hash->{Counter}, $hash->{Tally}, $hash->{Bin}
     return;
 }
 
-sub display_hashes {
+sub estats_display_hashes {
     my ( $hashes, $sort, $reverse ) = @_;
     my $ret = $EMPTY_STRING;
 
@@ -1492,24 +1509,24 @@ sub display_hashes {
 
     if ($rev) {
         foreach my $e ( sort { $a->{$sort} <=> $b->{$sort} } ( @{$hashes} ) ) {
-            $ret .= display_hash($e);
+            $ret .= estats_display_hash($e);
         }
     } else {
         foreach
           my $e ( reverse sort { $a->{$sort} <=> $b->{$sort} } ( @{$hashes} ) )
         {
-            $ret .= display_hash($e);
+            $ret .= estats_display_hash($e);
         }
     }
     return $ret;
 }
 
 # FIXME:  This function really should be merged with as show_inst...
-sub show_name {
+sub estats_show_name {
     my ( $des, $stats ) = @_;
 
     if ( not defined $des ) {
-        return show_inst($stats);
+        return estats_show_inst($stats);
     }
 
     my @req = split( "\\.", $des );
@@ -1555,7 +1572,7 @@ sub show_name {
     return $ret;
 }
 
-sub show_inst {
+sub estats_show_inst {
     my ($stats) = @_;
 
     my $ret;
@@ -1595,16 +1612,16 @@ sub show_inst {
     return $ret;
 }
 
-sub read_stats {
+sub estats_read_stats {
     my @data = @_;
 
-    my $header = parse_header( shift @data );
+    my $header = estats_parse_header( shift @data );
 
     return unless $header;
 
     my @out;
     foreach my $vp (@data) {
-        my $parsed = parse_content( $vp, $header );
+        my $parsed = estats_parse_content( $vp, $header );
         if ( defined $parsed ) {
             push @out, $parsed;
         }
@@ -1613,7 +1630,7 @@ sub read_stats {
     return \@out;
 }
 
-sub show_stats {
+sub estats_show_stats {
     my $d = shift;
 
     # This function is slightly delicate, the --full-report option
@@ -1640,7 +1657,7 @@ sub show_stats {
                 my $rng = rng_dup($rank_rng);
                 while ( defined( my $rank = rng_shift($rng) ) ) {
                     if ( defined $d->[$rank] ) {
-                        push @ret, summarise( $d->[$rank] );
+                        push @ret, estats_summarise( $d->[$rank] );
                     } else {
                         my $vps = $#{$d} + 1;
                         print "Invalid rank $rank (0 to $vps)\n";
@@ -1648,10 +1665,11 @@ sub show_stats {
                 }
                 $new = \@ret;
             } else {
-                $new = summarise_many($d);
+                $new = estats_summarise_many($d);
             }
 
-            display_hashes( $new, $conf{stats_sort_key}, $conf{stats_reverse} );
+            estats_display_hashes( $new, $conf{stats_sort_key},
+                $conf{stats_reverse} );
             return;
         }
 
@@ -1659,14 +1677,14 @@ sub show_stats {
             my $rng = rng_dup($rank_rng);
             while ( defined( my $rank = rng_shift($rng) ) ) {
                 if ( defined $d->[$rank] ) {
-                    print show_name( $conf{stats_name}, $d->[$rank] );
+                    print estats_show_name( $conf{stats_name}, $d->[$rank] );
                 } else {
                     my $vps = $#{$d} + 1;
                     print "Invalid rank $rank (0 to $vps)\n";
                 }
             }
         } else {
-            print show_name( $conf{stats_name}, total($d) );
+            print estats_show_name( $conf{stats_name}, estats_total($d) );
         }
     }
 
@@ -1944,11 +1962,11 @@ sub local_stats_from_job {
     }
     close $PCMD;
 
-    my $s = read_stats(@data);
+    my $s = estats_read_stats(@data);
 
     # $stats_total = 1;
 
-    show_stats($s);
+    estats_show_stats($s);
     return;
 }
 
@@ -7822,7 +7840,7 @@ sub common_main {
     # Config options need to be read locally rather than globally
     $allfns{qsnet_stats} = {
         handler_all => \&inner_show_stats,
-        out_handler => \&show_stats,
+        out_handler => \&estats_show_stats,
         qsnet       => 1,
         arg_long    => 'statistics-total',
         arg_short   => 's',
