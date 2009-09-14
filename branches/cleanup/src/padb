@@ -434,6 +434,10 @@ my $COLON  = qr{:}x;
 
 my $EMPTY_STRING = q{};
 
+# Enable sorting in Data::Dumper for clarity.
+$Data::Dumper::Sortkeys  = 1;
+$Data::Dumper::Quotekeys = 0;
+
 sub check_and_convert_bool {
     my ($str) = @_;
     my @yes   = qw(1 yes on enabled);
@@ -479,6 +483,23 @@ sub check_int {
 
     printf {*STDERR} "Integer value \"%s\" not recognised, aborting.\n", $str;
     exit 1;
+}
+
+sub check_signal {
+    my ($signal) = @_;
+
+    my $s = uc $signal;
+    my %sig_names;
+    foreach ( split $SPACE, $Config{sig_name} ) {
+        $sig_names{$_} = 1;
+    }
+
+    if ( not defined $sig_names{$s} ) {
+        printf {*STDERR} "Error: signal \"%s\" is invalid, aborting.\n",
+          $signal;
+        exit 1;
+    }
+    return $s;
 }
 
 # Look for edb in the default install location only.
@@ -644,7 +665,7 @@ my $output_compress;
 my $output_compress_long;
 my $output_tree;
 
-my @config_options;
+my %config_options;
 
 my %ic_names;
 my %ic_names_cmd;
@@ -667,7 +688,7 @@ sub debug_log {
     printf "DEBUG ($type): %3d: $str\n", $time, @params;
     return if $debug_modes{$type} eq 'basic';
     return unless defined $handle;
-    print Dumper($handle);
+    print Data::Dumper->Dump( [$handle], [$type] );
     return;
 }
 
@@ -682,6 +703,7 @@ $debug_modes{signon}      = undef;
 $debug_modes{rmgr}        = undef;
 $debug_modes{ctree}       = undef;
 $debug_modes{tdata}       = undef;
+$debug_modes{config}      = undef;
 
 sub slurp_file {
     my ($file) = @_;
@@ -729,7 +751,7 @@ sub get_process_list {
 
 sub parse_args_outer {
 
-    Getopt::Long::Configure('bundling');
+    Getopt::Long::Configure( 'bundling', 'pass_through' );
     my $debugflag;
 
     my @ranks;
@@ -747,7 +769,6 @@ sub parse_args_outer {
         'compress-long|C'     => \$output_compress_long,
         'tree|t'              => \$output_tree,
         'input-file|file|i=s' => \$input_file,
-        'config-option|O=s'   => \@config_options,
         'full-report=s'       => \$full_report,
         'core-stack'          => \$core_stack,
         'core=s'              => \$core_name,
@@ -764,24 +785,40 @@ sub parse_args_outer {
     # The primary modes, one of these only must be set.
     my %config_hash;
 
+    foreach my $arg ( keys %allfns ) {
+
+        # Set the primary mode in the hash.
+        $optionhash{ to_arg( $allfns{$arg} ) } = \$config_hash{$arg};
+    }
+
+    # Parse the options once to pick up the mode and any single letter options
+    # which might be bundled with it.
+    GetOptions(%optionhash);
+
+    Getopt::Long::Configure( 'default', 'bundling' );
+
+    my $mode;
+
+    foreach my $arg ( keys %config_hash ) {
+        next unless defined $config_hash{$arg};
+        $mode = $arg;
+        $have_allfns_option++;
+    }
+
     # The secondary args, specify all of them for now as we only
     # call GetOptions once.
     my %sec_args;
 
-    foreach my $arg ( keys %allfns ) {
-
-        # Set the primary mode in the hash.
-        $optionhash{ $allfns{$arg}{arg} } = \$config_hash{$arg};
-
-        if ( defined $allfns{$arg}{secondary} ) {
-            foreach my $sec ( @{ $allfns{$arg}{secondary} } ) {
-
-                # Set this option in the option hash.
-                $optionhash{ $sec->{arg} } = \$sec_args{ $sec->{arg_long} };
-
-            }
+    # Set any extra options this mode may or may not accept.
+    if ( defined $mode and defined $allfns{$mode}{secondary} ) {
+        foreach my $sec ( @{ $allfns{$mode}{secondary} } ) {
+            $optionhash{ to_arg($sec) } = \$sec_args{ $sec->{arg_long} };
         }
     }
+
+    # Set this for the second iteration only so that GetOptions can
+    # abort correctly if they are called without a value.
+    $optionhash{'config-option|O=s'} = \%config_options;
 
     GetOptions(%optionhash) or exit 1;
 
@@ -801,14 +838,6 @@ sub parse_args_outer {
                 }
             }
         }
-    }
-
-    my $mode;
-
-    foreach my $arg ( keys %config_hash ) {
-        next unless defined $config_hash{$arg};
-        $mode = $arg;
-        $have_allfns_option++;
     }
 
     if (@ranks) {
@@ -839,6 +868,11 @@ sub parse_args_outer {
                     # Else set it to the default for this mode.
                     $conf{mode_options}{$arg}{ $sec->{arg_long} } =
                       $sec->{default};
+                }
+
+                if ( defined $sec->{verify} ) {
+                    $conf{options_verify}{$arg}{ $sec->{arg_long} } =
+                      $sec->{verify};
                 }
 
                 $conf{mode_options_reverse}{ $sec->{arg_long} }{$arg} = 1;
@@ -4436,7 +4470,25 @@ sub config_from_env {
     return;
 }
 
+sub _config_help {
+    my ( $max_len, $mode ) = @_;
+
+    print "\nOptions for mode '$allfns{$mode}{arg_long}'\n";
+    foreach my $key ( sort keys %{ $conf{mode_options}{$mode} } ) {
+        my $name = $key;
+        $name =~ s{_}{-}gx;
+        if ( defined $conf{mode_options}{$mode}{$key} ) {
+            printf
+              " %$max_len" . "s = '%s'\n",
+              $name, $conf{mode_options}{$mode}{$key};
+        } else {
+            printf " %$max_len" . "s = undef\n", $name;
+        }
+    }
+}
+
 sub config_help {
+    my ($mode) = @_;
     print "Current options are:\n";
 
     my $max_len = 0;
@@ -4459,18 +4511,11 @@ sub config_help {
         }
     }
 
-    foreach my $mode ( sort keys %{ $conf{mode_options} } ) {
-        print "\nOptions for mode '$allfns{$mode}{arg_long}'\n";
-        foreach my $key ( sort keys %{ $conf{mode_options}{$mode} } ) {
-            my $name = $key;
-            $name =~ s{_}{-}gx;
-            if ( defined $conf{mode_options}{$mode}{$key} ) {
-                printf
-                  " %$max_len" . "s = '%s'\n",
-                  $name, $conf{mode_options}{$mode}{$key};
-            } else {
-                printf " %$max_len" . "s = undef\n", $name;
-            }
+    if ( defined $mode ) {
+        _config_help( $max_len, $mode );
+    } else {
+        foreach ( sort keys %{ $conf{mode_options} } ) {
+            _config_help( $max_len, $_ );
         }
     }
     return;
@@ -4506,9 +4551,9 @@ sub outer_main {
     # however you can do the second.
     # -Oedbopt="--pagesize=8192 --pagesize-header=4096"
     # -Oedbopt="--pagesize 8192 --pagesize-header 4096"
-    foreach my $config_option (@config_options) {
+    foreach my $key ( keys %config_options ) {
 
-        my ( $key, $val ) = split $EQUALS, $config_option;
+        my $val = $config_options{$key};
 
         my $name = $key;
 
@@ -4518,12 +4563,7 @@ sub outer_main {
             and not exists $conf{mode_options_reverse}{$key} )
         {
             print "Error, unknown config option '$name'\n";
-            config_help();
-            exit 1;
-        }
-        if ( not defined $val ) {
-            print "Error, config option '$name' requires value\n";
-            config_help();
+            config_help($mode);
             exit 1;
         }
         config_set( $key, $val );
@@ -4540,6 +4580,20 @@ sub outer_main {
     foreach my $co (@conf_int) {
         check_int( $conf{$co} );
     }
+
+ # Now go through all the config options and both verify they are acceptable and
+ # convert true/false strings to 1/0 values.
+    foreach my $key ( keys %{ $conf{mode_options_reverse} } ) {
+        foreach my $mode ( keys %{ $conf{mode_options_reverse}{$key} } ) {
+            if ( defined $conf{options_verify}{$mode}{$key} ) {
+                $conf{mode_options}{$mode}{$key} =
+                  $conf{options_verify}{$mode}{$key}(
+                    $conf{mode_options}{$mode}{$key} );
+            }
+        }
+    }
+
+    debug_log( 'config', \%conf, 'Finished setting configuration options' );
 
     if ($list_rmgrs) {
         foreach my $res ( sort keys %rmgr ) {
@@ -4663,19 +4717,6 @@ sub outer_main {
         cmdline_error(
 "$prog: Error: you must specify only one of -x, -S, -s, -g, -q, -X or --kill\n"
         );
-    }
-
-    # If delivering a signal check that it's valid.
-    if ( defined $mode and ( $mode eq 'kill' ) ) {
-        my $signal = uc $conf{mode_options}{kill}{signal};
-        my %sig_names;
-        foreach ( split $SPACE, $Config{sig_name} ) {
-            $sig_names{$_} = 1;
-        }
-
-        if ( not defined $sig_names{$signal} ) {
-            cmdline_error("$prog: Error: signal \"$signal\" is invalid\n");
-        }
     }
 
     if ( $output_tree
@@ -7696,7 +7737,8 @@ sub common_main {
             {
                 arg_long => 'signal',
                 type     => '=s',
-                default  => 'TERM'
+                default  => 'TERM',
+                verify   => \&check_signal,
             }
         ]
     };
@@ -7866,16 +7908,6 @@ sub common_main {
         }
     };
 
-    # Make a getopt string out of each of the optional options.
-    foreach my $arg ( keys %allfns ) {
-        $allfns{$arg}{arg} = to_arg( $allfns{$arg} );
-
-        if ( defined $allfns{$arg}{secondary} ) {
-            foreach my $sec ( @{ $allfns{$arg}{secondary} } ) {
-                $sec->{arg} = to_arg($sec);
-            }
-        }
-    }
     return;
 }
 
