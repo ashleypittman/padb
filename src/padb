@@ -3061,7 +3061,7 @@ sub array_from_target_namespace {
     my ($r) = @_;
 
     my @all;
-    foreach my $value ( sort keys %{$r} ) {
+    foreach my $value ( keys %{$r} ) {
         while ( defined( my $rank = rng_shift( $r->{$value} ) ) ) {
             $all[$rank] = $value;
         }
@@ -3138,7 +3138,7 @@ sub show_proc_format {
     my @all;
 
     my $lines = tree_from_namespace( $nlines->{target_data} );
-    foreach my $tag ( sort keys %{$lines} ) {
+    foreach my $tag ( keys %{$lines} ) {
         my %hash;
         $hash{vp} = $tag;
         foreach my $key ( keys %{ $lines->{$tag} } ) {
@@ -7229,14 +7229,14 @@ sub convert_pids_to_child_pids {
         my $newpid;
 
         if ( defined $ip->{scripts} ) {
-            my @ppids = sort @{ $ip->{scripts} };
+            my @ppids = sort { $a <=> $b } @{ $ip->{scripts} };
             $newpid = $ppids[0];
         }
 
         # If there are any pids which aren't scripts then target the
         # first one.
         if ( defined $ip->{notscripts} ) {
-            my @ppids = sort @{ $ip->{notscripts} };
+            my @ppids = sort { $a <=> $b } @{ $ip->{notscripts} };
             $newpid = $ppids[0];
         }
 
