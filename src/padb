@@ -3907,6 +3907,7 @@ sub rng_shift {
     return $value;
 }
 
+# Accept duplicate values in this function.
 sub rng_add_value {
     my ( $rg, $value ) = @_;
 
@@ -3948,7 +3949,6 @@ sub rng_add_value {
             }
             return;
         } elsif ( $value >= $part->{l} and $value <= $part->{u} ) {
-            carp("Failed to add value to range (Value already in range)");
             return;
         }
         $idx++;
