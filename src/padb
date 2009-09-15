@@ -4078,44 +4078,52 @@ sub rng_add_value {
     }
 
     # If it's after the last value then just add it.
-    if ( $value > $rg->[-1]->{u} ) {
+    {
+        my $lu = $rg->[-1]->{u};
+        if ( $value > $lu ) {
 
-        if ( $value == $rg->[-1]->{u} + 1 ) {
-            $rg->[-1]->{u}++;
+            if ( $value == $lu + 1 ) {
+                $rg->[-1]->{u}++;
+                return;
+            }
+            push @{$rg}, { l => $value, u => $value };
             return;
         }
-
-        push @{$rg}, { l => $value, u => $value };
-        return;
     }
 
     my $idx = 0;
     foreach my $part ( @{$rg} ) {
 
-        if ( $value == $part->{l} - 1 ) {
+        my $l = $part->{l};
+        my $u = $part->{u};
+
+        if ( $value < $l ) {
 
             # Extend the current entry downwards.
-            $part->{l}--;
-            return;
-        } elsif ( $value < $part->{l} ) {
+            if ( $value == $l - 1 ) {
+                $part->{l}--;
+                return;
+            }
 
             # If it's before the current entry then insert it.
             splice @{$rg}, $idx, 0, { l => $value, u => $value };
             return;
-        } elsif ( $value == $part->{u} + 1 ) {
+        } elsif ( $value == $u + 1 ) {
+
+            # If we meet the subsequent entry then merge the two.
+            # No need to check there is a subsequent entry here as
+            # that case has already been dealt with above.
+            if ( $u + 2 == $rg->[ $idx + 1 ]->{l} ) {
+                $part->{u} = $rg->[ $idx + 1 ]->{u};
+                splice @{$rg}, $idx + 1, 1;
+                return;
+            }
 
             # Extend the current entry upwards.
             $part->{u}++;
 
-            # If we meet the subsequent entry then merge the two.
-            if ( exists $rg->[ $idx + 1 ]
-                and $part->{u} + 1 == $rg->[ $idx + 1 ]->{l} )
-            {
-                $part->{u} = $rg->[ $idx + 1 ]->{u};
-                splice @{$rg}, $idx + 1, 1;
-            }
             return;
-        } elsif ( $value >= $part->{l} and $value <= $part->{u} ) {
+        } elsif ( $value >= $l and $value <= $u ) {
 
             # Already in range.
             return;
@@ -7766,8 +7774,8 @@ sub common_main {
         help        => 'Show process information in top format',
         options_i   => {
             column_seperator => '  ',
-            proc_sort_key => 'vp',
-            nprocs_output => undef,
+            proc_sort_key    => 'vp',
+            nprocs_output    => undef,
         },
         options_bool => {
             proc_show_proc     => 'yes',
