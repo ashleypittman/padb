@@ -250,7 +250,7 @@ use Carp;
 # Main.
 
 my $prog    = basename $0;
-my $version = "3.0-rc1";
+my $version = "3.0-rc2";
 
 my %conf;
 
