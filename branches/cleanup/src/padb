@@ -3689,8 +3689,8 @@ sub check_signon {
     my ( $comm_data, $data ) = @_;
     return if ( $conf{check_signon} eq 'none' );
 
-    if ( not defined $data->{target_data}{found}{yes}
-        or rng_empty( $data->{target_data}{found}{yes} ) )
+    if ( not defined $data->{target_data}{FOUND}{yes}
+        or rng_empty( $data->{target_data}{FOUND}{yes} ) )
     {
         printf "Warning, failed to locate any ranks\n";
         return 1;
@@ -3698,7 +3698,7 @@ sub check_signon {
 
     my %here;
     while (
-        defined( my $proc = rng_shift( $data->{target_data}{found}{yes} ) ) )
+        defined( my $proc = rng_shift( $data->{target_data}{FOUND}{yes} ) ) )
     {
         $here{$proc} = 1;
     }
@@ -3717,14 +3717,14 @@ sub check_signon {
 
     return if ( $conf{check_signon} eq 'missing' );
 
-    if ( keys %{ $data->{target_data}{name} } != 1 ) {
+    if ( keys %{ $data->{target_data}{NAME} } != 1 ) {
         print "Warning, remote process name differs across ranks\n";
-        report_failed_signon( 'name', \%{ $data->{target_data}{name} } );
+        report_failed_signon( 'name', \%{ $data->{target_data}{NAME} } );
     }
 
-    if ( keys %{ $data->{target_data}{state} } != 1 ) {
+    if ( keys %{ $data->{target_data}{STATE} } != 1 ) {
         print "Warning, remote process state differs across ranks\n";
-        report_failed_signon( 'state', \%{ $data->{target_data}{state} } );
+        report_failed_signon( 'state', \%{ $data->{target_data}{STATE} } );
     }
     return;
 }
@@ -3800,7 +3800,7 @@ sub command_from_inner {
     # Check for all processes being found, or rather check for none being found.
     # If there are none then we probably don't have any info from the so tell
     # the inner to quit and don't process any data we have just received.
-    if ( not defined $d->{target_data}{found}{yes} ) {
+    if ( not defined $d->{target_data}{FOUND}{yes} ) {
         print "No remaining processes, is job dead?\n";
         $comm_data->{current_req} = last_command();
         issue_command_to_inner( $cdata, $comm_data->{current_req} );
@@ -3832,11 +3832,11 @@ sub command_from_inner {
     # sending.
     my $mode = $comm_data->{current_req}->{mode};
 
-    if ( defined $d->{target_data}{error} ) {
+    if ( defined $d->{target_data}{ERROR} ) {
         print "Warning: errors reported by some ranks\n========\n";
-        foreach my $error ( sort keys %{ $d->{target_data}{error} } ) {
+        foreach my $error ( sort keys %{ $d->{target_data}{ERROR} } ) {
             printf "%s: $error\n",
-              rng_convert_to_user( $d->{target_data}{error}{$error} );
+              rng_convert_to_user( $d->{target_data}{ERROR}{$error} );
         }
         print "========\n";
     }
@@ -4153,11 +4153,11 @@ sub rng_create_from_array {
     my (@r) = @_;
 
     my $rng = rng_create_empty();
-    
+
     # Sort the array into numerical order so that the add_value calls
     # can be fast.
 
-    foreach my $v (sort {$a <=> $b} @r) {
+    foreach my $v ( sort { $a <=> $b } @r ) {
         rng_add_value( $rng, $v );
     }
     return $rng;
@@ -4843,11 +4843,13 @@ sub output {
 # Report a single string error for a given target rank.
 sub target_error {
     my ( $rank, $error ) = @_;
-    target_key_pair( $rank, 'error', $error );
+    target_key_pair( $rank, 'ERROR', $error );
     return;
 }
 
 # Report a single string error for a given target rank.
+# By convention (for now) this is called with UPPERCASE keys
+# for control/padb values and lowercase keys for mode values.
 sub target_key_pair {
     my ( $rank, $key, $value ) = @_;
 
@@ -6520,9 +6522,9 @@ sub stack_trace_from_pids {
         my $ok;
         do {
 
-	    # The first time round the loop we will have a gdb handle from above,
-	    # only re-attach if we have already failed on the first try and are
-	    # here a second time.
+           # The first time round the loop we will have a gdb handle from above,
+           # only re-attach if we have already failed on the first try and are
+           # here a second time.
             if ( not defined $gdb ) {
                 send_cont_signal($pid);
                 my $g = gdb_start();
@@ -6644,7 +6646,7 @@ sub kill_proc {
 
 sub ping_rank {
     my ( $cargs, $vp, $pid ) = @_;
-    target_key_pair( $vp, 'PING', 'ACK' );
+    target_key_pair( $vp, 'ping', 'ACK' );
     output( $vp, 'ACK' );
     return;
 }
@@ -7287,9 +7289,9 @@ sub inner_find_pids {
     foreach my $proc ( @{ $inner_conf{all_pids} } ) {
         my $pid = $proc->{pid};
         my $vp  = $proc->{vp};
-        target_key_pair( $vp, 'found', 'yes' );
-        target_key_pair( $vp, 'name',  $proc->{status}->{Name} );
-        target_key_pair( $vp, 'state', $proc->{status}->{State} );
+        target_key_pair( $vp, 'FOUND', 'yes' );
+        target_key_pair( $vp, 'NAME',  $proc->{status}->{Name} );
+        target_key_pair( $vp, 'STATE', $proc->{status}->{State} );
     }
     return;
 }
@@ -7386,7 +7388,7 @@ sub command_from_parent {
     # there is nothing to target.
     foreach my $proc ( @{$pid_list} ) {
         if ( -d "/proc/$proc->{pid}" ) {
-            target_key_pair( $proc->{vp}, 'found', 'yes' );
+            target_key_pair( $proc->{vp}, 'FOUND', 'yes' );
         }
     }
 
