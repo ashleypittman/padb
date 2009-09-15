@@ -7782,7 +7782,7 @@ sub common_main {
             nprocs_output    => undef,
         },
         options_bool => {
-            proc_show_proc     => 'yes',
+            proc_shows_proc    => 'yes',
             proc_shows_stat    => 'yes',
             proc_shows_fds     => 'no',
             proc_shows_maps    => 'no',
