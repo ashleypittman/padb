@@ -3332,7 +3332,7 @@ sub new_tree {
     my ($lines) = @_;
     my %tree;
     debug_log( 'tree', undef, 'Making the tree' );
-    foreach my $tag ( sort keys %{$lines} ) {
+    foreach my $tag ( sort { $a <=> $b } keys %{$lines} ) {
         add_tag_to_tree( \%tree, $tag, $lines->{$tag} );
     }
     debug_log( 'tree', undef, 'Formatting the tree' );
