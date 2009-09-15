@@ -6479,10 +6479,11 @@ sub stack_trace_from_pids {
         }
     }
 
-    if ( $carg->{strip_below_main} ) {
-        foreach ( split $COMMA, $carg->{stack_strip_below} ) {
-            $below{$_} = 1;
-        }
+    # Always do this here as we test for strip_below_main later
+    # and we want to be able to test stack traces for the presence
+    # of main even if we aren't stripping them.
+    foreach ( split $COMMA, $carg->{stack_strip_below} ) {
+        $below{$_} = 1;
     }
 
     foreach my $proc ( @{$list} ) {
@@ -6510,12 +6511,15 @@ sub stack_trace_from_pids {
 
         my $vp  = $proc->{vp};
         my $pid = $proc->{pid};
+        my $gdb = $proc->{gdb};
 
         my $ok;
         do {
-            my $gdb;
 
-            if ($tries) {
+	    # The first time round the loop we will have a gdb handle from above,
+	    # only re-attach if we have already failed on the first try and are
+	    # here a second time.
+            if ( not defined $gdb ) {
                 send_cont_signal($pid);
                 my $g = gdb_start();
                 if ( gdb_attach( $g, $pid ) ) {
@@ -6527,11 +6531,8 @@ sub stack_trace_from_pids {
                         target_error( $vp, 'Failed to attach to process' );
                     }
                 }
-            } else {
-                $gdb = $proc->{gdb};
             }
 
-            $ok = 0;
             if ( defined $gdb ) {
                 if (   $carg->{stack_shows_params}
                     or $carg->{stack_shows_locals} )
@@ -6542,20 +6543,21 @@ sub stack_trace_from_pids {
                 }
                 gdb_detach($gdb);
                 gdb_quit($gdb);
+                $gdb = undef;
                 if ( defined $threads[0]->{frames} ) {
                     my @frames = @{ $threads[0]->{frames} };
-
-                    $ok = 1;
-                    $ok = 0
-                      unless ( defined $frames[-1]{func}
-                        and $frames[-1]{func} eq 'main' );
-                } else {
-                    $ok = 0;
+                    foreach my $frame (@frames) {
+                        if (    defined $frame->{func}
+                            and defined $below{ $frame->{func} } )
+                        {
+                            $ok = 1;
+                            last;
+                        }
+                    }
                 }
             }
-            $tries++;
-          } while ( ( $ok != 1 )
-            and ( $tries < $carg->{gdb_retry_count} ) );
+          } while ( ( not $ok )
+            and ( $tries++ < $carg->{gdb_retry_count} ) );
 
         if ( not defined $threads[0]{id} ) {
             target_error( $vp,
@@ -6579,8 +6581,10 @@ sub stack_trace_from_pids {
             # Find a funtion to strip above.  Only actually enable
             # this if there is a function present which we are targeting
             # or else no output will be generated!
+            # Do this in reverse order so we strip as much as possible
+            # from the stack trace.
             if ( $carg->{strip_below_main} ) {
-                foreach my $frame (@frames) {
+                foreach my $frame ( reverse @frames ) {
                     next unless exists $frame->{func};
                     if ( defined $below{ $frame->{func} } ) {
                         $strip_below = $frame->{func};
@@ -6588,8 +6592,7 @@ sub stack_trace_from_pids {
                 }
             }
 
-            foreach my $i ( reverse 0 .. $#frames ) {
-                my $frame = $frames[$i];
+            foreach my $frame ( reverse @frames ) {
 
                 target_error( $vp, "error from gdb: $frame->{error}" )
                   if exists $frame->{error};
@@ -6605,11 +6608,12 @@ sub stack_trace_from_pids {
 
                 $strip_below = undef;
 
-                output( $vp,
-                        $function 
-                      . '() at '
-                      . ( $frame->{file} || '?' ) . ':'
-                      . ( $frame->{line} || '?' ) );
+                my $l = output(
+                    $vp, sprintf "%s() at %s:%s",
+                    $function,
+                    ( $frame->{file} || '?' ),
+                    ( $frame->{line} || '?' )
+                );
                 if ( $carg->{stack_shows_params} ) {
                     show_stack_vars( $vp, $frame, 'params' );
                 }
