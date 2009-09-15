@@ -4195,8 +4195,6 @@ sub go_job {
     # involve setting environment variables.
     my ( $cmd, $ncpus, $hosts ) = setup_pcmd($jobid);
 
-    return 1 unless ($cmd);
-
     $conf{verbose} && defined $ncpus && print "Job has $ncpus process(es)\n";
     $conf{verbose} && defined $hosts && print "Job spans $hosts host(s)\n";
 
