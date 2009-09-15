@@ -4742,7 +4742,7 @@ sub outer_main {
     }
 
     if ( not $input_file
-        and ( $have_allfns_option > 1 ) )
+        and ( $have_allfns_option != 1 ) )
     {
         cmdline_error(
 "$prog: Error: you must specify only one of -x, -S, -s, -g, -q, -X or --kill\n"
