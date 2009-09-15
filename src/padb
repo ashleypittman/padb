@@ -4152,8 +4152,12 @@ sub rng_dup {
 sub rng_create_from_array {
     my (@r) = @_;
 
-    my $rng = rng_convert_from_user( shift @r );
-    while ( defined( my $v = shift @r ) ) {
+    my $rng = rng_create_empty();
+    
+    # Sort the array into numerical order so that the add_value calls
+    # can be fast.
+
+    foreach my $v (sort {$a <=> $b} @r) {
         rng_add_value( $rng, $v );
     }
     return $rng;
