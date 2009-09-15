@@ -4687,8 +4687,9 @@ sub outer_main {
 
         push_command('deadlock');
 
-        my %c = ( strip_above_wait => 0 );
-        push_command( 'stack', 'tree', \%c );
+        my $c = $conf{mode_options}{stack};
+        $c->{strip_above_wait} = 0;
+        push_command( 'stack', 'tree', $c );
 
         go_job($full_report);
         exit 0;
