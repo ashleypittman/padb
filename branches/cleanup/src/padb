@@ -2403,7 +2403,7 @@ sub slurm_is_installed {
 
 sub slurm_get_jobs {
     my $user = shift;
-    my @res  = `squeue -t running -u $user -h -o "%i" 2>/dev/null`;
+    my @res  = slurp_cmd("squeue -t running -u $user -h -o %i");
     chomp @res;
     return @res;
 }
@@ -2413,8 +2413,7 @@ sub slurm_get_jobs {
 sub slurm_job_to_ncpus {
     my $job   = shift;
     my $s     = "$job." . $conf{slurm_job_step};
-    my @steps = `squeue -s $s -o "%i %A" 2>/dev/null`;
-    return if ( $? != 0 );
+    my @steps = slurp_cmd("squeue -s $s -o %i,%A");
 
     # The %A option is new so ensure we have the TASKS output
     # before we believe what we see here...
@@ -2422,8 +2421,9 @@ sub slurm_job_to_ncpus {
     # we probably can't do anything anyway.
     my $tasks;
     my $have_tasks = 0;
+    chomp @steps;
     foreach my $step (@steps) {
-        my ( $step, $cpus ) = split $SPACE, $step;
+        my ( $step, $cpus ) = split $COMMA, $step;
         $tasks      = $cpus if ( $step eq $s );
         $have_tasks = 1     if ( $cpus eq 'TASKS' );
     }
@@ -2434,11 +2434,11 @@ sub slurm_job_to_ncpus {
 # Query the nodecount for the "job" as that is what we shall be running on.
 sub slurm_job_to_nodecount {
     my $job  = shift;
-    my @jobs = `squeue -o "%i %D" 2>/dev/null`;
-    return if ( $? != 0 );
+    my @jobs = slurp_cmd("squeue -o %i,%D");
 
+    chomp @jobs;
     foreach my $step (@jobs) {
-        my ( $sj, $ncount ) = split $SPACE, $step;
+        my ( $sj, $ncount ) = split $COMMA, $step;
         return $ncount if ( $sj eq $job );
     }
     return;
@@ -2451,20 +2451,20 @@ sub slurm_job_to_nodecount {
 sub slurm_job_to_nodelist {
     my $job   = shift;
     my $s     = "$job." . $conf{slurm_job_step};
-    my @steps = `squeue -s $s -o "%i %N" 2>/dev/null`;
-    return if ( $? != 0 );
+    my @steps = slurp_cmd("squeue -s $s -o %i,%N");
 
+    chomp @steps;
     foreach my $step (@steps) {
-        my ( $sj, $nlist ) = split $SPACE, $step;
+        my ( $sj, $nlist ) = split $COMMA, $step;
         return $nlist if ( $sj eq $s );
-
     }
     return;
 }
 
 sub slurm_job_is_running {
     my $job    = shift;
-    my $status = lc `squeue -h -j $job -o "%T"`;
+    my @s      = slurp_cmd("squeue -h -j $job -o %T");
+    my $status = lc $s[0];
     chomp $status;
     return ( $status eq 'running' );
 }
@@ -6947,8 +6947,8 @@ sub slurm_find_pids {
     my $jobid = shift;
 
     my @procs =
-      `scontrol listpids $jobid.$inner_conf{slurm_job_step} 2>/dev/null`;
-    return if ( $? != 0 );
+      slurp_cmd("scontrol listpids $jobid.$inner_conf{slurm_job_step}");
+
     foreach my $proc (@procs) {
         my ( $pid, $job, $step, undef, $global ) = split $SPACE, $proc;
         next if ( $global eq '-' );
