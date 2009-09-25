@@ -5160,7 +5160,9 @@ sub _gdb_new_parse {
 
         my @all;
         my %res;
-        while ( defined $l ) {
+	# gdb_extract_value_braces returns an empty string if the gdb output
+	# contains {} so handle this case correctly here.
+        while ( defined $l and $l ne "") {
             my ( $kk, $vv );
             ( $kk, $vv, $l ) = _gdb_new_parse( $l, $collapse );
 
