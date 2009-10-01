@@ -23,6 +23,13 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
 # Revision history
+
+# Version 3.?
+#  * Add "mpirun" as a resource manager, this causes it walk the local
+#    process list looking for processes called mpirun and to get the pid
+#    and hostlist by reading data from Mpir_Proctable as specified in the
+#    origional paper.  Padb then launches itself via pdsh.
+#
 # Version 3.0
 #  * Full-duplex communication between inner and outer processes, padb no
 #    longer simply sends request on the command line and processes the
@@ -306,6 +313,13 @@ my @inner_conf_cmd = qw(port_range outer);
 
 my %rmgr;
 
+$rmgr{mpirun} = {
+    get_active_jobs        => \&mpirun_get_jobs,
+    job_is_running         => \&local_job_is_running,
+    setup_pcmd             => \&mpirun_setup_pcmd,
+    require_inner_callback => 1,
+};
+
 $rmgr{rms} = {
     is_installed    => \&rms_is_installed,
     get_active_jobs => \&rms_get_jobs,
@@ -329,7 +343,6 @@ $rmgr{orte} = {
     get_active_jobs => \&open_get_jobs,
     setup_pcmd      => \&open_setup_pcmd,
     cleanup_pcmd    => \&open_cleanup_pcmd,
-    find_pids       => \&open_find_pids,
 };
 
 $rmgr{'lsf-rms'} = {
@@ -403,6 +416,7 @@ $conf{check_signon} = 'all';
 $conf{interval}            = '10s';
 $conf{watch_clears_screen} = 'enabled';
 $conf{scripts}             = 'bash,sh,dash,ash,perl,xterm';
+$conf{mpirun}              = 'mpirun,orterun,srun,mpdrun,prun';
 $conf{lsf_job_offset}      = 1;
 $conf{local_fd_name}       = '/dev/null';
 $conf{inner_callback}      = 'disabled';
@@ -2723,7 +2737,7 @@ sub open_setup_pcmd {
     my $cmd    = "orterun -machinefile $fn -np $i $prefix";
     my $hosts  = $#hosts + 1;
 
-    return ( $cmd, $open_jobs{$job}{nprocs}, $hosts );
+    return ( $cmd, $open_jobs{$job}{nprocs}, $hosts, $open_jobs{$job}{ranks} );
 }
 
 sub open_cleanup_pcmd {
@@ -2792,6 +2806,77 @@ sub lsf_setup_pcmd {
     my $cmd = "prun -i /dev/null -T $res";
 
     return ( $cmd, $ncpus );
+}
+
+###############################################################################
+#
+# mpirun support.
+#
+###############################################################################
+
+sub mpirun_get_jobs {
+    my $user = shift;
+
+    my @jobs;
+
+    my %mpirun;
+
+    map { $mpirun{$_}++ } split $COMMA, $conf{mpirun};
+
+    foreach my $pid ( get_process_list($user) ) {
+        my $name = find_from_status( $pid, "Name" );
+        if ( defined $mpirun{$name} ) {
+            push @jobs, $pid;
+            next;
+        }
+
+        my $link = readlink "/proc/$pid/exe";
+        next unless defined $link;
+        if ( defined $mpirun{ basename($link) } ) {
+            push @jobs, $pid;
+        }
+    }
+    return @jobs;
+}
+
+sub mpirun_setup_pcmd {
+    my ($job) = @_;
+
+    if ( not find_exe('pdsh') ) {
+        printf("mpirun resource manager requires pdsh to be installed\n");
+        return;
+    }
+
+    my $gdb = gdb_start();
+    if ( not gdb_attach( $gdb, $job ) ) {
+        return;
+    }
+
+    my $nprocs = gdb_read_value( $gdb, "MPIR_proctable_size" );
+
+    my %pt;
+    foreach my $proc ( 0 .. ( $nprocs - 1 ) ) {
+        my $hostd = gdb_read_value( $gdb, "MPIR_proctable[$proc].host_name" );
+
+        if ( $hostd =~ m{\"(\w+)\"\z}x ) {
+            my $host = $1;
+
+            my $pid = gdb_read_value( $gdb, "MPIR_proctable[$proc].pid" );
+
+            $pt{$host}{$proc} = $pid;
+        }
+    }
+
+    gdb_detach($gdb);
+    gdb_quit($gdb);
+
+    my @hosts = keys(%pt);
+
+    my $hlist = join q{,}, @hosts;
+
+    my $cmd = "pdsh -w $hlist";
+    my $hc  = @hosts;
+    return ( $cmd, $nprocs, $hc, \%pt );
 }
 
 ###############################################################################
@@ -3604,8 +3689,8 @@ sub first_command {
     # configuration options.
     # XXX: Need to send over scripts and other stuff here as well.
 
-    if ( $conf{rmgr} eq 'orte' ) {
-        $req->{orte_data} = $open_jobs{ $comm_data->{jobid} }{ranks};
+    if ( defined $comm_data->{pd} ) {
+        $req->{pd} = $comm_data->{pd};
     }
 
     $req->{cinner} = \%cinner;
@@ -4208,10 +4293,7 @@ sub create_local_port {
 }
 
 sub go_parallel {
-    my $jobid      = shift;
-    my $cmd        = shift;
-    my $nprocesses = shift;
-    my $nhosts     = shift;
+    my ( $jobid, $cmd, $nprocesses, $nhosts, $pd ) = @_;
 
     my $comm_data;
 
@@ -4228,6 +4310,12 @@ sub go_parallel {
         my %cdata;
         $cdata{event_cb} = \&handle_event_from_port;
         $comm_data->{sockets}{$sl} = \%cdata;
+    }
+
+    if ( defined $pd ) {
+        debug_log( 'verbose', $pd,
+            'Remote process data available on frontend' );
+        $comm_data->{pd} = $pd;
     }
 
     map { $cmd .= " --$_=\"$cinner_cmd{$_}\"" } keys %cinner_cmd;
@@ -4375,7 +4463,7 @@ sub go_job {
 
     # Setup whatever is needed for running parallel commands, note this
     # might involve setting environment variables.
-    my ( $cmd, $ncpus, $hosts ) = setup_pcmd($jobid);
+    my ( $cmd, $ncpus, $hosts, $pd ) = setup_pcmd($jobid);
 
     $conf{verbose} && defined $ncpus && print "Job has $ncpus process(es)\n";
     $conf{verbose} && defined $hosts && print "Job spans $hosts host(s)\n";
@@ -4386,11 +4474,10 @@ sub go_job {
     $cmd .= " $0 --inner";
 
     if ( not defined $hosts ) {
-        print "Full duplex mode needs to know the host count\n";
-        print "Which is doesn't for this resource manager: $conf{rmgr}\n";
+        print "Fatal problem setting up the resource manager: $conf{rmgr}\n";
         return 1;
     }
-    my $errors = go_parallel( $jobid, $cmd, $ncpus, $hosts );
+    my $errors = go_parallel( $jobid, $cmd, $ncpus, $hosts, $pd );
 
     debug_log( 'verbose', undef, 'Completed command' );
 
@@ -6992,17 +7079,6 @@ sub mpd_find_pids {
     return;
 }
 
-sub open_find_pids {
-    my $job = shift;
-
-    my $hostname = $inner_conf{hostname};
-
-    foreach my $rank ( keys %{ $inner_conf{orte_data}{$hostname} } ) {
-        maybe_show_pid( $rank, $inner_conf{orte_data}{$hostname}{$rank} );
-    }
-    return;
-}
-
 sub rms_find_pids {
     my $jobid = shift;
 
@@ -7289,13 +7365,17 @@ sub convert_pids_to_child_pids {
 sub inner_find_pids {
     my ( $netdata, $cmd ) = @_;
 
-    if ( $inner_conf{rmgr} eq 'orte' ) {
-        $inner_conf{orte_data} = $cmd->{orte_data};
-    }
+    if ( defined $cmd->{pd} ) {
+        my $hostname = $inner_conf{hostname};
+        foreach my $rank ( keys %{ $cmd->{pd}{$hostname} } ) {
+            maybe_show_pid( $rank, $cmd->{pd}{$hostname}{$rank} );
+        }
+    } else {
 
-    # Query the resource manager to find the pids, they'll be added to the
-    # "all_pids" array.
-    $rmgr{ $inner_conf{rmgr} }{find_pids}( $inner_conf{jobid} );
+        # Query the resource manager to find the pids, they'll be added to
+        # the "all_pids" array.
+        $rmgr{ $inner_conf{rmgr} }{find_pids}( $inner_conf{jobid} );
+    }
 
     convert_pids_to_child_pids();
 
