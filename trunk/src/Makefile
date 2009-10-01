@@ -27,3 +27,14 @@ tarfile:
 	/bin/cp ${FILES} padb-${VERSION}
 	svnversion > padb-${VERSION}/svnversion
 	tar -czf padb-${VERSION}.tgz padb-${VERSION}
+
+tidy:
+	perltidy -b -ce -w -se padb
+
+pc:	padb
+	perlcritic --brutal --verbose "%l: (%s) %m\n" padb > .pc.tmp || true
+	/bin/mv .pc.tmp pc
+
+report: pc
+	./report.pl pc | tee report
+
