@@ -1,7 +1,7 @@
 
 INSTALL_DIR=/usr/local/
 CONFIG_DIR=/etc
-VERSION=3.0-rc2
+VERSION=3.0
 
 FILES = Makefile minfo.c mpi_interface.h padb
 
