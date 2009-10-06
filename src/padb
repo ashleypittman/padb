@@ -2,6 +2,10 @@
 
 # padb. a simple parallel debugging aid.
 
+# $URL$
+# $Date$
+# $Revision$
+
 # For help and support visit http://padb.pittman.org.uk
 # or email padb-users@pittman.org.uk
 
@@ -274,8 +278,15 @@ use Carp;
 # Inner
 # Main.
 
+my $svn_revision_string = '$Revision$';
+my $svn_revision        = 'unknown';
+
+if ( $svn_revision_string =~ m{(\d+)} ) {
+    $svn_revision = $1;
+}
+
 my $prog    = basename $0;
-my $version = '3.0-rc1';
+my $version = "3.n (Revision $svn_revision)";
 
 my %conf;
 
