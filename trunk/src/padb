@@ -5036,7 +5036,7 @@ sub gdb_strip_first_quotes {
     if (
         $str =~ m{\A                    # Start of str.
                    "                    # Quote
-                   ((?:[^"\\]++|\\.)*+) # Anyting which isn't \"
+                   ((?:[^"\\]+|\\.)*)   # Anyting which isn't \"
                    "                    # Close quote
                    ,?                   # An optional comma.
                    (.*)                 # Rest of line
