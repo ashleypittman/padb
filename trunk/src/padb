@@ -2093,175 +2093,6 @@ sub cmp_list {
     return 1;
 }
 
-# This function returns an reference to an array of hashes, each hash
-# containing the "txt" of the function name and a further array of hash
-# references called "children".
-sub _make_tree {
-    my ( $level, $lines, $trange ) = @_;
-
-    my @peers;
-    my $prev;
-    my $tag = rng_shift($trange);
-
-    if (0) {
-        debug_log( 'tree', undef, 'called tag:%s, level:%d tags %s',
-            $tag, $level, rng_convert_to_user($trange) );
-    }
-
-    return if ( not defined $tag );
-    return if ( not defined $lines->{$tag} );
-
-    my @identical;
-    my $different_rng;
-
-    my $endlevel = $level;
-
-    # Populate the two lists, @identical and @different
-    my $line = $lines->{$tag}[$level];
-    if ( defined $line ) {
-        $different_rng = rng_create_empty();
-        while ( defined( my $tag2 = rng_shift($trange) ) ) {
-            if ( defined $lines->{$tag2}[$level]
-                and $line eq $lines->{$tag2}[$level] )
-            {
-                push @identical, $tag2;
-            } else {
-                rng_add_value( $different_rng, $tag2 );
-            }
-        }
-    } else {
-        $different_rng = $trange;
-    }
-
-    # Move $endlevel on as far as we can...
-    if ( $#identical >= 0 ) {
-        my $nextidentical;
-        do {
-            $nextidentical = 0;
-            my $nextfound = 0;
-            $endlevel++;
-            if ( defined $lines->{$tag}[$endlevel] ) {
-                foreach my $tag2 (@identical) {
-                    if ( defined $lines->{$tag2}[$endlevel]
-                        and $lines->{$tag}[$endlevel] eq
-                        $lines->{$tag2}[$endlevel] )
-                    {
-                        $nextfound++;
-                    }
-                }
-            }
-            if ( ( $#identical + 1 ) == $nextfound ) {
-                $nextidentical = 1;
-            }
-        } while $nextidentical;
-        $endlevel--;
-    } else {
-        $endlevel = ( $#{ $lines->{$tag} } );
-    }
-
-    if (0) {
-        debug_log(
-            'tree',
-            undef,
-            "level $level, endlevel $endlevel, identical:%s different: %s",
-            rng_convert_to_user( rng_create_from_array(@identical) ),
-            rng_convert_to_user($different_rng)
-        );
-    }
-
-    for ( my $l = $level ; $l <= $endlevel ; $l++ ) {
-
-        my %this;
-        $this{txt} = $lines->{$tag}[$l];
-
-        # @{ $this{vps} } = ( $tag, @identical );
-
-        # The plus two here is one for $tag and one to convert from array
-        # idx to number of entries.
-        $this{vpcount} = $#identical + 2;
-        $this{vpspec} =
-          rng_convert_to_user( rng_create_from_array( ( $tag, @identical ) ) );
-
-        if ( defined $prev ) {
-            push @{ $prev->{children} }, \%this;
-        } else {
-            push @peers, \%this;
-        }
-
-        $prev = \%this;
-
-    }
-
-    if ( $#identical >= 0 ) {
-
-        if ( $endlevel != $#{ $lines->{$tag} } + 1 ) {
-            unshift @identical, $tag;
-        }
-
-        my $r = rng_create_from_array(@identical);
-        $prev->{children} = _make_tree( $endlevel + 1, $lines, $r );
-    }
-
-    if (0) {
-        debug_log(
-            'tree',
-            undef,
-"returning level:$level endlevel:$endlevel identical:%s different: %s",
-            rng_convert_to_user( rng_create_from_array(@identical) ),
-            rng_convert_to_user($different_rng)
-        );
-    }
-
-    if ( not rng_empty($different_rng) ) {
-        my $new = _make_tree( $level, $lines, $different_rng );
-        push @peers, ( @{$new} );
-    }
-
-    return \@peers;
-}
-
-# Convert the rank output into a tree based form suitable for use with show_tree.
-sub make_tree {
-    my ($lines) = @_;
-    my $rng = rng_create_from_array( keys %{$lines} );
-    return _make_tree( 0, $lines, $rng );
-}
-
-# Takes a ref to a array of hashes...
-sub _show_tree {
-
-    my ( $ref, $parent, $indent ) = @_;
-
-    my $ret = $EMPTY_STRING;
-
-    # Don't need to sort the peers here because make_tree ensures the are
-    # sorted.
-    # my @peers = sort { $a->{vps}[0] <=> $b->{vps}[0] } ( @{$ref} );
-
-    my @peers = @{$ref};
-    foreach my $peer (@peers) {
-
-        if ( $#peers != 0 or $parent ne $peer->{vpspec} ) {
-            $ret .= "$indent-----------------\n";
-            $ret .= "$indent$peer->{vpspec} ($peer->{vpcount} processes)\n";
-            $ret .= "$indent-----------------\n";
-        }
-
-        $ret .= "$indent$peer->{txt}\n";
-        if ( defined $peer->{children} ) {
-            $ret .=
-              _show_tree( $peer->{children}, $peer->{vpspec}, "$indent  " );
-        }
-    }
-    return $ret;
-}
-
-sub show_tree {
-    my $ref = shift;
-    debug_log( 'tree', $ref, 'Complete tree' );
-    return _show_tree( $ref, "no-parent", $EMPTY_STRING );
-}
-
 ###############################################################################
 #
 # RMS support.
@@ -3362,7 +3193,7 @@ sub default_output_handler {
     my $mode  = $req->{mode};
 
     if ( defined $req->{out_format} ) {
-        complex_output_handler( $req->{out_format}, $lines );
+        complex_output_handler( $req->{out_format}, $lines, $d );
     } else {
         my $nprocesses = keys %{ $d->{target_output} };
         foreach my $process ( sort { $a <=> $b } keys %{ $d->{target_output} } )
@@ -3402,7 +3233,7 @@ sub add_tag_to_tree {
 }
 
 sub _display_tree {
-    my ( $tree, $parent, $indent ) = @_;
+    my ( $tree, $d, $parent, $indent, $path, $enforce_spec ) = @_;
 
     my $ret = $EMPTY_STRING;
 
@@ -3410,39 +3241,141 @@ sub _display_tree {
     my @peers =
       sort { $tree->{$a}->{min} <=> $tree->{$b}->{min} } keys %{$tree};
 
+    # This is ugly, dip inside the mode_options for the only mode which
+    # sets this value.
+    my $max_show = $conf{mode_options}{stack}{max_distinct_values};
+
+    my $child_enforce_spec = 0;
     foreach my $peer (@peers) {
 
         my $vpspec = rng_convert_to_user( $tree->{$peer}->{range} );
-        if ( $#peers != 0 or $parent ne $vpspec ) {
+        if ( $#peers != 0 or $parent ne $vpspec or $enforce_spec ) {
             $ret .= "$indent-----------------\n";
             $ret .= "$indent$vpspec ($tree->{$peer}->{count} processes)\n";
             $ret .= "$indent-----------------\n";
         }
 
         $ret .= "$indent$peer\n";
+        if ( defined $d->{target_data} ) {
+            my $l = "$path,$peer";
+
+            if ( defined $d->{target_data}{"$peer|params"} ) {
+                my @params_lists =
+                  sort keys %{ $d->{target_data}{"$peer|params"} };
+
+                # It's not impossible that the same function on the same
+                # line might have different params or locals, for example
+                # it could be a different binary.  It's probably rare
+                # enough that we can ignore it however.
+                my @params = split $COMMA, $params_lists[0];
+
+                $ret .= "$indent      params\n" if ( @params > 0 );
+                foreach my $var (@params) {
+
+                    my $key    = "$l|var|$var";
+                    my @values = keys %{ $d->{target_data}{$key} };
+
+                    my $type = '<unknown>';
+
+                    my @type_list =
+                      sort keys %{ $d->{target_data}{"$peer|param_type|$var"} };
+                    $type = $type_list[0];
+
+                    $child_enforce_spec = 1;
+                    if ( @values == 1 ) {
+                        foreach my $value ( sort @values ) {
+                            $ret .=
+                              "$indent        $type    $var = '$value' "
+                              . rng_convert_to_user(
+                                $d->{target_data}{$key}{$value} )
+                              . "\n";
+                        }
+                    } elsif ( @values > $max_show ) {
+                        $ret .=
+"$indent        $type    $var: <more than $max_show distinct values>\n";
+                    } else {
+                        $ret .= "$indent        $type    $var:\n";
+                        foreach my $value ( sort @values ) {
+                            $ret .=
+                              "$indent          '$value' "
+                              . rng_convert_to_user(
+                                $d->{target_data}{$key}{$value} )
+                              . "\n";
+                        }
+                    }
+                }
+            }
+
+            if ( defined $d->{target_data}{"$peer|locals"} ) {
+                my @locals_lists = keys %{ $d->{target_data}{"$peer|locals"} };
+
+                # It's not impossible that the same function on the same
+                # line might have different params or locals, for example
+                # it could be a different binary.  In the case of locals
+                # simply load all of them.
+                my @locals = split $COMMA, join( q{,}, @locals_lists );
+
+                $ret .= "$indent      locals\n" if ( @locals > 0 );
+                foreach my $var (@locals) {
+
+                    my $key    = "$l|var|$var";
+                    my @values = keys %{ $d->{target_data}{$key} };
+
+                    my $type = '<unknown>';
+
+                    my @type_list =
+                      sort keys %{ $d->{target_data}{"$peer|var_type|$var"} };
+                    $type = $type_list[0];
+
+                    $child_enforce_spec = 1;
+                    if ( @values == 1 ) {
+                        foreach my $value ( sort @values ) {
+                            $ret .=
+                              "$indent        $type    $var = '$value' "
+                              . rng_convert_to_user(
+                                $d->{target_data}{$key}{$value} )
+                              . "\n";
+                        }
+                    } elsif ( @values > $max_show ) {
+                        $ret .=
+"$indent        $type    $var: <more than $max_show distinct values>\n";
+                    } else {
+                        $ret .= "$indent        $type    $var:\n";
+                        foreach my $value ( sort @values ) {
+                            $ret .=
+                              "$indent          '$value' "
+                              . rng_convert_to_user(
+                                $d->{target_data}{$key}{$value} )
+                              . "\n";
+                        }
+                    }
+                }
+            }
+        }
         if ( defined $tree->{$peer}->{desc} ) {
-            $ret .=
-              _display_tree( $tree->{$peer}->{desc}, $vpspec, "$indent  " );
+            $ret .= _display_tree( $tree->{$peer}->{desc},
+                $d, $vpspec, "$indent  ", "$path,$peer", $child_enforce_spec );
         }
     }
     return $ret;
 }
 
 sub display_tree {
-    my ($tree) = @_;
-    return _display_tree( $tree, "no-parent", $EMPTY_STRING );
+    my ( $tree, $d ) = @_;
+    return _display_tree( $tree, $d, "no-parent", $EMPTY_STRING, $EMPTY_STRING,
+        1 );
 }
 
 # An experimental new tree format.
 sub new_tree {
-    my ($lines) = @_;
+    my ( $lines, $d ) = @_;
     my %tree;
     debug_log( 'tree', undef, 'Making the tree' );
     foreach my $tag ( sort { $a <=> $b } keys %{$lines} ) {
         add_tag_to_tree( \%tree, $tag, $lines->{$tag} );
     }
     debug_log( 'tree', undef, 'Formatting the tree' );
-    my $t = display_tree( \%tree );
+    my $t = display_tree( \%tree, $d );
     debug_log( 'tree', undef, 'Displaying the tree' );
     print $t;
     debug_log( 'tree', undef, 'Done' );
@@ -3450,12 +3383,10 @@ sub new_tree {
 }
 
 sub complex_output_handler {
-    my ( $output, $lines ) = @_;
+    my ( $output, $lines, $d ) = @_;
 
     if ( $output eq 'tree' ) {
-
-        #print show_tree( make_tree($lines) );
-        new_tree($lines);
+        new_tree( $lines, $d );
     } elsif ( $output eq 'compress' ) {
 
         foreach my $tag ( sort { $a <=> $b } ( keys %{$lines} ) ) {
@@ -5166,7 +5097,7 @@ sub gdb_extract_value_square {
         }
 
     }
-    croak("Failed to extrace square braces from $str");
+    croak("Failed to extract square braces from $str");
 }
 
 sub gdb_extract_value_braces {
@@ -6708,6 +6639,7 @@ sub stack_trace_from_pids {
                 }
             }
 
+            my @fl = $EMPTY_STRING;
             foreach my $frame ( reverse @frames ) {
 
                 target_error( $vp, "error from gdb: $frame->{error}" )
@@ -6724,17 +6656,67 @@ sub stack_trace_from_pids {
 
                 $strip_below = undef;
 
-                my $l = output(
-                    $vp, sprintf "%s() at %s:%s",
-                    $function,
-                    ( $frame->{file} || '?' ),
-                    ( $frame->{line} || '?' )
-                );
-                if ( $carg->{stack_shows_params} ) {
-                    show_stack_vars( $vp, $frame, 'params' );
-                }
-                if ( $carg->{stack_shows_locals} ) {
-                    show_stack_vars( $vp, $frame, 'locals' );
+                my $l = sprintf "%s() at %s:%s",
+                  $function,
+                  ( $frame->{file} || '?' ),
+                  ( $frame->{line} || '?' );
+
+                output $vp, $l;
+
+                if ( $carg->{out_format} eq 'tree' ) {
+                    push @fl, $l;
+                    my $fl = join( ",", @fl );
+                    if ( $carg->{stack_shows_locals} ) {
+                        my @local_names;
+                        foreach my $loc ( @{ $frame->{locals} } ) {
+                            push @local_names, $loc->{name};
+                            target_key_pair( $vp, "$l|var_type|$loc->{name}",
+                                $loc->{type} );
+
+                            if ( length $loc->{value} > 70 ) {
+                                target_key_pair(
+                                    $vp,
+                                    $fl . '|var|' . $loc->{name},
+                                    '<value too long to display>'
+                                );
+                            } else {
+                                target_key_pair( $vp,
+                                    $fl . '|var|' . $loc->{name},
+                                    $loc->{value} );
+                            }
+                        }
+                        target_key_pair( $vp, "$l|locals",
+                            join( q{,}, sort @local_names ) );
+                    }
+                    if ( $carg->{stack_shows_params} ) {
+
+                        my @param_names;
+                        foreach my $par ( @{ $frame->{params} } ) {
+                            push @param_names, $par->{name};
+                            target_key_pair( $vp, "$l|param_type|$par->{name}",
+                                $par->{type} );
+                            if ( length $par->{value} > 70 ) {
+                                target_key_pair(
+                                    $vp,
+                                    $fl . '|var|' . $par->{name},
+                                    '<value too long to display>'
+                                );
+                            } else {
+                                target_key_pair( $vp,
+                                    $fl . '|var|' . $par->{name},
+                                    $par->{value} );
+                            }
+                        }
+                        target_key_pair( $vp, "$l|params",
+                            join( q{,}, @param_names ) );
+                    }
+                } else {
+                    if ( $carg->{stack_shows_params} ) {
+                        show_stack_vars( $vp, $frame, 'params' );
+                    }
+                    if ( $carg->{stack_shows_locals} ) {
+                        show_stack_vars( $vp, $frame, 'locals' );
+                    }
                 }
 
                 # Strip below this function if we need to.
@@ -7513,8 +7495,18 @@ sub command_from_parent {
     # data for this node/rank.
     if ( defined $allfns{ $cmd->{mode} }{handler_all} ) {
         eval {
+
+            # Bit of a hack here until I can fix it properly, pass on the
+            # output format so that the stack trace code knows when to do
+            # clever things in tree mode.
+            my $cargs = $cmd->{cargs};
+            if ( defined $cmd->{out_format} ) {
+                $cargs->{out_format} = $cmd->{out_format};
+            } else {
+                $cargs->{out_format} = 'raw';
+            }
             $netdata->{target_responce} =
-              $allfns{ $cmd->{mode} }{handler_all}( $cmd->{cargs}, $pid_list );
+              $allfns{ $cmd->{mode} }{handler_all}( $cargs, $pid_list );
             1;
         } or do {
             my $error = $@;
@@ -7920,14 +7912,15 @@ sub common_main {
         arg_short   => 'x',
         help        => 'Show stack trace (see also -t)',
         options_i   => {
-            gdb_retry_count => 3,
+            gdb_retry_count     => 3,
+            max_distinct_values => 3,
             stack_strip_above =>
 'elan_waitWord,elan_pollWord,elan_deviceCheck,opal_condition_wait,opal_progress',
             stack_strip_below => 'main,__libc_start_main,start_thread',
         },
         options_bool => {
-            stack_shows_params => 'no',
-            stack_shows_locals => 'no',
+            stack_shows_params => 'yes',
+            stack_shows_locals => 'yes',
         },
         secondary => [
             {
