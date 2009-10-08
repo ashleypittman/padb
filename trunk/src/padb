@@ -2702,7 +2702,7 @@ sub mpirun_setup_pcmd {
     foreach my $proc ( 0 .. ( $nprocs - 1 ) ) {
         my $hostd = gdb_read_value( $gdb, "MPIR_proctable[$proc].host_name" );
 
-        if ( $hostd =~ m{\"(\w+)\"\z}x ) {
+        if ( $hostd =~ m{\"([\w\d]+)\"\z}x ) {
             my $host = $1;
 
             my $pid = gdb_read_value( $gdb, "MPIR_proctable[$proc].pid" );
@@ -2716,10 +2716,13 @@ sub mpirun_setup_pcmd {
 
     my @hosts = keys(%pt);
 
-    my $hlist = join q{,}, @hosts;
+    my $cmd = $EMPTY_STRING;
+    if ( $hosts[0] ne hostname() or @hosts > 1 ) {
+        my $hlist = join q{,}, @hosts;
+        $cmd = "pdsh -w $hlist";
+    }
 
-    my $cmd = "pdsh -w $hlist";
-    my $hc  = @hosts;
+    my $hc = @hosts;
     return ( $cmd, $nprocs, $hc, \%pt );
 }
 
