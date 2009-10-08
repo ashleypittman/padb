@@ -6713,8 +6713,10 @@ sub stack_trace_from_pids {
                                     $loc->{value} );
                             }
                         }
-                        target_key_pair( $vp, "$l|locals",
-                            join( q{,}, sort @local_names ) );
+                        if ( @local_names > 0 ) {
+                            target_key_pair( $vp, "$l|locals",
+                                join( q{,}, sort @local_names ) );
+                        }
                     }
                     if ( $carg->{stack_shows_params} ) {
 
@@ -6735,8 +6737,10 @@ sub stack_trace_from_pids {
                                     $par->{value} );
                             }
                         }
-                        target_key_pair( $vp, "$l|params",
-                            join( q{,}, @param_names ) );
+                        if ( @param_names > 0 ) {
+                            target_key_pair( $vp, "$l|params",
+                                join( q{,}, @param_names ) );
+                        }
                     }
                 } else {
                     if ( $carg->{stack_shows_params} ) {
