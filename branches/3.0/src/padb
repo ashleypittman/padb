@@ -23,6 +23,12 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
 # Revision history
+#
+# Version 3.1
+#  * Added a --create-secret-file option to automatically create a secret
+#    file
+#  * Allow the secret file to contain digits and dots as well as letters
+#
 # Version 3.0
 #  * Full-duplex communication between inner and outer processes, padb
 #    no longer simply sends request on the command line and processes
@@ -250,7 +256,7 @@ use Carp;
 # Main.
 
 my $prog    = basename $0;
-my $version = "3.0";
+my $version = "3.1";
 
 my %conf;
 
@@ -566,6 +572,7 @@ my $have_allfns_option = 0;
 my $full_report;
 my $core_stack;
 my $list_rmgrs;
+my $create_secret;
 my $watch;
 my $local_stats;
 my $show_jobs;
@@ -652,6 +659,7 @@ sub parse_args_outer {
         "norc"                => \$norc,
         "config-file=s"       => \$configfile,
         "debug=s"             => \$debugflag,
+        'create-secret-file'  => \$create_secret,
     );
 
     my %config_hash;
@@ -4139,6 +4147,24 @@ sub go_parallel {
     return 0;
 }
 
+sub create_padb_secret {
+    my $filename = "$ENV{HOME}/.padb-secret";
+    my $FD;
+    if ( not open $FD, '>', $filename ) {
+        printf("Failed to create secret file: $!\n");
+        return;
+    }
+    if ( chmod( 0600, $FD ) != 1 ) {
+        printf("Failed to chmod secret file: $!\n");
+        return;
+    }
+    my $s = rand;
+    print {$FD} "secret=$s\n";
+    close $FD;
+    print("Sucessfully created secret file ($filename)\n");
+    return;
+}
+
 sub find_padb_secret {
 
     my $file = "$ENV{HOME}/.padb-secret";
@@ -4163,9 +4189,11 @@ sub find_padb_secret {
     if ( $#l != 0 ) {
         return;
     }
-    if ( $l[0] =~ /^secret=(\w+)$/ ) {
+    if ( $l[0] =~ /^secret=([\d\w\.]+)$/ ) {
         return $1;
     }
+    print "Failed to load secret from file ($file)\n";
+    exit 1;
 }
 
 sub go_job {
@@ -4182,6 +4210,7 @@ sub go_job {
 
         if ( not defined $secret ) {
             printf("Error: Could not load secret file on this node\n");
+            print "Use --create-secret-file to create one\n";
             exit(1);
         }
 
@@ -4400,6 +4429,11 @@ sub outer_main {
             exit(1);
         }
         config_set( $key, $val );
+    }
+
+    if ($create_secret) {
+        create_padb_secret();
+        exit 0;
     }
 
     if ($list_rmgrs) {
