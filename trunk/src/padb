@@ -695,6 +695,7 @@ my $have_allfns_option = 0;
 my $full_report;
 my $core_stack;
 my $list_rmgrs;
+my $create_secret;
 my $watch;
 my $local_stats;
 my $show_jobs;
@@ -821,6 +822,7 @@ sub parse_args_outer {
         'norc'                => \$norc,
         'config-file=s'       => \$configfile,
         'debug=s'             => \$debugflag,
+        'create-secret-file'  => \$create_secret,
     );
 
     # The primary modes, one of these only must be set.
@@ -4353,6 +4355,24 @@ sub go_parallel {
     return 0;
 }
 
+sub create_padb_secret {
+    my $filename = "$ENV{HOME}/.padb-secret";
+    my $FD;
+    if ( not open $FD, '>', $filename ) {
+        printf("Failed to create secret file: $!\n");
+        return;
+    }
+    if ( chmod( 0600, $FD ) != 1 ) {
+        printf("Failed to chmod secret file: $!\n");
+        return;
+    }
+    my $s = rand;
+    print {$FD} "secret=$s\n";
+    close $FD;
+    print("Sucessfully created secret file ($filename)\n");
+    return;
+}
+
 sub find_padb_secret {
 
     my $file = "$ENV{HOME}/.padb-secret";
@@ -4375,9 +4395,11 @@ sub find_padb_secret {
     if ( $#l != 0 ) {
         return;
     }
-    if ( $l[0] =~ m{\Asecret=(\w+)\Z}x ) {
+    if ( $l[0] =~ m{\Asecret=([\w\d\.]+)\Z}x ) {
         return $1;
     }
+    print "Failed to load secret from file ($file)\n";
+    exit 1;
 }
 
 sub go_job {
@@ -4394,6 +4416,7 @@ sub go_job {
 
         if ( not defined $secret ) {
             print "Error: Could not load secret file on this node\n";
+            print "Use --create-secret-file to create one\n";
             exit 1;
         }
 
@@ -4658,6 +4681,11 @@ sub outer_main {
     }
 
     debug_log( 'config', \%conf, 'Finished setting configuration options' );
+
+    if ($create_secret) {
+        create_padb_secret();
+        exit 0;
+    }
 
     if ($list_rmgrs) {
         foreach my $res ( sort keys %rmgr ) {
