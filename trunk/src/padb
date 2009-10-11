@@ -2480,7 +2480,7 @@ sub mpd_setup_pcmd {
 
     my $cmd = "mpdrun -machinefile $fn -np $i";
 
-    my $hosts = $#hosts + 1;
+    my $hosts = @hosts;
 
     return ( $cmd, $d->{$job}{lastproc} + 1, $hosts );
 }
@@ -2530,13 +2530,13 @@ sub open_get_data {
 
         my @elems = split qr{\s*\|\s*}, $l;
 
-        if ( $#elems == 3 ) {
+        if ( @elems == 4 ) {
             my $nprocs = $elems[3];
             my $name   = $elems[0];
             if ( $name =~ m{\A\[(\d+)\,\d+]\z}x ) {
                 $open_jobs{$1}{nprocs} = $nprocs;
             }
-        } elsif ( $#elems == 5 ) {
+        } elsif ( @elems == 6 ) {
             my $name = $elems[1];
             if ( $name =~ m{\A\[\[(\d+)\,\d+\]\,(\d+)\]}x ) {
                 my $job  = $1;
@@ -2579,7 +2579,7 @@ sub open_setup_pcmd {
 
     my $prefix = find_ompi_prefix();
     my $cmd    = "orterun -machinefile $fn -np $i $prefix";
-    my $hosts  = $#hosts + 1;
+    my $hosts  = @hosts;
 
     return ( $cmd, $open_jobs{$job}{nprocs}, $hosts, $open_jobs{$job}{ranks} );
 }
@@ -2773,7 +2773,7 @@ sub find_rmgr {
             push @ok, $res;
         }
     }
-    if ( $#ok != 0 ) {
+    if ( @ok != 1 ) {
         print
 "Error, multiple resource managers detected, use -Ormgr=<resource manager>\n";
         push @ok, 'local-fd';
@@ -2823,13 +2823,13 @@ sub find_any_rmgr {
     }
 
     # One resource manager is installed, good.
-    if ( $#installed == 0 ) {
+    if ( @installed == 1 ) {
         setup_rmgr( $installed[0] );
         return;
     }
 
     # No resource managers are installed, bad.
-    if ( $#installed == -1 ) {
+    if ( @installed == 0 ) {
         print
 "Error, multiple resource managers detected, use -Ormgr=<resource manager>\n";
         push @installed, 'local-fd';
@@ -2841,13 +2841,13 @@ sub find_any_rmgr {
     my @active;
     foreach my $res (@installed) {
         my @jobs = $rmgr{$res}{get_active_jobs}($user);
-        if ( $#jobs != -1 ) {
+        if ( @jobs != 0 ) {
             push @active, $res;
         }
     }
 
     # Only one resource manager has active jobs, let's use it.
-    if ( $#active == 0 ) {
+    if ( @active == 1 ) {
         setup_rmgr( $active[0] );
         return;
     }
@@ -3230,8 +3230,7 @@ sub add_tag_to_tree {
         $tree->{$line}{min} = $tag;
     }
     $tree->{$line}{count}++;
-    my $rem = $#{$output};
-    if ( $rem >= 0 ) {
+    if ( @{$output} > 0 ) {
         add_tag_to_tree( \%{ $tree->{$line}{desc} }, $tag, $output );
     }
     return;
@@ -3254,7 +3253,7 @@ sub _display_tree {
     foreach my $peer (@peers) {
 
         my $vpspec = rng_convert_to_user( $tree->{$peer}->{range} );
-        if ( $#peers != 0 or $parent ne $vpspec or $enforce_spec ) {
+        if ( @peers != 1 or $parent ne $vpspec or $enforce_spec ) {
             $ret .= "$indent-----------------\n";
             $ret .= "$indent$vpspec ($tree->{$peer}->{count} processes)\n";
             $ret .= "$indent-----------------\n";
@@ -3562,7 +3561,7 @@ sub generate_binary_tree {
     while ( @{$a} ) {
         foreach my $joint (@joints) {
             my @children = splice @{$a}, 0, $width;
-            if ( $#children > -1 ) {
+            if ( @children > 0 ) {
                 push @leaves, @children;
                 @{ $comm_tree{$joint}{children} } = @children;
             }
@@ -3669,7 +3668,7 @@ sub last_command {
 sub next_command {
     my $comm_data = shift;
 
-    if ( $#commands == -1 ) {
+    if ( @commands == 0 ) {
         return last_command();
     }
 
@@ -3914,7 +3913,7 @@ sub hello_from_inner {
 
     # Children connect back with "Hello $outerkey $hostname $port $innernkey";
     my @words = split $SPACE, $line;
-    if ( $#words != 4 or $words[0] ne 'Hello' or $words[1] ne $secret ) {
+    if ( @words != 5 or $words[0] ne 'Hello' or $words[1] ne $secret ) {
         print "Bad signon $line\n";
         return 0;
     }
@@ -3934,7 +3933,7 @@ sub hello_from_inner {
 sub inner_stdout_cb {
     my ( $comm_data, $cdata, $line ) = @_;
     my @words = split $SPACE, $line;
-    if ( $#words == 3 and $words[0] eq 'connect' ) {
+    if ( @words == 4 and $words[0] eq 'connect' ) {
 
         handle_signon( $comm_data, $words[1], $words[2], $words[3] );
         return;
@@ -4093,7 +4092,7 @@ sub rng_shift {
     my ($rg) = @_;
 
     # Return undef if this range is empty.
-    return if ( $#{$rg} == -1 );
+    return if ( @{$rg} == 0 );
 
     my $value = $rg->[0]->{l};
     if ( $rg->[0]->{l} == $rg->[0]->{u} ) {
@@ -4395,7 +4394,7 @@ sub find_padb_secret {
     }
 
     my @l = slurp_file($file);
-    if ( $#l != 0 ) {
+    if ( @l != 1 ) {
         return;
     }
     if ( $l[0] =~ m{\Asecret=([\w\d\.]+)\Z}x ) {
@@ -4704,7 +4703,7 @@ sub outer_main {
             if ( $working eq 'yes' ) {
                 print "$r: ";
                 my @jobs = $rmgr{$res}{get_active_jobs}($user);
-                if ( $#jobs > -1 ) {
+                if ( @jobs > 0 ) {
                     my $j = join q{ }, sort { $a <=> $b } @jobs;
                     print "jobs($j)\n";
                 } else {
@@ -4782,12 +4781,12 @@ sub outer_main {
     }
 
     if ( $all or $any ) {
-        if ( $#ARGV != -1 ) {
+        if ( @ARGV != 0 ) {
             cmdline_error(
                 "$prog: Error: --all incompatible with specific ids\n");
         }
     } elsif ( !$input_file ) {
-        if ( $#ARGV == -1 ) {
+        if ( @ARGV == 0 ) {
             cmdline_error(
                 "$prog: Error: no jobs specified, use --all or jobids\n");
         }
@@ -4837,13 +4836,13 @@ sub outer_main {
         find_any_rmgr($user);
 
         @jobids = get_all_jobids($user);
-        printf "Active jobs (%d) are @jobids\n", $#jobids + 1
+        printf "Active jobs (%d) are @jobids\n", @jobids
           if $conf{verbose};
-        if ( $#jobids == -1 ) {
+        if ( @jobids == 0 ) {
             printf "No active jobs could be found for user '$user'\n";
             exit 1;
         }
-        if ( $any && $#jobids != 0 ) {
+        if ( $any && @jobids > 1 ) {
             printf "More than 1 active job (@jobids) for user '$user'\n";
             exit 1;
         }
@@ -4859,7 +4858,7 @@ sub outer_main {
         }
     }
 
-    if ( $#jobids > 0 and $watch ) {
+    if ( @jobids > 1 and $watch ) {
         print "Cannot use --watch with more than one job\n";
         exit 1;
     }
@@ -4867,7 +4866,7 @@ sub outer_main {
     foreach my $jobid (@jobids) {
 
         print "\nCollecting information for job '$jobid'\n\n"
-          if ( $conf{verbose} or ( $#jobids > 0 ) );
+          if ( $conf{verbose} or ( @jobids > 1 ) );
 
         my $of;
         $of = 'tree'       if $output_tree;
@@ -5700,7 +5699,7 @@ sub mpi_go_deadlock_detect_helper {
     my $are     = 'are';
     my $have    = 'have';
 
-    if ( $#identical == 0 ) {
+    if ( @identical == 1 ) {
         $members = 'member';
         $are     = 'is';
         $have    = 'has';
@@ -5723,7 +5722,7 @@ sub mpi_go_deadlock_detect {
 
     my %tg;
 
-    if ( $#target_groups != -1 ) {
+    if ( @target_groups != 0 ) {
         foreach my $gid (@target_groups) {
             $tg{$gid}++;
         }
@@ -5742,7 +5741,7 @@ sub mpi_go_deadlock_detect {
                 $gid = "$gd->{id}($gd->{ranks}{0})";
             }
 
-            if ( $#target_groups != -1 ) {
+            if ( @target_groups != 0 ) {
                 next unless defined $tg{$gid};
             }
 
@@ -5769,7 +5768,7 @@ sub mpi_go_deadlock_detect {
 
     foreach my $gid ( sort keys %ad ) {
 
-        if ( $#target_groups != -1 ) {
+        if ( @target_groups != 0 ) {
             next unless defined $tg{$gid};
         }
 
@@ -5832,7 +5831,7 @@ sub mpi_go_deadlock_detect {
                     push @inactive, $ident;
                 }
             }
-            if ( $#inactive != -1 ) {
+            if ( @inactive != 0 ) {
                 $ret .= $gstr
                   . mpi_go_deadlock_detect_helper(
                     'not in a call to the collectives',
@@ -6052,7 +6051,7 @@ sub stack_from_core {
     foreach my $thread ( sort { $a->{id} <=> $b->{id} } @threads ) {
         my @frames = @{ $thread->{frames} };
 
-        print "ThreadId: $thread->{id}\n" if ( $#threads != 0 );
+        print "ThreadId: $thread->{id}\n" if ( @threads != 1 );
 
         for ( my $i = $#frames ; $i >= 0 ; $i-- ) {
             my $frame = $frames[$i];
@@ -6653,7 +6652,7 @@ sub stack_trace_from_pids {
             next unless defined $thread->{frames};
             my @frames = @{ $thread->{frames} };
 
-            output( $vp, "ThreadId: $thread->{id}" ) if ( $#threads != 0 );
+            output( $vp, "ThreadId: $thread->{id}" ) if ( @threads != 1 );
 
             my $strip_below;
 
@@ -6967,7 +6966,7 @@ sub mpi_watch_all {
 
         @mq = fetch_mpi_queue_gdb( $carg, $vp, $pid, $gdb );
 
-        if ( $#mq == 0 ) {
+        if ( @mq == 0 ) {
             $good = ',';
         } else {
             foreach my $o (@mq) {
@@ -7447,7 +7446,7 @@ sub command_from_parent {
 
         my @children =
           @{ $cmd->{connection_tree}{ $inner_conf{hostname} }{children} };
-        $netdata->{children} = $#children + 1;
+        $netdata->{children} = @children;
 
         # Only one child is tested so far.
         foreach my $chostname (@children) {
@@ -8057,7 +8056,7 @@ sub common_main {
 
 common_main();
 
-if ( $#ARGV >= 0 and $ARGV[0] eq '--inner' ) {
+if ( @ARGV > 0 and $ARGV[0] eq '--inner' ) {
     shift @ARGV;
     inner_main();
 } else {
