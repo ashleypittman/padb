@@ -5662,7 +5662,7 @@ sub show_mpi_queue_for_deadlock_all {
             $proc->{gdb} = $gdb;
             push @all, $proc;
         } else {
-            output $vp, 'Failed to attach to to process';
+            output( $vp, 'Failed to attach to to process' );
         }
 
     }
@@ -6110,7 +6110,7 @@ sub run_ptrack_cmd {
       or p_die( $vp, "cant start command $cmd" );
     while (<$CMD>) {
         chomp $_;
-        output $vp, $_;
+        output( $vp, $_ );
         $lines++;
     }
     send_cont_signal($pid);
@@ -6123,7 +6123,7 @@ sub run_command {
     open my $CMDS, '-|', "$cmd" or p_die $vp, 'cant fork subcommand';
     while (<$CMDS>) {
         chomp $_;
-        output $vp, $_;
+        output( $vp, $_ );
     }
     close $CMDS;
     return;
@@ -6692,7 +6692,7 @@ sub stack_trace_from_pids {
                   ( $frame->{file} || '?' ),
                   ( $frame->{line} || '?' );
 
-                output $vp, $l;
+                output( $vp, $l );
 
                 if ( $carg->{out_format} eq 'tree' ) {
                     push @fl, $l;
