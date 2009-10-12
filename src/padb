@@ -6119,7 +6119,7 @@ sub run_ptrack_cmd {
 
 sub run_command {
     my ( $vp, $cmd ) = @_;
-    open my $CMDS, '-|', "$cmd" or p_die $vp, 'cant fork subcommand';
+    open my $CMDS, '-|', "$cmd" or p_die( $vp, 'cant fork subcommand' );
     while (<$CMDS>) {
         chomp $_;
         output( $vp, $_ );
