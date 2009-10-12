@@ -84,7 +84,7 @@ foreach my $fn (@fns) {
 }
 
 foreach my $fn (@fns) {
-    printf("Function: $fn $fns{$fn}{start}\n");
+    printf("Function: $fn\n");
 
     if ( defined $refs{$fn} ) {
         printf("\tIs dereferenced\n");
