@@ -2669,7 +2669,7 @@ sub mpirun_get_jobs {
 
     foreach my $pid ( get_process_list($user) ) {
         my $name = find_from_status( $pid, "Name" );
-        if ( defined $mpirun{$name} ) {
+        if ( defined $name and defined $mpirun{$name} ) {
             push @jobs, $pid;
             next;
         }
@@ -3880,7 +3880,8 @@ sub command_from_inner {
     }
 
     if ( defined $allfns{$mode}{out_handler} ) {
-        $allfns{$mode}{out_handler}( $conf{mode_options}{$mode}, $d );
+        $allfns{$mode}{out_handler}( $conf{mode_options}{$mode}, $d,
+            $comm_data->{current_req} );
     } else {
         default_output_handler( $comm_data->{current_req}, $d );
     }
@@ -4836,7 +4837,7 @@ sub outer_main {
         find_any_rmgr($user);
 
         @jobids = get_all_jobids($user);
-        printf "Active jobs (%d) are @jobids\n", @jobids
+        printf "Active jobs (%d) are @jobids\n", $#jobids + 1
           if $conf{verbose};
         if ( @jobids == 0 ) {
             printf "No active jobs could be found for user '$user'\n";
@@ -5468,7 +5469,6 @@ sub run_minfo {
         tracepid => -1,
         attached => 0,
     };
-    my @mq;
 
     my $cmd = $inner_conf{minfo};
     $h->{hpid} = open3( $h->{fd}{wtr}, $h->{fd}{rdr}, $h->{fd}{err}, $cmd )
@@ -5480,18 +5480,123 @@ sub run_minfo {
 
     my %stats;
 
+    # Communicator data.
+    my %cd;
+
+    my %global;
+
+    $global{exit} = 'unknown';
+
+    my @cd;
+    my $bytes_to_read;
+    my $str_name;
+    my $str_value = $EMPTY_STRING;
+    my $str_global;
     while (<$handle>) {
         my $r = $_;
+
+        if ( defined $bytes_to_read ) {
+            $str_value .= $r;
+            if ( length $str_value eq $bytes_to_read + 1 ) {
+                chomp $str_value;
+                if ($str_global) {
+                    $global{$str_name} = $str_value;
+
+                    if ( $str_name eq 'ihqm' ) {
+                        my $image = readlink "/proc/$gdb->{tracepid}/exe";
+                        $str_value =~ s{%s}{$image};
+                    }
+
+                    if ( $str_name ne 'exit' and $str_name ne 'dmsg' ) {
+
+			# Report the string back to the outer process,
+			# don't bother forwarding exit status as that's
+			# done below.
+                        target_key_pair( $vp, "minfo_msg_$str_name",
+                            $str_value );
+                        target_key_pair( $vp, "minfo_msg", $str_name );
+                    }
+                } else {
+                    $cd{$str_name} = $str_value;
+                }
+                $bytes_to_read = undef;
+                $str_value     = "";
+            }
+            next;
+        }
+
         chomp $r;
-        if ( $r =~ m{\Areq:}x ) {
+        my $cmd = substr $r, 0, 4;
+        if ( $cmd eq 'req:' ) {
             my $res = minfo_handle_query( $gdb, $vp, $r, \%stats );
 
             # Some things *do* fail here, symbol lookups for example,
             # and we don't need to report it.
 
             print {$out} "$res\n";
+        } elsif ( $cmd eq 'out:' ) {
+            if (
+                $r =~ m{\A
+                        out:
+                        [ ]
+                        c:(\d+)
+                        [ ]
+                        (\w+):
+                        (\d+)
+                        [ ]?
+                        (\w+)?
+                        \z
+                        }x
+              )
+            {
+                my $cid   = $1;
+                my $key   = $2;
+                my $value = $3;
+                my $name  = $4;
+
+                if ( $key eq 'str' ) {
+                    $bytes_to_read = $value;
+                    $str_name      = $name;
+                    $str_global    = 0;
+                } elsif ( $key eq 'rt' ) {
+                    push @{ $cd{rt} }, $value;
+                } else {
+                    $cd{$key} = $value;
+                    $cd{mid} = $cid;
+                }
+            } else {
+                target_key_pair( $vp, "UNPARSEABLE MINFO", $r );
+            }
+        } elsif ( $cmd eq 'zzz:' ) {
+            if (
+                $r =~ m{\A
+                        zzz:
+                        [ ]
+                        (\w+):
+                        (\d+)
+                        [ ]?
+                        (\w+)?
+                        \z
+                        }x
+              )
+            {
+                my $key    = $1;
+                my $length = $2;
+                my $name   = $3;
+
+                if ( $key eq 'str' ) {
+                    $bytes_to_read = $length;
+                    $str_name      = $name;
+                    $str_global    = 1;
+                }
+            } else {
+                target_key_pair( $vp, "UNPARSEABLE MINFO", $r );
+            }
+        } elsif ( $cmd eq 'done' ) {
+            push @cd, dclone( \%cd );
+            undef %cd;
         } else {
-            push @mq, $r;
+            push @{ $cd{raw} }, $r;
         }
     }
 
@@ -5509,13 +5614,44 @@ sub run_minfo {
         return;
     }
 
-    if ( $? != 0 ) {
+    if ( $global{exit} ne 'ok' ) {
+        if ( $global{exit} eq 'die' ) {
+            target_error( $vp,
+                "Error message from $inner_conf{minfo}: $global{dmsg}" );
 
-        # Bad exit code but we did talk to it so run with what we have.
-        target_error( $vp,
-            "Error running $inner_conf{minfo}: Bad exit code $?" );
+        } else {
+            target_error( $vp,
+                "Error running $inner_conf{minfo}: Bad exit code $?" );
+        }
     }
 
+    return minfo_to_array( \@cd );
+
+}
+
+sub minfo_to_array {
+    my ($cd) = @_;
+
+    my @mq;
+    foreach my $comm ( @{$cd} ) {
+
+        #print Dumper $comm;
+        push @mq, "comm$comm->{mid}: name: '$comm->{name}'";
+        if ( defined $comm->{rank} ) {
+            push @mq, "comm$comm->{mid}: rank: '$comm->{rank}'";
+        }
+        push @mq, "comm$comm->{mid}: size: '$comm->{size}'";
+        my $id = sprintf( "%#Lx", $comm->{id} );
+        push @mq, "comm$comm->{mid}: id: '$id'";
+
+        for my $i ( 0 .. $#{ $comm->{rt} } ) {
+            push @mq, "comm$comm->{mid}: Rank: local $i global $comm->{rt}[$i]";
+        }
+
+        foreach my $l ( @{ $comm->{raw} } ) {
+            push @mq, $l;
+        }
+    }
     return @mq;
 }
 
@@ -5687,6 +5823,45 @@ sub show_mpi_queue_for_deadlock_all {
     return $ret;
 }
 
+sub mpi_queue_output_handler {
+    my ( $carg, $lines, $three ) = @_;
+
+    my %headers = (
+        ihqm            => 'Message from DLL',
+        phqm            => 'Message from DLL',
+        dllerror        => 'Error string from DLL',
+        warning         => 'Warning message from minfo',
+        dlldebugmessage => 'Debug message from DLL',
+    );
+
+    if ( exists $lines->{target_data}{minfo_msg} ) {
+        my @keys = sort keys %{ $lines->{target_data}{minfo_msg} };
+
+        foreach my $key (@keys) {
+            my @values = keys %{ $lines->{target_data}{"minfo_msg_$key"} };
+            my $head;
+            if ( defined $headers{$key} ) {
+                $head = $headers{$key};
+            } else {
+                $head = "Message from minfo/dll using unknown key: '$key'";
+            }
+            foreach my $value ( sort @values ) {
+                printf("----------------\n");
+                printf(
+                    
+		     rng_convert_to_user(
+                        $lines->{target_data}{"minfo_msg_$key"}{$value}
+                      ) . 
+		    ": $head\n");
+                printf("----------------\n");
+                printf( "%s\n", $value );
+            }
+        }
+    }
+
+    default_output_handler( $three, $lines );
+}
+
 sub mpi_go_deadlock_detect_helper {
     my $str        = shift;    # tagged onto the end of the line.
     my $possessive = shift;    # syntax to use (possessive/attributive)
@@ -5728,6 +5903,8 @@ sub mpi_go_deadlock_detect {
         }
     }
 
+    my $no_data = 0;
+
     foreach my $process ( keys %{$cd} ) {
         my $rd = $cd->{$process};
         foreach my $g ( keys %{$rd} ) {
@@ -5750,6 +5927,9 @@ sub mpi_go_deadlock_detect {
             }
             $ad{$gid}{size} = $gd->{size};
             $ad{$gid}{name} = $gd->{name};
+            if ( not exists $gd->{coll} ) {
+                $no_data++;
+            }
             foreach my $coll ( keys %{ $gd->{coll} } ) {
                 my $count = $gd->{coll}{$coll}{count};
                 if ( defined $gd->{coll}{$coll}{active} ) {
@@ -5843,13 +6023,21 @@ sub mpi_go_deadlock_detect {
 
     my $count = keys %ad;
 
+    if ( $count eq $no_data ) {
+        $ret .=
+          "Total: $count communicators, no communication data recorded.\n";
+        return $ret;
+    }
+
     if ( $count == 1 ) {
         my $use_str = ( $i_count == 1 ) ? $EMPTY_STRING : ' not';
-        $ret .= "Total: $count group which is$use_str in use.\n";
+        $ret .= "Total: $count communicators which is$use_str in use.\n";
     } else {
         my $i_str = ( $i_count == 1 ) ? 'is' : 'are';
-        $ret .= "Total: $count groups of which $i_count $i_str in use.\n";
+        $ret .=
+          "Total: $count communicators of which $i_count $i_str in use.\n";
     }
+    $ret .= "No data was recorded for $no_data communicators\n";
 
     return $ret;
 }
@@ -5887,7 +6075,7 @@ sub mpi_deadlock_detect {
             } elsif ( $line =~ /^msg\d+/ ) {
                 ;    # nop
             } else {
-                print "Failed to match minfo output: $line\n";
+		#print "Failed to match minfo output: $line\n";
             }
         }
         $coll_data{$rank} = \%lid;
@@ -6784,8 +6972,12 @@ sub show_queue {
     my %remote_env = get_remote_env($pid);
 
     if ( defined $remote_env{LD_LIBRARY_PATH} ) {
-        $ENV{LD_LIBRARY_PATH} =
-          "$remote_env{LD_LIBRARY_PATH}:$inner_conf{myld}";
+        if ( defined $inner_conf{myld} ) {
+            $ENV{LD_LIBRARY_PATH} =
+              "$remote_env{LD_LIBRARY_PATH}:$inner_conf{myld}";
+        } else {
+            $ENV{LD_LIBRARY_PATH} = "$remote_env{LD_LIBRARY_PATH}";
+        }
     }
 
     my $cmd = "$inner_conf{edb} --queues --pid=$pid";
@@ -7852,12 +8044,13 @@ sub common_main {
     # Sort out secondary and options_i so they are handled in the same way.
 
     $allfns{queue} = {
-        arg_long  => 'message-queue',
-        qsnet     => 1,
-        arg_short => 'q',
-        handler   => \&show_queue,
-        help      => 'Show the message queues',
-        options_i => { mpi_dll => undef, }
+        out_handler => \&mpi_queue_output_handler,
+        arg_long    => 'message-queue',
+        qsnet       => 1,
+        arg_short   => 'q',
+        handler     => \&show_queue,
+        help        => 'Show the message queues',
+        options_i   => { mpi_dll => undef, }
 
     };
 
