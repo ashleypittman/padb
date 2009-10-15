@@ -3236,6 +3236,35 @@ sub add_tag_to_tree {
     return;
 }
 
+# Calculate the formatting needed for displaying a list of variables and
+# their types allowing them to be neatly formatted on the screen.  Take an
+# array of hashes and combine {name} and {type} into a new value
+# {type_name} which is the same length as {type_name} for all other entries
+# in the array.
+sub format_local_vars {
+    my ($list) = @_;
+
+    my $max = 0;
+    foreach my $var ( @{$list} ) {
+        my $name_len = length $var->{name};
+        my $type_len = length $var->{type};
+        if ( $name_len + $type_len > $max ) {
+            $max = $name_len + $type_len;
+        }
+    }
+
+    $max++;
+
+    foreach my $var ( @{$list} ) {
+        my $name_len = length $var->{name};
+        my $type_len = length $var->{type};
+        my $pad      = $max - ( $name_len + $type_len );
+        $var->{type_name} = $var->{type} . " " x $pad . $var->{name};
+    }
+
+    return;
+}
+
 sub _display_tree {
     my ( $tree, $d, $parent, $indent, $path, $enforce_spec ) = @_;
 
@@ -3274,34 +3303,44 @@ sub _display_tree {
                 my @params = split $COMMA, $params_lists[0];
 
                 $ret .= "$indent      params\n" if ( @params > 0 );
+
+                my @all_vars;
                 foreach my $var (@params) {
-
-                    my $key    = "$l|var|$var";
-                    my @values = keys %{ $d->{target_data}{$key} };
-
-                    my $type = '<unknown>';
-
                     my @type_list =
                       sort keys %{ $d->{target_data}{"$peer|param_type|$var"} };
-                    $type = $type_list[0];
+                    my $type = $type_list[0];
+                    push @all_vars,
+                      {
+                        name => $var,
+                        type => $type,
+                      };
+                }
+
+                format_local_vars( \@all_vars );
+
+                foreach my $vref (@all_vars) {
+                    my $var    = $vref->{name};
+                    my $key    = "$l|var|$var";
+                    my @values = keys %{ $d->{target_data}{$key} };
+                    my $type   = $vref->{type};
 
                     $child_enforce_spec = 1;
                     if ( @values == 1 ) {
                         foreach my $value ( sort @values ) {
                             $ret .=
-                              "$indent        $type    $var = '$value' "
+                              "$indent        $vref->{type_name} = '$value' "
                               . rng_convert_to_user(
                                 $d->{target_data}{$key}{$value} )
                               . "\n";
                         }
                     } elsif ( @values > $max_show ) {
                         $ret .=
-"$indent        $type    $var: <more than $max_show distinct values>\n";
+"$indent        $vref->{type_name}: <more than $max_show distinct values>\n";
                     } else {
-                        $ret .= "$indent        $type    $var:\n";
+                        $ret .= "$indent        $vref->{type_name}:\n";
                         foreach my $value ( sort @values ) {
                             $ret .=
-                              "$indent          '$value' "
+                              "$indent            '$value' "
                               . rng_convert_to_user(
                                 $d->{target_data}{$key}{$value} )
                               . "\n";
@@ -3320,34 +3359,44 @@ sub _display_tree {
                 my @locals = split $COMMA, join( q{,}, @locals_lists );
 
                 $ret .= "$indent      locals\n" if ( @locals > 0 );
+
+                my @all_vars;
                 foreach my $var (@locals) {
-
-                    my $key    = "$l|var|$var";
-                    my @values = keys %{ $d->{target_data}{$key} };
-
-                    my $type = '<unknown>';
-
                     my @type_list =
                       sort keys %{ $d->{target_data}{"$peer|var_type|$var"} };
-                    $type = $type_list[0];
+                    my $type = $type_list[0];
+                    push @all_vars,
+                      {
+                        name => $var,
+                        type => $type,
+                      };
+                }
+
+                format_local_vars( \@all_vars );
+
+                foreach my $vref (@all_vars) {
+                    my $var    = $vref->{name};
+                    my $key    = "$l|var|$var";
+                    my @values = keys %{ $d->{target_data}{$key} };
+                    my $type   = $vref->{type};
 
                     $child_enforce_spec = 1;
                     if ( @values == 1 ) {
                         foreach my $value ( sort @values ) {
                             $ret .=
-                              "$indent        $type    $var = '$value' "
+                              "$indent        $vref->{type_name} = '$value' "
                               . rng_convert_to_user(
                                 $d->{target_data}{$key}{$value} )
                               . "\n";
                         }
                     } elsif ( @values > $max_show ) {
                         $ret .=
-"$indent        $type    $var: <more than $max_show distinct values>\n";
+"$indent        $vref->{type_name}: <more than $max_show distinct values>\n";
                     } else {
-                        $ret .= "$indent        $type    $var:\n";
+                        $ret .= "$indent        $vref->{type_name}:\n";
                         foreach my $value ( sort @values ) {
                             $ret .=
-                              "$indent          '$value' "
+                              "$indent            '$value' "
                               . rng_convert_to_user(
                                 $d->{target_data}{$key}{$value} )
                               . "\n";
@@ -5509,9 +5558,9 @@ sub run_minfo {
 
                     if ( $str_name ne 'exit' and $str_name ne 'dmsg' ) {
 
-			# Report the string back to the outer process,
-			# don't bother forwarding exit status as that's
-			# done below.
+                        # Report the string back to the outer process,
+                        # don't bother forwarding exit status as that's
+                        # done below.
                         target_key_pair( $vp, "minfo_msg_$str_name",
                             $str_value );
                         target_key_pair( $vp, "minfo_msg", $str_name );
@@ -5848,11 +5897,12 @@ sub mpi_queue_output_handler {
             foreach my $value ( sort @values ) {
                 printf("----------------\n");
                 printf(
-                    
-		     rng_convert_to_user(
+
+                    rng_convert_to_user(
                         $lines->{target_data}{"minfo_msg_$key"}{$value}
-                      ) . 
-		    ": $head\n");
+                      )
+                      . ": $head\n"
+                );
                 printf("----------------\n");
                 printf( "%s\n", $value );
             }
@@ -6075,7 +6125,8 @@ sub mpi_deadlock_detect {
             } elsif ( $line =~ /^msg\d+/ ) {
                 ;    # nop
             } else {
-		#print "Failed to match minfo output: $line\n";
+
+                #print "Failed to match minfo output: $line\n";
             }
         }
         $coll_data{$rank} = \%lid;
@@ -6700,18 +6751,12 @@ sub show_stack_vars {
     my ( $vp, $frame, $type ) = @_;
     return unless defined $frame->{$type};
     return if ( @{ $frame->{$type} } == 0 );
-    my %l = ( t => 0, n => 0 );
-    foreach my $arg ( @{ $frame->{$type} } ) {
-        $l{t} = length $arg->{type} if ( length $arg->{type} > $l{t} );
-        $l{n} = length $arg->{name} if ( length $arg->{name} > $l{n} );
-    }
-    my $header = "  $type:";
-    output( $vp, $header );
+
+    format_local_vars( $frame->{$type} );
+    output( $vp, "  $type:" );
     foreach my $arg ( @{ $frame->{$type} } ) {
         my $value = ( defined $arg->{value} ? $arg->{value} : '??' );
-        my $output = sprintf "    %-$l{t}s %$l{n}s = %s", $arg->{type},
-          $arg->{name}, $value;
-        output( $vp, $output );
+        output( $vp, "    $arg->{type_name} = $value" );
     }
     return;
 }
