@@ -2699,14 +2699,14 @@ sub mpirun_setup_pcmd {
 
     my %pt;
     foreach my $proc ( 0 .. ( $nprocs - 1 ) ) {
-        my $hostd = gdb_read_value( $gdb, "MPIR_proctable[$proc].host_name" );
-
-        if ( $hostd =~ m{\"([\w\d\-\.]+)\"\z}x ) {
-            my $host = $1;
-            my $pid = gdb_read_value( $gdb, "MPIR_proctable[$proc].pid" );
+        my $hostp =
+          gdb_read_value( $gdb, "(void *)MPIR_proctable[$proc].host_name" );
+        my $host = gdb_string( $gdb, 1024, $hostp );
+        my $pid = gdb_read_value( $gdb, "MPIR_proctable[$proc].pid" );
+        if ( defined $host and defined $pid ) {
             $pt{$host}{$proc} = $pid;
         } else {
-            print "Failed to extract hostname from $hostd\n";
+            print "Failed to extract process info for rank $proc\n";
         }
     }
 
