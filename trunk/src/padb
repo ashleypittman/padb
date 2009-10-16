@@ -481,12 +481,12 @@ $Data::Dumper::Sortkeys  = 1;
 $Data::Dumper::Quotekeys = 0;
 
 sub check_and_convert_bool {
-    my ($str) = @_;
-    my @yes   = qw(1 yes on enabled);
-    my @no    = qw(0 no off disabled);
+    my ($str)    = @_;
+    my @enabled  = qw(1 yes on true enabled);
+    my @disabled = qw(0 no off false disabled);
     my %bool_table;
-    map { $bool_table{$_} = 1 } @yes;
-    map { $bool_table{$_} = 0 } @no;
+    map { $bool_table{$_} = 1 } @enabled;
+    map { $bool_table{$_} = 0 } @disabled;
 
     if ( defined $bool_table{$str} ) {
         return $bool_table{$str};
@@ -2304,7 +2304,7 @@ sub slurm_job_to_ncpus {
 # Query the nodecount for the "job" as that is what we shall be running on.
 sub slurm_job_to_nodecount {
     my $job  = shift;
-    my @jobs = slurp_cmd("squeue -o %i,%D");
+    my @jobs = slurp_cmd('squeue -o %i,%D');
 
     chomp @jobs;
     foreach my $step (@jobs) {
@@ -2497,9 +2497,8 @@ sub mpd_cleanup_pcmd {
 ###############################################################################
 
 sub find_ompi_prefix {
-    my $name = "ompi-ps";
     foreach my $dir ( split $COLON, $ENV{PATH} ) {
-        next unless ( -x "$dir/$name" );
+        next unless ( -x "$dir/ompi-ps" );
         my @d = split "/", $dir;
         pop @d;
         my $prefix = join q{/}, @d;
@@ -2668,7 +2667,7 @@ sub mpirun_get_jobs {
     map { $mpirun{$_}++ } split $COMMA, $conf{mpirun};
 
     foreach my $pid ( get_process_list($user) ) {
-        my $name = find_from_status( $pid, "Name" );
+        my $name = find_from_status( $pid, 'Name' );
         if ( defined $name and defined $mpirun{$name} ) {
             push @jobs, $pid;
             next;
@@ -2687,7 +2686,7 @@ sub mpirun_setup_pcmd {
     my ($job) = @_;
 
     if ( not find_exe('pdsh') ) {
-        printf("mpirun resource manager requires pdsh to be installed\n");
+        print "mpirun resource manager requires pdsh to be installed\n";
         return;
     }
 
@@ -2696,7 +2695,7 @@ sub mpirun_setup_pcmd {
         return;
     }
 
-    my $nprocs = gdb_read_value( $gdb, "MPIR_proctable_size" );
+    my $nprocs = gdb_read_value( $gdb, 'MPIR_proctable_size' );
 
     my %pt;
     foreach my $proc ( 0 .. ( $nprocs - 1 ) ) {
@@ -3124,7 +3123,7 @@ sub show_proc_format {
     foreach my $hash (@all) {
         my @res;
         foreach my $key (@proc_format_array) {
-            my $value = "??";
+            my $value = '??';
             if ( defined $hash->{$key} ) {
                 $value = $hash->{$key};
             }
@@ -3218,7 +3217,7 @@ sub default_output_handler {
 sub add_tag_to_tree {
     my ( $tree, $tag, $output ) = @_;
 
-    my $line = shift( @{$output} );
+    my $line = shift @{$output};
 
     if ( not defined $tree->{$line}{range} ) {
         $tree->{$line}{range} = rng_create_empty();
@@ -3259,7 +3258,7 @@ sub format_local_vars {
         my $name_len = length $var->{name};
         my $type_len = length $var->{type};
         my $pad      = $max - ( $name_len + $type_len );
-        $var->{type_name} = $var->{type} . " " x $pad . $var->{name};
+        $var->{type_name} = $var->{type} . q{ } x $pad . $var->{name};
     }
 
     return;
@@ -3457,7 +3456,7 @@ sub complex_output_handler {
             printf "%s\n", rng_convert_to_user($rng);
             print "----------------\n";
             foreach my $data ( @{ $lines->{$tag} } ) {
-                print("$data\n");
+                print "$data\n";
             }
         }
     } elsif ( $output eq 'compress_c' ) {
@@ -3534,7 +3533,7 @@ sub connect_to_child {
         Proto    => 'tcp',
     ) or die "Failed to connect to child ($host:$port)";
 
-    print $socket "hello $word\n";
+    print {$socket} "hello $word\n";
 
     return $socket;
 }
@@ -3780,7 +3779,7 @@ sub check_signon {
     if ( not defined $data->{target_data}{FOUND}{yes}
         or rng_empty( $data->{target_data}{FOUND}{yes} ) )
     {
-        printf "Warning, failed to locate any ranks\n";
+        print "Warning, failed to locate any ranks\n";
         return 1;
     }
 
@@ -4411,17 +4410,17 @@ sub create_padb_secret {
     my $filename = "$ENV{HOME}/.padb-secret";
     my $FD;
     if ( not open $FD, '>', $filename ) {
-        printf("Failed to create secret file: $!\n");
+        print "Failed to create secret file: $!\n";
         return;
     }
     if ( chmod( 0600, $FD ) != 1 ) {
-        printf("Failed to chmod secret file: $!\n");
+        print "Failed to chmod secret file: $!\n";
         return;
     }
     my $s = rand;
     print {$FD} "secret=$s\n";
     close $FD;
-    print("Sucessfully created secret file ($filename)\n");
+    print "Sucessfully created secret file ($filename)\n";
     return;
 }
 
@@ -4609,7 +4608,7 @@ sub _config_help {
     my $max_len = 0;
 
     foreach my $key ( sort keys %{ $conf{mode_options}{$mode} } ) {
-        if ( length($key) > $max_len ) {
+        if ( length $key > $max_len ) {
             $max_len = length($key);
         }
     }
@@ -4889,11 +4888,11 @@ sub outer_main {
         printf "Active jobs (%d) are @jobids\n", $#jobids + 1
           if $conf{verbose};
         if ( @jobids == 0 ) {
-            printf "No active jobs could be found for user '$user'\n";
+            print "No active jobs could be found for user '$user'\n";
             exit 1;
         }
         if ( $any && @jobids > 1 ) {
-            printf "More than 1 active job (@jobids) for user '$user'\n";
+            print "More than 1 active job (@jobids) for user '$user'\n";
             exit 1;
         }
     } else {
@@ -5450,9 +5449,8 @@ sub gdb_read_raw {
 
 sub gdb_string {
     my ( $gdb, $len, $strp ) = @_;
-    my $offset = 0;
-    my $str    = $EMPTY_STRING;
-    my @s      = gdb_read_raw( $gdb, $strp, $len );
+    my $str = $EMPTY_STRING;
+    my @s = gdb_read_raw( $gdb, $strp, $len );
     return if ( not defined $s[0] );
     foreach my $d (@s) {
         my $v = hex $d;
@@ -5563,7 +5561,7 @@ sub run_minfo {
                         # done below.
                         target_key_pair( $vp, "minfo_msg_$str_name",
                             $str_value );
-                        target_key_pair( $vp, "minfo_msg", $str_name );
+                        target_key_pair( $vp, 'minfo_msg', $str_name );
                     }
                 } else {
                     $cd{$str_name} = $str_value;
@@ -5614,7 +5612,7 @@ sub run_minfo {
                     $cd{mid} = $cid;
                 }
             } else {
-                target_key_pair( $vp, "UNPARSEABLE MINFO", $r );
+                target_key_pair( $vp, 'UNPARSEABLE MINFO', $r );
             }
         } elsif ( $cmd eq 'zzz:' ) {
             if (
@@ -5639,7 +5637,7 @@ sub run_minfo {
                     $str_global    = 1;
                 }
             } else {
-                target_key_pair( $vp, "UNPARSEABLE MINFO", $r );
+                target_key_pair( $vp, 'UNPARSEABLE MINFO', $r );
             }
         } elsif ( $cmd eq 'done' ) {
             push @cd, dclone( \%cd );
@@ -5690,7 +5688,7 @@ sub minfo_to_array {
             push @mq, "comm$comm->{mid}: rank: '$comm->{rank}'";
         }
         push @mq, "comm$comm->{mid}: size: '$comm->{size}'";
-        my $id = sprintf( "%#Lx", $comm->{id} );
+        my $id = sprintf "%#Lx", $comm->{id};
         push @mq, "comm$comm->{mid}: id: '$id'";
 
         for my $i ( 0 .. $#{ $comm->{rt} } ) {
@@ -5895,21 +5893,20 @@ sub mpi_queue_output_handler {
                 $head = "Message from minfo/dll using unknown key: '$key'";
             }
             foreach my $value ( sort @values ) {
-                printf("----------------\n");
-                printf(
+                print "----------------\n";
+                printf
 
-                    rng_convert_to_user(
-                        $lines->{target_data}{"minfo_msg_$key"}{$value}
-                      )
-                      . ": $head\n"
-                );
-                printf("----------------\n");
-                printf( "%s\n", $value );
+                  rng_convert_to_user(
+                    $lines->{target_data}{"minfo_msg_$key"}{$value} )
+                  . ": $head\n";
+                print "----------------\n";
+                printf "%s\n", $value;
             }
         }
     }
 
     default_output_handler( $three, $lines );
+    return;
 }
 
 sub mpi_go_deadlock_detect_helper {

@@ -14,7 +14,7 @@ my %subs;
 
 my @builtin =
   qw(basename Dumper qw Configure dclone join defined delete print shift close accept confess A new thaw add
-  remove count flush handles printf split dirname);
+  remove count flush handles printf split dirname ref);
 
 my %builtin;
 
