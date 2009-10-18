@@ -3921,8 +3921,8 @@ sub command_from_inner {
     if ( defined $d->{target_data}{ERROR} ) {
         print "Warning: errors reported by some ranks\n========\n";
         foreach my $error ( sort keys %{ $d->{target_data}{ERROR} } ) {
-            printf "%s: $error\n",
-              rng_convert_to_user( $d->{target_data}{ERROR}{$error} );
+            printf "%s: %s\n",
+              rng_convert_to_user( $d->{target_data}{ERROR}{$error} ), $error;
         }
         print "========\n";
     }
