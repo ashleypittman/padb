@@ -4999,6 +4999,7 @@ sub gdb_start {
         gdbpid   => -1,
         tracepid => -1,
         attached => 0,
+        pa       => 0,
     };
 
     my $cmd = 'gdb --interpreter=mi -q';
@@ -5050,6 +5051,22 @@ sub gdb_attach {
     $gdb->{attached} = 1;
     $gdb->{tracepid} = $pid;
 
+    $gdb->{maps} = read_maps($pid);
+
+    my $open = gdb_read_value( $gdb, 'opal_version_string' );
+
+    if ( defined $open ) {
+        $gdb->{runtime}{ompi} = 1;
+    }
+
+    my $mpich2 = gdb_read_value( $gdb, 'MPID_GROUP' );
+
+    if ( defined $mpich2 ) {
+        $gdb->{runtime}{mpich2} = 1;
+    }
+
+    gdb_n_send( $gdb, 'set print address off' );
+
     return $pid;
 }
 
@@ -5075,14 +5092,47 @@ sub gdb_wait_for_prompt {
     return;
 }
 
-sub gdb_n_send {
+sub _gdb_send_real {
     my ( $gdb, $cmd ) = @_;
     gdb_wait_for_prompt($gdb);
     my $handle = $gdb->{wtr};
     print {$handle} "$cmd\n";
     my %r = gdb_n_next_result($gdb);
     $r{cmd} = $cmd;
+    if ( 0 and defined $r{status} and $r{status} ne 'done' ) {
+        print Dumper \%r;
+    }
     return %r;
+}
+
+sub _gdb_set_print_address {
+    my ( $gdb, $flag ) = @_;
+
+    if ( $flag == $gdb->{pa} ) {
+        return;
+    }
+
+    $gdb->{pa} = $flag;
+
+    if ($flag) {
+        _gdb_send_real( $gdb, 'set print address on' );
+    } else {
+        _gdb_send_real( $gdb, 'set print address off' );
+    }
+
+}
+
+sub gdb_n_send {
+    my ( $gdb, $cmd ) = @_;
+    _gdb_set_print_address( $gdb, 0 );
+    return _gdb_send_real( $gdb, $cmd );
+}
+
+# Send a command with print address enabled.
+sub gdb_send_addr {
+    my ( $gdb, $cmd ) = @_;
+    _gdb_set_print_address( $gdb, 1 );
+    return _gdb_send_real( $gdb, $cmd );
 }
 
 sub gdb_send {
@@ -5091,7 +5141,7 @@ sub gdb_send {
     return $p{status};
 }
 
-sub strip_square {
+sub gdb_strip_square {
     my $str = shift;
     if ( $str =~ m{\A\[(.*)\]\z}x ) {
         return $1;
@@ -5168,9 +5218,9 @@ sub gdb_extract_value_square {
             $indent--;
             if ( $indent == 0 ) {
                 if ( $rem eq $EMPTY_STRING ) {
-                    return ( strip_square($value) );
+                    return ( gdb_strip_square($value) );
                 } else {
-                    return ( strip_square($value), $rem );
+                    return ( gdb_strip_square($value), $rem );
                 }
             }
         }
@@ -5397,22 +5447,22 @@ sub gdb_strip_value {
 
 sub gdb_type_size {
     my ( $gdb, $type ) = @_;
-    my %p = gdb_n_send( $gdb, "-data-evaluate-expression sizeof($type)" );
+    my %p = gdb_n_send( $gdb, "-data-evaluate-expression \"sizeof($type)\"" );
     return unless ( $p{status} eq 'done' );
     return gdb_strip_value( $p{reason} );
 }
 
 sub gdb_type_offset {
     my ( $gdb, $type, $field ) = @_;
-    my %p =
-      gdb_n_send( $gdb, "-data-evaluate-expression \"&(($type *)0)->$field\"" );
+    my %p = gdb_send_addr( $gdb,
+        "-data-evaluate-expression \"&(($type *)0)->$field\"" );
     return unless ( $p{status} eq 'done' );
     return hex gdb_strip_value( $p{reason} );
 }
 
 sub gdb_func_addr {
     my ( $gdb, $func ) = @_;
-    my %p = gdb_n_send( $gdb, "-data-evaluate-expression $func" );
+    my %p = gdb_send_addr( $gdb, "-data-evaluate-expression $func" );
     return unless ( $p{status} eq 'done' );
     my $value = gdb_strip_value( $p{reason} );
     my @a     = split $SPACE, $value;
@@ -5422,7 +5472,7 @@ sub gdb_func_addr {
 
 sub gdb_var_addr {
     my ( $gdb, $var ) = @_;
-    my %p = gdb_n_send( $gdb, "-data-evaluate-expression &$var" );
+    my %p = gdb_send_addr( $gdb, "-data-evaluate-expression \"&($var)\"" );
     return unless ( $p{status} eq 'done' );
     return gdb_strip_value( $p{reason} );
 }
@@ -5458,6 +5508,43 @@ sub gdb_string {
         $str .= sprintf '%c', $v;
     }
     return $str;
+}
+
+sub gdb_read_pointer {
+    my ( $gdb, $addr ) = @_;
+
+    # Quote the request in case it contains spaces.
+    my %t =
+      gdb_send_addr( $gdb, "-data-evaluate-expression \"*(void **)$addr\"" );
+    if ( $t{status} eq 'done' ) {
+        my $v = gdb_parse_reason( $t{reason} );
+        return $v->{value};
+    }
+    return;
+}
+
+sub gdb_read_value {
+    my ( $gdb, $name ) = @_;
+
+    # Quote the request in case it contains spaces.
+    my %t = gdb_n_send( $gdb, "-data-evaluate-expression \"$name\"" );
+    if ( $t{status} eq 'done' ) {
+        my $v = gdb_parse_reason( $t{reason} );
+        return $v->{value};
+    }
+    return;
+}
+
+sub gdb_read_value_addr {
+    my ( $gdb, $name ) = @_;
+
+    # Quote the request in case it contains spaces.
+    my %t = gdb_send_addr( $gdb, "-data-evaluate-expression \"$name\"" );
+    if ( $t{status} eq 'done' ) {
+        my $v = gdb_parse_reason( $t{reason} );
+        return $v->{value};
+    }
+    return;
 }
 
 sub minfo_handle_query {
@@ -6134,15 +6221,176 @@ sub mpi_deadlock_detect {
     return;
 }
 
-sub gdb_read_value {
-    my ( $gdb, $name ) = @_;
+sub read_maps {
+    my ($pid) = @_;
 
-    # Quote the request in case it contains spaces.
-    my %t = gdb_n_send( $gdb, "-data-evaluate-expression \"$name\"" );
-    if ( $t{status} eq 'done' ) {
-        my $v = gdb_parse_reason( $t{reason} );
-        return $v->{value};
+    my @regions;
+    foreach my $rgn ( slurp_file("/proc/$pid/maps") ) {
+        my ( $area, $perm, $offset, $time, $inode, $file ) =
+          split $SPACE, $rgn;
+        my ( $start, $end ) = split "-", $area;
+
+        my %region = (
+            start => _hex("0x$start"),
+            end   => _hex("0x$end"),
+            perm  => $perm
+        );
+
+        $region{file} = $file if ( defined $file and length $file );
+        push @regions, \%region;
     }
+
+    return \@regions;
+}
+
+sub describe_pointer {
+    my ( $gdb, $ptr ) = @_;
+
+    my $pval = _hex($ptr);
+
+    if ( $ptr eq '0x0' ) {
+        return '<null pointer>';
+    }
+
+    foreach my $rgn ( @{ $gdb->{maps} } ) {
+        if ( $pval >= $rgn->{start} and $pval <= $rgn->{end} ) {
+            if ( defined $rgn->{file} ) {
+                return "<valid pointer perm=$rgn->{perm} ($rgn->{file})>";
+            } else {
+                return "<valid pointer perm=$rgn->{perm}>";
+            }
+        }
+    }
+    return "<$ptr (Invalid pointer)>";
+}
+
+sub expand_var_hash {
+    my ( $gdb, $lookup, $type, $addr ) = @_;
+    if ( defined $lookup->{$type} ) {
+        my $fm = $lookup->{$type};
+        my $r = gdb_read_pointer( $gdb, $addr );
+        $fm =~ s{%s}{$r};
+        my $str_loc = gdb_var_addr( $gdb, $fm );
+        if ( defined $str_loc ) {
+            my $value = gdb_string( $gdb, 1024, $str_loc );
+            if ( defined $value and length $value > 0 ) {
+                return $value;
+            }
+        }
+    }
+    return;
+}
+
+sub custom_expand_var {
+    my ( $gdb, $type, $name, $addr ) = @_;
+
+    my %lookup_generic = ( 'char *' => "%s", );
+
+    my %lookup_open = (
+        'MPI_Comm'              => "((struct ompi_communicator_t *)%s).c_name",
+        'MPI_Datatype'          => "((struct ompi_datatype_t *)%s).name",
+        'MPI_Op'                => "((struct ompi_op_t *)%s).o_name",
+        'ompi_communicator_t *' => "((struct ompi_communicator_t *)%s).c_name",
+        'ompi_datatype_t *'     => "((struct ompi_datatype_t *)%s).name",
+        'ompi_op_t *'           => "((struct ompi_op_t *)%s).o_name",
+    );
+
+    my %lookup_mpich2 = ( 'MPID_Comm *' => "((MPID_Comm *)%s).name", );
+
+    my $var_desc = expand_var_hash( $gdb, \%lookup_generic, $type, $addr );
+    return $var_desc if defined $var_desc;
+
+    if ( defined $gdb->{runtime}{ompi} ) {
+        $var_desc = expand_var_hash( $gdb, \%lookup_open, $type, $addr );
+        return $var_desc if defined $var_desc;
+    }
+
+    if ( defined $gdb->{runtime}{mpich2} ) {
+        $var_desc = expand_var_hash( $gdb, \%lookup_mpich2, $type, $addr );
+        return $var_desc if defined $var_desc;
+    }
+
+    return;
+
+}
+
+sub gdb_expand_var {
+    my ( $gdb, $arg ) = @_;
+
+    # If you try and read a value which claims to be optimized away it
+    # will return a value of zero, hard to know how to handle this but
+    # not reporting it is probably the better of the two options.
+    return
+      if ( defined $arg->{value} and $arg->{value} eq '<value optimized out>' );
+
+    # Char * pointers are already correctly handled by gdb with set
+    # pointer off enabled so don't try and modify these.
+    return if ( $arg->{type} eq 'char *' );
+
+    my $type = $arg->{type};
+    my $addr = gdb_var_addr( $gdb, $arg->{name} );
+
+    # Strip out and struct from the given type as it makes no
+    # difference to the code if it's there or not.
+    if ( substr( $type, 0, 7 ) eq 'struct ' ) {
+        $type = substr $type, 7;
+    }
+
+    # Check for custom types, these are individual, often run-time
+    # specific types that have handlers defined for them.  Basically
+    # we know what the type is so go in and extract the information we
+    # need.
+    if ( defined $addr ) {
+        my $expanded_var =
+          custom_expand_var( $gdb, $type, $arg->{name}, $addr );
+        if ( defined $expanded_var ) {
+            return "<$expanded_var>";
+        }
+    }
+
+    # If it's a pointer, firstly load it's value, then try and print
+    # it, if that fails then describe it.
+    if ( defined $type and substr( $type, -2 ) eq ' *' ) {
+        my $pointer;
+
+        if ( defined $addr ) {
+            $pointer = gdb_read_pointer( $gdb, $addr );
+        }
+
+        if ( not defined $pointer ) {
+            $pointer = gdb_read_value_addr( $gdb, $arg->{name} );
+        }
+
+        if ( $pointer eq '0x0' ) {
+            return '<null pointer>';
+        }
+
+        # Try and print the contents of the pointer, this works fine
+        # for types like 'double *' but produces lots of data for more
+        # complex types, check the length here and reject it now if we
+        # need to so that describe_later() can work.
+        if ( defined $addr and $type ne 'void *' ) {
+            my $value = gdb_read_value( $gdb, "*($type)$addr" );
+            if ( defined $value and length $value <= 70 ) {
+                return $value;
+            }
+        }
+
+        # Describe the pointer by where it points to and what perms it
+        # has.
+        return describe_pointer( $gdb, $pointer );
+    }
+
+    # Some variables don't show up a value from list-locals,
+    # __FUNCION__ and array pointers are two examples.  For vars where
+    # the value isn't given automatically read the value of them
+    # directly.
+    return if defined $arg->{value};
+    my $value = gdb_read_value( $gdb, $arg->{name} );
+    if ( defined $value ) {
+        return $value;
+    }
+
     return;
 }
 
@@ -6150,30 +6398,12 @@ sub gdb_expand_vars {
     my ( $gdb, $frame, $type ) = @_;
 
     foreach my $arg ( @{ $frame->{$type} } ) {
-
-        # Detect simple pointers and deferefence then to show the
-        # underlying struct.  Works quite well but is a problem with very
-        # large or complex data structures.  More work is required to make
-        # this feature viable so leave it disabled for now.  Perhaps have
-        # an option for enabling it in a per-type basis?
-
-        if ( ( $arg->{type} =~ m/ \*$/ ) and $arg->{value} ne "0x0" and 0 ) {
-            my $value = gdb_read_value( $gdb, "* $arg->{name}" );
-            if ( defined $value ) {
-                $arg->{value} .= " ($value)";
-            }
-        }
-
-        # Some variables don't show up a value from list-locals,
-        # __FUNCION__ and array pointers are two examples.  For vars where
-        # the value isn't given automatically read the value of them
-        # directly.
-        next if defined $arg->{value};
-        my $value = gdb_read_value( $gdb, $arg->{name} );
+        my $value = gdb_expand_var( $gdb, $arg );
         if ( defined $value ) {
             $arg->{value} = $value;
         }
     }
+
     return;
 }
 
@@ -6188,7 +6418,7 @@ sub gdb_dump_frames {
         foreach my $frame ( @{ $data->{stack} } ) {
             gdb_send( $gdb, "-stack-select-frame $frame->{level}" );
 
-            my %r = gdb_n_send( $gdb,
+            my %r = gdb_send_addr( $gdb,
                 "-stack-list-arguments 2 $frame->{level} $frame->{level}" );
             my $args = gdb_parse_reason( $r{reason} );
 
@@ -6217,11 +6447,11 @@ sub gdb_dump_frames_per_thread {
     my @th = ();
     my %result = gdb_n_send( $gdb, '-thread-list-ids' );
     if ( $result{status} ne 'done' ) {
-        return ('unknown error');
+        return;
     }
     my $data = gdb_parse_reason( $result{reason}, 'thread-ids' );
     if ( not defined $data->{'thread-ids'} ) {
-        return ( { error => $data->{msg} || 'unknown error' } );
+        return;
     }
     if ( $data->{'number-of-threads'} == 0 ) {
         my %t;
