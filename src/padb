@@ -5000,6 +5000,8 @@ sub gdb_start {
         tracepid => -1,
         attached => 0,
         pa       => 0,
+        debug    => 0,
+        seq      => 1,
     };
 
     my $cmd = 'gdb --interpreter=mi -q';
@@ -5009,6 +5011,11 @@ sub gdb_start {
 
     $gdb->{gdbpid} = open3( $gdb->{wtr}, $gdb->{rdr}, $gdb->{err}, $cmd )
       or croak "Unable to popen() gdb: $!";
+
+    if ( $gdb->{debug} ) {
+        my ( $fh, $file ) = tempfile("/tmp/padb-gdb-debug-log-XXXXXX");
+        $gdb->{debugfd} = $fh;
+    }
 
     return $gdb;
 }
@@ -5021,6 +5028,10 @@ sub gdb_quit {
         next unless exists $gdb->{$fdname};
         close $gdb->{$fdname};
     }
+    if ( defined $gdb->{debugfd} ) {
+        close $gdb->{debugfd};
+    }
+
     return;
 }
 
@@ -5065,7 +5076,7 @@ sub gdb_attach {
         $gdb->{runtime}{mpich2} = 1;
     }
 
-    gdb_n_send( $gdb, 'set print address off' );
+    gdb_n_send( $gdb, '-gdb-set print address off' );
 
     return $pid;
 }
@@ -5086,6 +5097,10 @@ sub gdb_wait_for_prompt {
     my ($gdb) = shift;
     my $handle = $gdb->{rdr};
     while (<$handle>) {
+
+        if ( defined $gdb->{debugfd} ) {
+            print { $gdb->{debugfd} } $_;
+        }
         return if /^\(gdb\)/;
     }
 
@@ -5096,10 +5111,19 @@ sub _gdb_send_real {
     my ( $gdb, $cmd ) = @_;
     gdb_wait_for_prompt($gdb);
     my $handle = $gdb->{wtr};
-    print {$handle} "$cmd\n";
-    my %r = gdb_n_next_result($gdb);
+    my $seq    = $gdb->{seq}++;
+    print {$handle} "$seq$cmd\n";
+    if ( defined $gdb->{debugfd} ) {
+        print { $gdb->{debugfd} } "$seq$cmd\n";
+    }
+    my %r = gdb_n_next_result( $gdb, $seq );
+    if ( $gdb->{attached} and $r{seq} ne $seq ) {
+        croak(
+"Invalid sequence number from gdb, expecting $seq got $r{seq} cmd=\"$cmd\""
+        );
+    }
     $r{cmd} = $cmd;
-    if ( 0 and defined $r{status} and $r{status} ne 'done' ) {
+    if ( $gdb->{debugfd} and defined $r{status} and $r{status} ne 'done' ) {
         print Dumper \%r;
     }
     return %r;
@@ -5115,9 +5139,9 @@ sub _gdb_set_print_address {
     $gdb->{pa} = $flag;
 
     if ($flag) {
-        _gdb_send_real( $gdb, 'set print address on' );
+        _gdb_send_real( $gdb, '-gdb-set print address on' );
     } else {
-        _gdb_send_real( $gdb, 'set print address off' );
+        _gdb_send_real( $gdb, '-gdb-set print address off' );
     }
 
 }
@@ -5398,6 +5422,10 @@ sub gdb_n_next_result {
 
     while (<$handle>) {
 
+        if ( defined $gdb->{debugfd} ) {
+            print { $gdb->{debugfd} } $_;
+        }
+
         #printf("Line $_\n");
         return %res if /^\(gdb\)/;
 
@@ -5407,10 +5435,14 @@ sub gdb_n_next_result {
         #if (/\&\"(.*)\"\n/) {    #"
         #    $res{debug} .= $1;
         #}
-        if (m{\A\^(done|error),?(.*)\Z}x) {
-            $res{status} = $1;
-            if ( defined $2 and $2 ne $EMPTY_STRING ) {
-                $res{reason} = $2;
+        if (m{\A(\d+)\^(done|error),?(.*)\Z}x) {
+            my $seq    = $1;
+            my $status = $2;
+            my $reason = $3;
+            $res{status} = $status;
+            $res{seq}    = $seq;
+            if ( defined $reason and $reason ne $EMPTY_STRING ) {
+                $res{reason} = $reason;
             }
 
             #if ( defined $res{raw} ) {
@@ -5433,6 +5465,10 @@ sub gdb_n_next_result {
     #    $res{debug} =~ s/\\n/\n/g;
     #    chomp $res{debug};
     #}
+
+    if ( $gdb->{attached} ) {
+        croak("Unexpected EOF from gdb");
+    }
 
     return %res;
 }
