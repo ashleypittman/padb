@@ -2700,7 +2700,7 @@ sub mpirun_setup_pcmd {
     my %pt;
     foreach my $proc ( 0 .. ( $nprocs - 1 ) ) {
         my $hostp =
-          gdb_read_value( $gdb, "(void *)MPIR_proctable[$proc].host_name" );
+          gdb_read_value_addr( $gdb, "(void *)MPIR_proctable[$proc].host_name" );
         my $host = gdb_string( $gdb, 1024, $hostp );
         my $pid = gdb_read_value( $gdb, "MPIR_proctable[$proc].pid" );
         if ( defined $host and defined $pid ) {
