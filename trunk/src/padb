@@ -2699,8 +2699,8 @@ sub mpirun_setup_pcmd {
 
     my %pt;
     foreach my $proc ( 0 .. ( $nprocs - 1 ) ) {
-        my $hostp =
-          gdb_read_value_addr( $gdb, "(void *)MPIR_proctable[$proc].host_name" );
+        my $hostp = gdb_read_value_addr( $gdb,
+            "(void *)MPIR_proctable[$proc].host_name" );
         my $host = gdb_string( $gdb, 1024, $hostp );
         my $pid = gdb_read_value( $gdb, "MPIR_proctable[$proc].pid" );
         if ( defined $host and defined $pid ) {
@@ -7266,6 +7266,38 @@ sub kill_proc {
     return;
 }
 
+# Experimental, currently reports on what's on the node rather than what
+# the specific process is attached to, hopefully this functionality will be
+# added in the future.
+
+# https://svn.open-mpi.org/trac/hwloc/ticket/21
+sub lstopo {
+    my ( $cargs, $vp, $pid ) = @_;
+
+    target_error( $vp, "Reporting per node rather than per process" );
+
+    my @output = slurp_cmd("lstopo --whole-system");
+
+    # Check the return code, if it's not found then there won't be any
+    # output, if it was found but returned an error then do report the
+    # output as it might be useful.
+    my $rc = $?;
+    if ( $rc != 0 ) {
+        if ( not find_exe("lstopo") ) {
+            target_error( $vp, "Error running lstopo: command not found" );
+            return;
+        } else {
+            target_error( $vp, "Error running lstopo" );
+        }
+    }
+
+    chomp @output;
+    foreach my $line (@output) {
+        output( $vp, $line );
+    }
+    return;
+}
+
 sub ping_rank {
     my ( $cargs, $vp, $pid ) = @_;
     target_key_pair( $vp, 'ping', 'ACK' );
@@ -8489,6 +8521,12 @@ sub common_main {
             mpi_dll        => undef,
             mpi_watch_file => undef
         }
+    };
+
+    $allfns{lstopo} = {
+        handler  => \&lstopo,
+        arg_long => 'lstopo',
+        help     => 'Show CPU topology',
     };
 
     $allfns{ping} = {
