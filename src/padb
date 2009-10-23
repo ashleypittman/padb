@@ -2692,10 +2692,19 @@ sub mpirun_setup_pcmd {
 
     my $gdb = gdb_start();
     if ( not gdb_attach( $gdb, $job ) ) {
+        if ( defined $gdb->{error} ) {
+            print "Failed to attach to process: $gdb->{error}\n";
+        } else {
+            print "Failed to attach to process\n";
+        }
         return;
     }
 
     my $nprocs = gdb_read_value( $gdb, 'MPIR_proctable_size' );
+    if ( not defined $nprocs ) {
+        print "No MPIR_proctable_size symbol found, cannot continue";
+        return;
+    }
 
     my %pt;
     foreach my $proc ( 0 .. ( $nprocs - 1 ) ) {
@@ -2714,6 +2723,11 @@ sub mpirun_setup_pcmd {
     gdb_quit($gdb);
 
     my @hosts = keys(%pt);
+
+    if ( @hosts == 0 ) {
+        print "No process data found";
+        return;
+    }
 
     my $cmd = $EMPTY_STRING;
     if ( $hosts[0] ne hostname() or @hosts > 1 ) {
