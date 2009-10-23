@@ -32,7 +32,7 @@ char *(*es)(int errorcode);
 void show_string (char *desc, char *str)
 {
     printf("zzz: str:%d %s\n%s\n",
-	   strlen(str),
+	   (int) strlen(str),
 	   desc,
 	   str);
 }
@@ -345,7 +345,7 @@ int show_comm (struct process *p,mqs_communicator *comm)
     
     printf("out: c:%d str:%d name\n%s\n",
 	   c,
-	   strlen(comm->name),
+	   (int) strlen(comm->name),
 	   comm->name);
     
     printf("out: c:%d id:%ld\n",
