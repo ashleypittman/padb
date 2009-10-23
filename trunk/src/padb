@@ -7838,7 +7838,6 @@ sub reply_from_child {
 sub pid_to_name {
     my $pid = shift;
     my $exe = readlink "/proc/$pid/exe";
-    my $cmd;
     if ( defined $exe ) {
         return basename($exe);
     } else {
