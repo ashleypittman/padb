@@ -771,6 +771,7 @@ sub slurp_dir {
     return @files;
 }
 
+# Return an array of current processes for a given user.
 sub get_process_list {
     my ($user) = @_;
     my $uid = getpwnam $user;
@@ -789,6 +790,32 @@ sub get_process_list {
         push @userpids, $pid;
     }
     return @userpids;
+}
+
+# Return the process list for a given user, return a hash indexed by pid
+# and containing the parent pid for the given process.
+sub get_extended_process_list {
+    my ($user) = @_;
+    my $uid = getpwnam $user;
+    return unless defined $uid;
+    my @pids = slurp_dir('/proc');
+    my @userpids;
+    my %procs;
+    foreach my $pid (@pids) {
+        next unless ( $pid =~ m{\A\d+\z}xms );
+        my ( undef, undef, undef, undef, $owner ) = stat "/proc/$pid";
+
+        # Check the stat worked, it's possible for processes to dissapear
+        # Take care to check for defined rather than true as root has a uid
+        # of zero.
+        next unless defined $owner;
+        next unless $owner == $uid;
+        my $ppid = find_from_status( $pid, 'PPid' );
+        if ( defined $ppid ) {
+            $procs{$pid} = $ppid;
+        }
+    }
+    return %procs;
 }
 
 sub parse_args_outer {
@@ -7850,14 +7877,14 @@ sub pid_to_name {
 # more interesting pids, in particular look for pids which appear to be
 # scripts and, if they have any children, look at the children instead.
 sub convert_pids_to_child_pids {
-    my @pids = get_process_list( getpwuid $< );
+    my %process_data = get_extended_process_list( getpwuid $< );
 
     my %scripts;
     map { $scripts{$_}++ } split $COMMA, $inner_conf{scripts};
 
     my $ipids = $inner_conf{rmpids};
 
-    foreach my $pid (@pids) {
+    foreach my $pid ( keys %process_data ) {
 
         # The resource manager pid this pid is associated with.
         my $rmpid;
@@ -7865,14 +7892,14 @@ sub convert_pids_to_child_pids {
         if ( defined $ipids->{$pid} ) {
             $rmpid = $pid;
         } else {
-            my $ppid = find_from_status( $pid, 'PPid' );
+            my $ppid = $process_data{$pid};
 
             while ( defined $ppid and $ppid != 1 ) {
                 if ( defined $ipids->{$ppid} ) {
                     $rmpid = $ppid;
                     $ppid  = undef;
                 } else {
-                    $ppid = find_from_status( $ppid, 'PPid' );
+                    $ppid = $process_data{$ppid};
                 }
             }
         }
