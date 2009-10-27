@@ -5724,11 +5724,17 @@ sub run_minfo {
         hpid     => -1,
         tracepid => -1,
         attached => 0,
+        debug    => 0,
     };
 
     my $cmd = $inner_conf{minfo};
     $h->{hpid} = open3( $h->{fd}{wtr}, $h->{fd}{rdr}, $h->{fd}{err}, $cmd )
       or confess "Unable to popen() h: $!\n";
+
+    if ( $h->{debug} ) {
+        my ( $fh, $file ) = tempfile("/tmp/padb-minfo-debug-log-$vp-XXXXXX");
+        $h->{debugfd} = $fh;
+    }
 
     my $handle = $h->{fd}{rdr};
 
@@ -5750,6 +5756,10 @@ sub run_minfo {
     my $str_global;
     while (<$handle>) {
         my $r = $_;
+
+        if ( defined $h->{debugfd} ) {
+            print { $h->{debugfd} } $r;
+        }
 
         if ( defined $bytes_to_read ) {
             $str_value .= $r;
@@ -5790,6 +5800,11 @@ sub run_minfo {
             # and we don't need to report it.
 
             print {$out} "$res\n";
+
+            if ( defined $h->{debugfd} ) {
+                print { $h->{debugfd} } "$res\n";
+            }
+
         } elsif ( $cmd eq 'out:' ) {
             if (
                 $r =~ m{\A
@@ -6581,6 +6596,7 @@ sub gdb_dump_frames_per_thread {
         push @th, \%t;
         return @th;
     }
+
     # Solaris has a extra "LWP" thread for every process which gdb reports
     # as being a duplicate of the main thread for a process.  Skip loading
     # this thread as it doesn't add anything to the output rather muddies
