@@ -292,6 +292,18 @@ my %conf;
 
 my $secret;
 
+# Solaris support!  Tested for and works for stack traces, anything else
+# should be considered a bonus at this stage.  Reports are welcome, more so
+# if they contain good news.
+my $running_on_solaris = 0;
+
+# Test for solaris by checking for a file rather than running uname, it'll
+# be quicker.  Note that with this option enabled padb will still function
+# correctly on Linux.
+if ( -d '/proc/1/path' ) {
+    $running_on_solaris = 1;
+}
+
 # Config options the inner knows about, only forward options if they are in
 # this list.
 my @inner_conf = qw(edb edbopt minfo rmgr scripts slurm_job_step);
@@ -774,6 +786,16 @@ sub slurp_dir {
 # Return an array of current processes for a given user.
 sub get_process_list {
     my ($user) = @_;
+    if ($running_on_solaris) {
+        my @procs = slurp_cmd("ps -o pid= -u $user");
+        chomp @procs;
+        my @clean_procs;
+        foreach my $proc (@procs) {
+            $proc =~ s{\s*}{}g;
+            push @clean_procs, $proc;
+        }
+        return @clean_procs;
+    }
     my $uid = getpwnam $user;
     return unless defined $uid;
     my @pids = slurp_dir('/proc');
@@ -796,6 +818,20 @@ sub get_process_list {
 # and containing the parent pid for the given process.
 sub get_extended_process_list {
     my ($user) = @_;
+    if ($running_on_solaris) {
+        my @procs = slurp_cmd("ps -o pid= -o ppid= -u $user");
+        my %procs;
+        foreach my $proc (@procs) {
+
+            # A little bit of magic here, ps left pads its output with a
+            # space which the regexp matches so $pid is the second entry
+            # returned from the split command.  I need to verify that Linux
+            # ps and Solaris ps behave the same in this situation.
+            my ( undef, $pid, $ppid ) = split $SPACE, $proc;
+            $procs{$pid} = $ppid;
+        }
+        return %procs;
+    }
     my $uid = getpwnam $user;
     return unless defined $uid;
     my @pids = slurp_dir('/proc');
@@ -5079,6 +5115,15 @@ sub gdb_quit {
 sub gdb_attach {
     my ( $gdb, $pid ) = @_;
 
+    if ($running_on_solaris) {
+        my $exe = readlink("/proc/$pid/path/a.out");
+        my %cs = gdb_n_send( $gdb, "file $exe" );
+        if ( $cs{status} ne 'done' ) {
+            croak("Gdb command file $exe failed");
+            return;
+        }
+    }
+
     send_cont_signal($pid);
     my %p = gdb_n_send( $gdb, "attach $pid" );
 
@@ -6531,16 +6576,25 @@ sub gdb_dump_frames_per_thread {
         return;
     }
     if ( $data->{'number-of-threads'} == 0 ) {
-        my %t;
-        $t{id} = 0;
+        my %t = ( id => 0 );
         @{ $t{frames} } = gdb_dump_frames( $gdb, $detail );
         push @th, \%t;
         return @th;
     }
+    # Solaris has a extra "LWP" thread for every process which gdb reports
+    # as being a duplicate of the main thread for a process.  Skip loading
+    # this thread as it doesn't add anything to the output rather muddies
+    # the water somewhat.  What I don't know is if the LWP reports to be a
+    # duplicate of the first thread, I suspect it's the last one so drop
+    # the last thread from the list reported by gdb.  This needs verifying
+    # and possibly changing by somebody who has access to both solaris and
+    # multi threaded processes.
+    if ($running_on_solaris) {
+        pop @{ $data->{'thread-ids'} };
+    }
     foreach my $thread ( @{ $data->{'thread-ids'} } ) {
         my $id = $thread->{'thread-id'};
-        my %t;
-        $t{id} = $id;
+        my %t = ( id => $id );
         gdb_send( $gdb, "-thread-select $id" );
         @{ $t{frames} } = gdb_dump_frames( $gdb, $detail );
         push @th, \%t;
@@ -7611,6 +7665,21 @@ sub maybe_show_pid {
 sub find_from_status {
     my ( $pid, $key ) = @_;
 
+    if ($running_on_solaris) {
+        my %key_lookup = (
+            PPid  => 'ppid',
+            Name  => 'comm',
+            State => 's',
+        );
+        my $ps_key = $key_lookup{$key};
+        my @res    = slurp_cmd("ps -o $ps_key= -p $pid");
+        return if ( @res == 0 );
+        chomp @res;
+        my $proc = $res[0];
+        $proc =~ s{\s*}{}g;
+        return $proc;
+    }
+
     foreach my $l ( slurp_file("/proc/$pid/status") ) {
         if ( $l =~ m{\A(\w+):\s*(.+)}x ) {
             if ( $1 eq $key ) { return $2; }
@@ -7894,7 +7963,7 @@ sub convert_pids_to_child_pids {
         } else {
             my $ppid = $process_data{$pid};
 
-            while ( defined $ppid and $ppid != 1 ) {
+            while ( defined $ppid and $ppid != 1 and $ppid != 0 ) {
                 if ( defined $ipids->{$ppid} ) {
                     $rmpid = $ppid;
                     $ppid  = undef;
@@ -7982,8 +8051,8 @@ sub inner_find_pids {
         my $pid = $proc->{pid};
         my $vp  = $proc->{vp};
         target_key_pair( $vp, 'FOUND', 'yes' );
-        target_key_pair( $vp, 'NAME',  $proc->{status}->{Name} );
-        target_key_pair( $vp, 'STATE', $proc->{status}->{State} );
+        target_key_pair( $vp, 'NAME',  find_from_status( $pid, 'Name' ) );
+        target_key_pair( $vp, 'STATE', find_from_status( $pid, 'State' ) );
     }
     return;
 }
