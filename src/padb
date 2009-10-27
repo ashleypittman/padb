@@ -5727,8 +5727,10 @@ sub run_minfo {
         debug    => 0,
     };
 
+    $h->{fd}{err} = *M_ERROR;
+
     my $cmd = $inner_conf{minfo};
-    $h->{hpid} = open3( $h->{fd}{wtr}, $h->{fd}{rdr}, $h->{fd}{err}, $cmd )
+    $h->{hpid} = open3( $h->{fd}{wtr}, $h->{fd}{rdr}, *M_ERROR, $cmd )
       or confess "Unable to popen() h: $!\n";
 
     if ( $h->{debug} ) {
@@ -5869,6 +5871,20 @@ sub run_minfo {
         } else {
             push @{ $cd{raw} }, $r;
         }
+    }
+
+    # Belt and braces approach, minfo shouldn't have any output on
+    # stderr which means that if it does then it's a bug.  Check that
+    # and report it to the user as a problem.
+    my $eh                  = $h->{fd}{err};
+    my $stderr              = $EMPTY_STRING;
+    my $have_error_messages = 0;
+    while (<$eh>) {
+        $have_error_messages = 1;
+        $stderr .= $_;
+    }
+    if ($have_error_messages) {
+        target_error( $vp, "Stderr from minfo: $stderr" );
     }
 
     my $sc = keys %stats;
