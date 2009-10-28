@@ -2,11 +2,13 @@
 INSTALL_DIR=/usr/local/
 CONFIG_DIR=/etc
 VERSION=3.0-rc1
+CC=gcc
+CFLAGS=-Wall -g
 
 FILES = Makefile minfo.c mpi_interface.h padb
 
 minfo.x: minfo.c mpi_interface.h
-	cc -g minfo.c -o minfo.x -ldl -Wall
+	$(CC) minfo.c -o minfo.x -ldl $(CFLAGS)
 
 install: minfo.x
 	/bin/mkdir -p ${INSTALL_DIR}/bin
