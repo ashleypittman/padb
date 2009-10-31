@@ -1,6 +1,6 @@
 Index: ompi/mpi/c/alltoallv.c
 ===================================================================
---- ompi/mpi/c/alltoallv.c	(revision 21956)
+--- ompi/mpi/c/alltoallv.c	(revision 21316)
 +++ ompi/mpi/c/alltoallv.c	(working copy)
 @@ -106,11 +106,13 @@
  
@@ -18,7 +18,7 @@ Index: ompi/mpi/c/alltoallv.c
  
 Index: ompi/mpi/c/bcast.c
 ===================================================================
---- ompi/mpi/c/bcast.c	(revision 21956)
+--- ompi/mpi/c/bcast.c	(revision 21316)
 +++ ompi/mpi/c/bcast.c	(working copy)
 @@ -105,9 +105,11 @@
  
@@ -34,7 +34,7 @@ Index: ompi/mpi/c/bcast.c
  }
 Index: ompi/mpi/c/allgather.c
 ===================================================================
---- ompi/mpi/c/allgather.c	(revision 21956)
+--- ompi/mpi/c/allgather.c	(revision 21316)
 +++ ompi/mpi/c/allgather.c	(working copy)
 @@ -99,11 +99,13 @@
  
@@ -52,7 +52,7 @@ Index: ompi/mpi/c/allgather.c
  
 Index: ompi/mpi/c/scatter.c
 ===================================================================
---- ompi/mpi/c/scatter.c	(revision 21956)
+--- ompi/mpi/c/scatter.c	(revision 21316)
 +++ ompi/mpi/c/scatter.c	(working copy)
 @@ -156,10 +156,12 @@
  
@@ -69,7 +69,7 @@ Index: ompi/mpi/c/scatter.c
  }
 Index: ompi/mpi/c/gather.c
 ===================================================================
---- ompi/mpi/c/gather.c	(revision 21956)
+--- ompi/mpi/c/gather.c	(revision 21316)
 +++ ompi/mpi/c/gather.c	(working copy)
 @@ -173,10 +173,12 @@
  
@@ -86,7 +86,7 @@ Index: ompi/mpi/c/gather.c
  }
 Index: ompi/mpi/c/allgatherv.c
 ===================================================================
---- ompi/mpi/c/allgatherv.c	(revision 21956)
+--- ompi/mpi/c/allgatherv.c	(revision 21316)
 +++ ompi/mpi/c/allgatherv.c	(working copy)
 @@ -119,12 +119,14 @@
  
@@ -105,7 +105,7 @@ Index: ompi/mpi/c/allgatherv.c
  
 Index: ompi/mpi/c/reduce_scatter.c
 ===================================================================
---- ompi/mpi/c/reduce_scatter.c	(revision 21956)
+--- ompi/mpi/c/reduce_scatter.c	(revision 21316)
 +++ ompi/mpi/c/reduce_scatter.c	(working copy)
 @@ -123,6 +123,7 @@
  
@@ -124,7 +124,7 @@ Index: ompi/mpi/c/reduce_scatter.c
  }
 Index: ompi/mpi/c/scan.c
 ===================================================================
---- ompi/mpi/c/scan.c	(revision 21956)
+--- ompi/mpi/c/scan.c	(revision 21316)
 +++ ompi/mpi/c/scan.c	(working copy)
 @@ -95,6 +95,7 @@
  
@@ -143,7 +143,7 @@ Index: ompi/mpi/c/scan.c
  }
 Index: ompi/mpi/c/scatterv.c
 ===================================================================
---- ompi/mpi/c/scatterv.c	(revision 21956)
+--- ompi/mpi/c/scatterv.c	(revision 21316)
 +++ ompi/mpi/c/scatterv.c	(working copy)
 @@ -185,10 +185,12 @@
  
@@ -160,7 +160,7 @@ Index: ompi/mpi/c/scatterv.c
  }
 Index: ompi/mpi/c/allreduce.c
 ===================================================================
---- ompi/mpi/c/allreduce.c	(revision 21956)
+--- ompi/mpi/c/allreduce.c	(revision 21316)
 +++ ompi/mpi/c/allreduce.c	(working copy)
 @@ -99,6 +99,7 @@
  
@@ -180,7 +180,7 @@ Index: ompi/mpi/c/allreduce.c
  
 Index: ompi/mpi/c/alltoall.c
 ===================================================================
---- ompi/mpi/c/alltoall.c	(revision 21956)
+--- ompi/mpi/c/alltoall.c	(revision 21316)
 +++ ompi/mpi/c/alltoall.c	(working copy)
 @@ -82,11 +82,13 @@
  
@@ -198,7 +198,7 @@ Index: ompi/mpi/c/alltoall.c
  
 Index: ompi/mpi/c/reduce.c
 ===================================================================
---- ompi/mpi/c/reduce.c	(revision 21956)
+--- ompi/mpi/c/reduce.c	(revision 21316)
 +++ ompi/mpi/c/reduce.c	(working copy)
 @@ -126,6 +126,7 @@
  
@@ -217,7 +217,7 @@ Index: ompi/mpi/c/reduce.c
  }
 Index: ompi/mpi/c/barrier.c
 ===================================================================
---- ompi/mpi/c/barrier.c	(revision 21956)
+--- ompi/mpi/c/barrier.c	(revision 21316)
 +++ ompi/mpi/c/barrier.c	(working copy)
 @@ -54,6 +54,8 @@
  
@@ -238,7 +238,7 @@ Index: ompi/mpi/c/barrier.c
    OMPI_ERRHANDLER_RETURN(err, comm, err, FUNC_NAME);
 Index: ompi/mpi/c/gatherv.c
 ===================================================================
---- ompi/mpi/c/gatherv.c	(revision 21956)
+--- ompi/mpi/c/gatherv.c	(revision 21316)
 +++ ompi/mpi/c/gatherv.c	(working copy)
 @@ -187,11 +187,13 @@
  
@@ -257,7 +257,7 @@ Index: ompi/mpi/c/gatherv.c
  }
 Index: ompi/communicator/communicator.h
 ===================================================================
---- ompi/communicator/communicator.h	(revision 21956)
+--- ompi/communicator/communicator.h	(revision 21316)
 +++ ompi/communicator/communicator.h	(working copy)
 @@ -137,6 +137,14 @@
  
@@ -325,7 +325,7 @@ Index: ompi/communicator/communicator.h
   */
 Index: ompi/communicator/comm.c
 ===================================================================
---- ompi/communicator/comm.c	(revision 21956)
+--- ompi/communicator/comm.c	(revision 21316)
 +++ ompi/communicator/comm.c	(working copy)
 @@ -98,7 +98,7 @@
  
@@ -353,9 +353,9 @@ Index: ompi/communicator/comm.c
             efficiently */
 Index: ompi/debuggers/ompi_msgq_dll.c
 ===================================================================
---- ompi/debuggers/ompi_msgq_dll.c	(revision 21956)
+--- ompi/debuggers/ompi_msgq_dll.c	(revision 21316)
 +++ ompi/debuggers/ompi_msgq_dll.c	(working copy)
-@@ -367,11 +367,12 @@
+@@ -360,11 +360,12 @@
  int mqs_image_has_queues (mqs_image *image, char **message)
  {
      mpi_image_info * i_info = (mpi_image_info *)mqs_get_image_info (image);
@@ -370,7 +370,7 @@ Index: ompi/debuggers/ompi_msgq_dll.c
          "to extract the message queues are not as expected in\n"
          "the image '%s'\n"
          "No message queue display is possible.\n"
-@@ -393,7 +394,10 @@
+@@ -386,7 +387,10 @@
      }
  
      /* Fill in the type information */
@@ -382,7 +382,7 @@ Index: ompi/debuggers/ompi_msgq_dll.c
  } /* mqs_image_has_queues */
  
  /***********************************************************************
-@@ -1319,6 +1323,35 @@
+@@ -1312,6 +1316,35 @@
      mqs_free (info);
  } /* mqs_destroy_image_info */
  
@@ -420,7 +420,7 @@ Index: ompi/debuggers/ompi_msgq_dll.c
  char * mqs_dll_error_string (int errcode)
 Index: ompi/debuggers/ompi_common_dll.c
 ===================================================================
---- ompi/debuggers/ompi_common_dll.c	(revision 21956)
+--- ompi/debuggers/ompi_common_dll.c	(revision 21316)
 +++ ompi/debuggers/ompi_common_dll.c	(working copy)
 @@ -76,7 +76,7 @@
   * basic type for the requests as they hold all the information we
@@ -452,7 +452,7 @@ Index: ompi/debuggers/ompi_common_dll.c
      {
          mqs_type* qh_type = mqs_find_type( image, "ompi_group_t", mqs_lang_c );
          if( !qh_type ) {
-@@ -400,7 +406,6 @@
+@@ -399,7 +405,6 @@
      }
  
      /* All the types are here. Let's succesfully return. */
@@ -460,7 +460,7 @@ Index: ompi/debuggers/ompi_common_dll.c
      return mqs_ok;
  
   type_missing:
-@@ -409,7 +414,6 @@
+@@ -408,7 +413,6 @@
       * unable to extract the information we need from the pointers. We
       * did our best but here we're at our limit. Give up!
       */
@@ -470,20 +470,20 @@ Index: ompi/debuggers/ompi_common_dll.c
  }
 Index: ompi/debuggers/msgq_interface.h
 ===================================================================
---- ompi/debuggers/msgq_interface.h	(revision 21956)
+--- ompi/debuggers/msgq_interface.h	(revision 21316)
 +++ ompi/debuggers/msgq_interface.h	(working copy)
-@@ -691,6 +691,8 @@
+@@ -693,6 +693,8 @@
  extern int mqs_set_process_identity (mqs_process *, int); 
  #endif
  
 +OMPI_DECLSPEC extern int mqs_get_comm_coll_state (mqs_process *, int, int *, int *);
 +
- END_C_DECLS
- 
- #endif /* defined (_MPI_INTERFACE_INCLUDED) */
+ #ifdef	__cplusplus
+ }
+ #endif
 Index: ompi/debuggers/ompi_common_dll_defs.h
 ===================================================================
---- ompi/debuggers/ompi_common_dll_defs.h	(revision 21956)
+--- ompi/debuggers/ompi_common_dll_defs.h	(revision 21316)
 +++ ompi/debuggers/ompi_common_dll_defs.h	(working copy)
 @@ -199,6 +199,8 @@
              int c_f_to_c_index;

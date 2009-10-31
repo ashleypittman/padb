@@ -1,14 +1,11 @@
 
 INSTALL_DIR=/usr/local/
 CONFIG_DIR=/etc
-VERSION=3.0-rc1
-CC=gcc
-CFLAGS=-Wall -g
 
 FILES = Makefile minfo.c mpi_interface.h padb
 
 minfo.x: minfo.c mpi_interface.h
-	$(CC) minfo.c -o minfo.x -ldl $(CFLAGS)
+	cc -g minfo.c -o minfo.x -ldl -Wall
 
 install: minfo.x
 	/bin/mkdir -p ${INSTALL_DIR}/bin
@@ -23,20 +20,10 @@ clean:
 	/bin/rm -f minfo.x
 
 tarfile:
-	/bin/rm -f padb-${VERSION}.tgz
-	/bin/rm -rf padb-${VERSION}
-	mkdir padb-${VERSION}
-	/bin/cp ${FILES} padb-${VERSION}
-	svnversion > padb-${VERSION}/svnversion
-	tar -czf padb-${VERSION}.tgz padb-${VERSION}
-
-tidy:
-	perltidy -b -ce -w -se padb
-
-pc:	padb
-	perlcritic --brutal --verbose "%l: (%s) %m\n" padb > .pc.tmp || true
-	/bin/mv .pc.tmp pc
-
-report: pc
-	./report.pl pc | tee report
+	/bin/rm -f padb-2.5.tgz
+	/bin/rm -rf padb-2.5
+	mkdir padb-2.5
+	/bin/cp ${FILES} padb-2.5
+	svnversion > padb-2.5/svnversion
+	tar -czf padb-2.5.tgz padb-2.5
 

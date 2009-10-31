@@ -1,6 +1,5 @@
 /*
  * Copyright (c) 2003,2004 Quadrics Ltd
- * Copyright (c) 2009, Ashley Pittman.
  */
 
 #ident "elfN.c,v 1.14 2005-11-03 11:23:04 ashley Exp"
@@ -12,24 +11,6 @@
 #include <dlfcn.h>
 #include <unistd.h>
 #include "mpi_interface.h"
-
-struct dll_entry_points {
-    char *(*dll_error_string)           (int);
-    void  (*setup_basic_callbacks)      (mqs_basic_callbacks *);
-    int   (*setup_image)                (mqs_image *, mqs_image_callbacks *);
-    int   (*image_has_queues)           (mqs_image *, char **);
-    int   (*setup_process)              (mqs_process *, mqs_process_callbacks *);
-    int   (*process_has_queues)         (mqs_process *, char **);
-    void  (*update_communicator_list)   (mqs_process *);
-    int   (*setup_communicator_iterator)(mqs_process *);
-    int   (*get_communicator)           (mqs_process *, mqs_communicator *);
-    int   (*next_communicator)          (mqs_process *);
-    int   (*get_global_rank)            (mqs_process *);
-    int   (*get_comm_coll_state)        (mqs_process *, int, int *, int *);
-    int   (*get_comm_group)             (mqs_process *, int *);
-    int   (*setup_operation_iterator)   (mqs_process *, int);
-    int   (*next_operation)             (mqs_process *, mqs_pending_operation *);
-};
 
 struct image {
     mqs_image_info *blob;
@@ -45,66 +26,6 @@ struct type {
     char   name[128];
     int    size;
 };
-
-struct dll_entry_points dll_ep = {};
-
-char *collective_names[] = { "Barrier",
-			     "Bcast",
-			     "Allgather",
-			     "Allgatherv",
-			     "Allreduce",
-			     "Alltoall",
-			     "Alltoallv",
-			     "Reduce_Scatter",
-			     "Reduce",
-			     "Gather",
-			     "Gatherv",
-			     "Scan",
-			     "Scatter",
-			     "Scatterv" };
-
-char *op_types[] = { "pending_send",
-		     "pending_receive",
-		     "unexpected_message" };
-
-char *op_status[] = { "pending",
-		      "matched",
-		      "complete" };
-
-void show_string (char *desc, char *str)
-{
-    printf("zzz: str:%d %s\n%s\n",
-	   (int) strlen(str),
-	   desc,
-	   str);
-}
-
-void show_warning (const char *msg)
-{
-    show_string("warning",(char *)msg);
-}
-
-void show_dll_error_code (int res)
-{
-    char *msg;
-    msg = dll_ep.dll_error_string(res);
-    show_string("dllerror",msg);
-}
-
-void die (char *msg)
-{
-    show_string("dmsg",msg);
-    show_string("exit","die");
-
-    fflush(NULL);
-    exit(0);
-}
-
-void die_with_code (int res, char *msg)
-{
-    show_dll_error_code(res);
-    die(msg);
-}
 
 #define QUERY_SIZE 1280
 
@@ -152,7 +73,7 @@ struct mqs_process_callbacks pcb;
 
 void show_msg (const char *msg)
 {
-    show_string("dlldebugmessage",(char *)msg);
+    printf("message from DLL:%s\n",msg);
 }
 
 char *get_msg (int msg )
@@ -202,7 +123,7 @@ int find_function (mqs_image *image, char *name, mqs_lang_code lang, mqs_taddr_t
 	    *addr = (mqs_taddr_t)base;
 	return mqs_ok;
     }
-    return mqs_no_information;
+    return -1;
 }
 
 int find_symbol (mqs_image *image, char *name, mqs_taddr_t *addr)
@@ -214,7 +135,7 @@ int find_symbol (mqs_image *image, char *name, mqs_taddr_t *addr)
 	}
 	return mqs_ok;
     }
-    return mqs_no_information;
+    return 100;
 }
 
 int req_to_int (char *req,int *res)
@@ -275,7 +196,7 @@ int find_rank (mqs_process *process)
 {
     struct process *p = (struct process *)process;
     if ( p->rank == -1 )
-	show_warning("DLL called find_rank before setup_process!");
+	printf("Warning, DLL called find_rank before setup_process!\n");
     return p->rank;
 }
 
@@ -301,7 +222,7 @@ int _find_data (mqs_process *proc, mqs_taddr_t addr, int size, void *base)
     
     i = ask(req,ans);
     if ( i != 0 )
-	return mqs_no_information;
+	return -1;
     
     for ( i = 0 ; i < size ; i++ ) {
 	char *e;
@@ -326,14 +247,14 @@ int find_data (mqs_process *proc, mqs_taddr_t addr, int size, void *base)
     int res;
     // printf("Trying to read data for %d from %p\n",size,(void *)addr);    
     if ( ! addr ) {
-	return mqs_no_information;
+	return 100;
     }
     do {
 	if ( offset > size )
 	    offset = size;
 	res = _find_data(proc,addr,offset,local);
 	if ( res != mqs_ok )
-	    return mqs_no_information;
+	    return 100;
 	
 	addr  += offset;
 	local += offset;
@@ -371,68 +292,34 @@ int fetch_image (char *local)
     return 0;
 }
 
-int msg_id = 0;
-
-int show_comm (struct process *p, mqs_communicator *comm, int c)
+void die (char *msg)
 {
-    if ( comm->local_rank >= 0 )
-	printf("out: c:%d rank:%d\n",
-	       c,
-	       (int)comm->local_rank);
-    
-    printf("out: c:%d size:%d\n",
-	   c,
-	   (int)comm->size);
-    
-    printf("out: c:%d str:%d name\n%s\n",
-	   c,
-	   (int) strlen(comm->name),
-	   comm->name);
-    
-    printf("out: c:%d id:%ld\n",
-	   c,
-	   comm->unique_id);
-    
+    printf("Error: %s\n",msg);
+    fflush(NULL);
+    exit(1);
+}
+
+int msgid = 0;
+
+int show_comm (struct process *p,mqs_communicator *comm)
+{
+    static int c = 0;
+    printf("comm%d: name: '%s'\n",
+	   c,comm->name);
+    printf("comm%d: rank: '%d'\n",
+	   c,(int)comm->local_rank);
+    printf("comm%d: size: '%d'\n",
+	   c,(int)comm->size);
+    printf("comm%d: id: '%p'\n",
+	   c,(void *)comm->unique_id);
+    msgid=0;
     return c++; /* This is not a political statement although if it was I'd stand by it */
 }
 
-void show_comm_members (mqs_process *target_process, mqs_communicator *comm, int comm_id)
+void show_op (mqs_pending_operation *op, int type)
 {
-    int *ranks = malloc(comm->size*sizeof(int));
-    int r = dll_ep.get_comm_group(target_process,ranks);
-    if ( r == mqs_ok ) {
-	int i;
-	for ( i = 0 ; i < comm->size ; i++ ) {
-	    printf("out: c:%d rt:%d\n",
-		   comm_id,
-		   ranks[i]);
-	}
-    }
-    free(ranks);
-}
-
-void show_comm_coll_state (mqs_process *target_process, mqs_communicator *comm, int comm_id)
-{
-    int i;
-    for ( i = 0 ; i < 14 ; i++ ) {
-	int seq = -1;
-	int active = -1;
-	int r = dll_ep.get_comm_coll_state(target_process,i,&seq,&active);
-	if ( r == mqs_ok ) {
-	    if ( seq != 0 )
-		printf("comm%d: Collective '%s': call count %d, %sactive\n",
-		       comm_id,
-		       collective_names[i],
-		       seq,
-		       active ? "" : "not ");
-	} else if ( r != mqs_no_information ) {
-	    show_dll_error_code(r);
-	}
-    }
-}
-
-void show_op (mqs_pending_operation *op, int msgid, int type)
-{
+    static char *types[] = { "pending_send", "pending_receive", "unexpected_message" };
+    static char *status[] = { "pending", "matched", "complete" };
     int i;
     int all = 0;
     
@@ -440,7 +327,7 @@ void show_op (mqs_pending_operation *op, int msgid, int type)
 	all = 1;
     
     printf("msg%d: Operation %d (%s) status %d (%s)\n",
-	   msgid,type,op_types[type],op->status,op_status[op->status]);
+	   msgid,type,types[type],op->status,status[op->status]);
     printf("msg%d: Rank local %d global %d\n",
 	   msgid,(int)op->desired_local_rank, (int)op->desired_global_rank);
     if ( all )
@@ -468,12 +355,17 @@ void show_op (mqs_pending_operation *op, int msgid, int type)
 	else
 	    i = 10;
     } while ( i++ < 5 );
+    
+    msgid++;
 }
 
-void load_ops (mqs_process *target_process,int type)
-{
+int (*soi)(mqs_process *process,int type);
+int (*no)(mqs_process *process, mqs_pending_operation *op);
 
-    int res = dll_ep.setup_operation_iterator(target_process,type);
+void load_ops (mqs_process *p,int type)
+{
+    mqs_pending_operation op;
+    int res = soi((mqs_process *)p,type);
     if ( res != mqs_ok ) {
 	if ( res != mqs_ok && res != mqs_no_information )
 	    printf("Setup operation iterator failed %d for type %d\n",res,type);
@@ -481,63 +373,15 @@ void load_ops (mqs_process *target_process,int type)
     }
     
     do {
-	mqs_pending_operation op = {};
-	res = dll_ep.next_operation(target_process,&op);
+	memset(&op,0,sizeof(mqs_pending_operation));
+	res = no((mqs_process *)p,&op);
 	if ( res == mqs_ok ) {
-	    show_op(&op,msg_id,type);
-	    msg_id++;
+	    show_op(&op,type);
 	} else if ( res != mqs_end_of_list ) {
 	    printf("Res from mqs_pending_operation is %d type %d\n",res,type);
 	}
 	
     } while ( res == mqs_ok );
-}
-
-void load_all_ops (mqs_process *target_process)
-{
-    msg_id = 0;
-    load_ops(target_process,mqs_pending_receives);
-    load_ops(target_process,mqs_unexpected_messages);
-    load_ops(target_process,mqs_pending_sends);
-}
-
-#define DLSYM_LAX(VAR,HANDLE,NAME) VAR.NAME = dlsym(HANDLE,"mqs_" #NAME)
-
-#define DLSYM(VAR,HANDLE,NAME) do {			      \
-	if ( (DLSYM_LAX(VAR,HANDLE,NAME)) == NULL ) {	      \
-	    show_warning("Failed to load symbol mqs_" #NAME); \
-	    return -1;					      \
-	}						      \
-    } while (0)
-
-/* Try and load the dll from a given filename, returns true if successfull.
- * populates the contents of dll_ep if true.
- */
-int load_msgq_dll(char *filename)
-{
-    void *dlhandle;
-    
-    dlhandle = dlopen(filename,RTLD_NOW);
-    if ( ! dlhandle ) 
-	return -1;
-
-    DLSYM(dll_ep,dlhandle,setup_basic_callbacks);
-    DLSYM(dll_ep,dlhandle,setup_image);
-    DLSYM(dll_ep,dlhandle,image_has_queues);
-    DLSYM(dll_ep,dlhandle,setup_process);
-    DLSYM(dll_ep,dlhandle,process_has_queues);
-    DLSYM(dll_ep,dlhandle,dll_error_string);
-    DLSYM(dll_ep,dlhandle,update_communicator_list);
-    DLSYM(dll_ep,dlhandle,setup_communicator_iterator);
-    DLSYM(dll_ep,dlhandle,get_communicator);
-    DLSYM(dll_ep,dlhandle,next_communicator);
-    DLSYM(dll_ep,dlhandle,setup_operation_iterator);
-    DLSYM(dll_ep,dlhandle,next_operation);
-    DLSYM(dll_ep,dlhandle,get_comm_group);
-
-    DLSYM_LAX(dll_ep,dlhandle,get_global_rank);
-    DLSYM_LAX(dll_ep,dlhandle,get_comm_coll_state);
-    return 0;
 }
 
 #define PATH_MAX 1024
@@ -546,32 +390,62 @@ int
 main ()
 {
     int res;
+    int nres;
     char *dll_name;
-    int comm_id = 0;
+    void *dlhandle;
+    void (*b)(mqs_basic_callbacks *bcb);
+    int (*si)(mqs_image *image,mqs_image_callbacks *icb);
+    int (*ihq)(mqs_image *image, char **msg);
+    int (*sp)(mqs_process *process,mqs_process_callbacks *pcb);
+    int (*phq)(mqs_process *process, char **msg);
+    void (*ucl)(mqs_process *process);
+    char *(*es)(int errorcode);
+    int (*sci)(mqs_process *process);
+    int (*gc)(mqs_process *process, mqs_communicator *comm);
+    int (*nc)(mqs_process *process);
+    int (*gr)(mqs_process *process);
+    int (*gcs)(mqs_process *, int, int *, int *);
+    int (*gcg)(mqs_process *, int *);
     
-    struct image   image;
-    struct process process;
-
-    mqs_image   *target_image   = (mqs_image   *)&image;
-    mqs_process *target_process = (mqs_process *)&process;
-
+    struct image i;
+    struct process p;
+    
     dll_name = getenv("MPINFO_DLL");
-    if ( ! dll_name ) {
-	
+    if ( dll_name ) {
+	dlhandle = dlopen(dll_name,RTLD_NOW);
+    } else {
+	char dll[PATH_MAX];
 	void *base = find_sym("sym","MPIR_dll_name");
 	if ( ! base ) {
-	    die("Could not find MPIR_dll_name symbol");
+	    die("Could not find dll_name symbol");
 	}
-	dll_name = malloc(PATH_MAX);
-	if ( fetch_string(NULL,dll_name,(mqs_taddr_t)base,PATH_MAX) != 0 ) {
-	    die("Could not read value of MPIR_dll_name");
-	}
+	fetch_string(NULL,&dll[0],(mqs_taddr_t)base,PATH_MAX);
+	dlhandle = dlopen(dll,RTLD_NOW);
     }
-
-    if ( load_msgq_dll(dll_name) != 0 ) {
+    
+    if ( ! dlhandle ) {
+	die("Could not open dll");
+    }
+    
+    b = dlsym(dlhandle,"mqs_setup_basic_callbacks");
+    if ( ! b ) {
 	die("Could not load symbols from dll");
     }
-        
+    si  = dlsym(dlhandle,"mqs_setup_image");
+    ihq = dlsym(dlhandle,"mqs_image_has_queues");
+    sp  = dlsym(dlhandle,"mqs_setup_process");
+    phq = dlsym(dlhandle,"mqs_process_has_queues");
+    es  = dlsym(dlhandle,"mqs_dll_error_string");
+    ucl = dlsym(dlhandle,"mqs_update_communicator_list");
+    sci = dlsym(dlhandle,"mqs_setup_communicator_iterator");
+    gc  = dlsym(dlhandle,"mqs_get_communicator");
+    nc  = dlsym(dlhandle,"mqs_next_communicator");
+    gr  = dlsym(dlhandle,"mqs_get_global_rank");
+    soi = dlsym(dlhandle,"mqs_setup_operation_iterator");
+    no  = dlsym(dlhandle,"mqs_next_operation");
+    gcs = dlsym(dlhandle,"mqs_get_comm_coll_state");
+    gcg = dlsym(dlhandle,"mqs_get_comm_group");
+    
     bcb.mqs_malloc_fp           = malloc;
     bcb.mqs_free_fp             = free;
     bcb.mqs_dprints_fp          = show_msg;
@@ -581,7 +455,7 @@ main ()
     bcb.mqs_put_process_info_fp = process_put;
     bcb.mqs_get_process_info_fp = process_get;
     
-    dll_ep.setup_basic_callbacks(&bcb);
+    b(&bcb);
     
     icb.mqs_get_type_sizes_fp = get_type_size;
     icb.mqs_find_function_fp  = find_function;
@@ -590,19 +464,27 @@ main ()
     icb.mqs_field_offset_fp   = find_offset;
     icb.mqs_sizeof_fp         = find_sizeof;
     
-    res = dll_ep.setup_image(target_image,&icb);
+    res = si((mqs_image *)&i,&icb);
     if ( res != mqs_ok ) {
-	die_with_code(res,"setup_image() failed");
+	die("Failed mqs_setup_image");
     }
     
     {
-	char *user_message = NULL;
-	res = dll_ep.image_has_queues(target_image,&user_message);
-	if ( user_message ) {
-	    show_string("ihqm",user_message);
+	char *m = NULL;
+	res = ihq((mqs_image *)&i,&m);
+	if ( m ) {
+	    char image[QUERY_SIZE];
+	    if ( fetch_image(image) == 0 ) {
+		printf(m,image);
+		printf("\n");
+	    } else
+		printf("%s\n",m);
 	}
 	if ( res != mqs_ok ) {
-	    die_with_code(res,"image_has_queues() failed");
+	    char *msg;
+	    msg = es(res);
+	    printf("message from DLL %d '%s'\n",res,msg);
+	    die("Failed image_has_queues");
 	}
     }
     
@@ -611,67 +493,102 @@ main ()
     pcb.mqs_fetch_data_fp      = find_data;
     pcb.mqs_target_to_host_fp  = convert_data;
     
-    process.rank  = -1;
-    process.image = &image;
+    p.rank = -1;
+    p.image = &i;
     
-    res = dll_ep.setup_process(target_process,&pcb);
+    res = sp((mqs_process *)&p,&pcb);
     if ( res != mqs_ok ) {
-	die_with_code(res,"mqs_setup_process() failed");
+	die("Failed mqs_setup_process");
     }
 
-    if ( dll_ep.get_global_rank ) {
-	process.rank = dll_ep.get_global_rank(target_process);
+    if ( gr ) {
+	p.rank = gr((mqs_process *)&p);
     } else {
 	/* Load the rank into p */
-	req_to_int("rank", &process.rank);
+	req_to_int("rank", &p.rank);
     }
     
     {
-	char *user_message = NULL;
-	res = dll_ep.process_has_queues(target_process,&user_message);
-	if ( user_message )
-	    show_string("phqm",user_message);
+	char *m = NULL;
+	res = phq((mqs_process *)&p,&m);
+	if ( m )
+	    printf("%s\n",m);
 	if ( res != mqs_ok ) {
-	    die_with_code(res,"process_has_queues() failed");
+	    char *msg;
+	    msg = es(res);
+	    printf("%s\n",msg);
+	    die("Failed process has_queue");
 	}
     }
     
-    dll_ep.update_communicator_list(target_process);
+    ucl((mqs_process *)&p);
     
-    res = dll_ep.setup_communicator_iterator(target_process);
+    res = sci((mqs_process *)&p);
     if ( res != mqs_ok ) {
-	die_with_code(res,"setup_communicator_iterator() failed");
+	die("Failed sci");
     }
     
     do {
-	mqs_communicator comm = {};
+	mqs_communicator comm;
 	
-	res = dll_ep.get_communicator(target_process,&comm);
+	res = gc((mqs_process *)&p,&comm);
 	if ( res != mqs_ok ) {
-	    die_with_code(res,"get_communicator() failed");
+	    char *msg;
+	    msg = es(res);
+	    printf("gc returned %d\n",res);
+	    printf("%s\n",msg);
+	    die("gc");
 	}
 	
-	show_comm(&process,&comm,comm_id);
-	
-	if ( comm.size > 1 ) {
+	if ( res == mqs_ok ) {
+	    /* Should check for comm.size here, open-mpi puts MPI_COMM_NULL in the list with a size of 0 */
+	    char *names[] = { "Barrier", "Bcast", "Allgather", "Allgatherv", "Allreduce", "Alltoall", "Alltoallv",
+			      "Reduce_Scatter", "Reduce", "Gather", "Gatherv", "Scan", "Scatter", "Scatterv" };
+	    int c;
+	    c = show_comm(&p,&comm);
+	    if ( comm.size > 1 ) {
+		if ( gcg ) {
+		    int *ranks = malloc(comm.size*sizeof(int));
+		    int r = gcg((mqs_process *)&p,ranks);
+		    if ( r == mqs_ok ) {
+			int i;
+			for ( i = 0 ; i < comm.size ; i++ ) {
+			    printf("comm%d: Rank: local %d global %d\n",c,i,ranks[i]);
+			}
+		    }
+		    free(ranks);
+		}
+		if ( gcs ) {
+		    int seq;
+		    int active;
+		    int r;
+		    int i = 0;
+		    for ( i = 0 ; i<14 ; i++ ) {
+			seq = -1;
+			active = -1;
+			r = gcs((mqs_process *)&p,i,&seq,&active);
+			if ( r == mqs_ok ) {
+			    if ( seq != 0 )
+				printf("comm%d: Collective '%s': call count %d, %sactive\n",c,names[i],seq,active ? "" : "not ");
+			} else if ( r != mqs_no_information ) {
+			    char *msg;
+			    msg = es(r);
+			    printf("Error: %s\n",msg);
+			}
+		    }
+		}
+		
+		load_ops((mqs_process *)&p,mqs_pending_receives);
+		load_ops((mqs_process *)&p,mqs_unexpected_messages);
+		load_ops((mqs_process *)&p,mqs_pending_sends);
+		
+	    }
 	    
-	    if ( dll_ep.get_comm_group )
-		show_comm_members(target_process,&comm,comm_id);
-	    
-	    if ( dll_ep.get_comm_coll_state )
-		show_comm_coll_state(target_process,&comm,comm_id);
-	    
-	    load_all_ops(target_process);
+	    nres = nc((mqs_process *)&p);
 	    
 	}
-	printf("done\n");
-	
-	res = dll_ep.next_communicator(target_process);
-	comm_id++;
-	
-    } while ( res == mqs_ok );
-
-    show_string("exit","ok");
+    } while ( res == mqs_ok && nres == mqs_ok );
+    
     return 0;
 }
 
