@@ -6364,8 +6364,8 @@ sub mpi_deadlock_detect {
     # XXX This is a bit of a hack to make the deadlock code work with input
     # files, the whole thing is due a tidy-up on the full-duplex branch
     # where this should be solved properly.
-    if ( defined $lines->{target_responce} ) {
-        $data = $lines->{target_responce};
+    if ( defined $lines->{target_response} ) {
+        $data = $lines->{target_response};
     } else {
         $data = $lines->{lines};
     }
@@ -7899,10 +7899,10 @@ sub reply_from_child {
     }
 
     # Combine the target process responses.
-    if ( exists $r->{target_responce} ) {
-        foreach my $tp ( keys %{ $r->{target_responce} } ) {
-            $handle->{all_replys}->{target_responce}{$tp} =
-              $r->{target_responce}{$tp};
+    if ( exists $r->{target_response} ) {
+        foreach my $tp ( keys %{ $r->{target_response} } ) {
+            $handle->{all_replys}->{target_response}{$tp} =
+              $r->{target_response}{$tp};
         }
     }
 
@@ -7915,10 +7915,10 @@ sub reply_from_child {
     }
 
     # Copy the target local responses.
-    if ( exists $handle->{target_responce} ) {
-        foreach my $tp ( keys %{ $handle->{target_responce} } ) {
-            $handle->{all_replys}->{target_responce}{$tp} =
-              $handle->{target_responce}{$tp};
+    if ( exists $handle->{target_response} ) {
+        foreach my $tp ( keys %{ $handle->{target_response} } ) {
+            $handle->{all_replys}->{target_response}{$tp} =
+              $handle->{target_response}{$tp};
         }
     }
 
@@ -7984,7 +7984,7 @@ sub reply_from_child {
     # Reset local data.
     $handle->{all_replys}      = undef;
     $handle->{child_replys}    = 0;
-    $handle->{target_responce} = undef;
+    $handle->{target_response} = undef;
     return;
 }
 
@@ -8240,7 +8240,7 @@ sub command_from_parent {
             } else {
                 $cargs->{out_format} = 'raw';
             }
-            $netdata->{target_responce} =
+            $netdata->{target_response} =
               $allfns{ $cmd->{mode} }{handler_all}( $cargs, $pid_list );
             1;
         } or do {
@@ -8271,7 +8271,7 @@ sub command_from_parent {
         }
 
         if (%gres) {
-            $netdata->{target_responce} = \%gres;
+            $netdata->{target_response} = \%gres;
         }
     }
 
@@ -8335,8 +8335,8 @@ sub command_from_outer {
 
     if ( $netdata->{children} == 0 ) {
         my $res;
-        if ( defined $netdata->{target_responce} ) {
-            $res->{target_responce} = $netdata->{target_responce};
+        if ( defined $netdata->{target_response} ) {
+            $res->{target_response} = $netdata->{target_response};
         }
 
         # Save any output we've got from this node.
@@ -8353,7 +8353,7 @@ sub command_from_outer {
         # Clear down the local inputs.
         %inner_output               = ();
         %local_target_data          = ();
-        $netdata->{target_responce} = undef;
+        $netdata->{target_response} = undef;
 
         if ( $netdata->{shutdown} ) {
             inner_cleanup_and_exit($netdata);
