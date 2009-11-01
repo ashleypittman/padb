@@ -3317,7 +3317,7 @@ sub add_tag_to_tree {
 # array of hashes and combine {name} and {type} into a new value
 # {type_name} which is the same length as {type_name} for all other entries
 # in the array.
-sub format_local_vars {
+sub _format_local_vars {
     my ($list) = @_;
 
     my $max = 0;
@@ -3341,10 +3341,50 @@ sub format_local_vars {
     return;
 }
 
-sub _display_tree {
-    my ( $tree, $d, $parent, $indent, $path, $enforce_spec ) = @_;
+sub _add_data_to_point_on_tree {
+    my ( $tree, $d, $l, $max_show, $peer, @vars ) = @_;
 
-    my $ret = $EMPTY_STRING;
+    my @all_vars;
+    foreach my $var (@vars) {
+        my @type_list =
+          sort keys %{ $d->{target_data}{"$peer|var_type|$var"} };
+        push @all_vars,
+          {
+            name => $var,
+            type => $type_list[0],
+          };
+    }
+
+    _format_local_vars( \@all_vars );
+
+    foreach my $vref (@all_vars) {
+        my $var    = $vref->{name};
+        my $key    = "$l|var|$var";
+        my @values = keys %{ $d->{target_data}{$key} };
+
+        if ( @values == 1 ) {
+            my $line = "  $vref->{type_name} = '$values[0]' "
+              . rng_convert_to_user( $d->{target_data}{$key}{ $values[0] } );
+            push @{ $tree->{$peer}->{aux} }, $line;
+        } elsif ( @values > $max_show ) {
+            my $line =
+              "  $vref->{type_name}: <more than $max_show distinct values>";
+            push @{ $tree->{$peer}->{aux} }, $line;
+        } else {
+            push @{ $tree->{$peer}->{aux} }, "  $vref->{type_name}:";
+            foreach my $value ( sort @values ) {
+                my $line = "      '$value' "
+                  . rng_convert_to_user( $d->{target_data}{$key}{$value} );
+                push @{ $tree->{$peer}->{aux} }, $line;
+
+            }
+        }
+    }
+
+}
+
+sub _add_data_to_tree {
+    my ( $tree, $d, $path ) = @_;
 
     # Sort peers by lowest rank of each branch.
     my @peers =
@@ -3353,6 +3393,71 @@ sub _display_tree {
     # This is ugly, dip inside the mode_options for the only mode which
     # sets this value.
     my $max_show = $conf{mode_options}{stack}{max_distinct_values};
+
+    foreach my $peer (@peers) {
+        my $l = "$path,$peer";
+
+        if ( defined $d->{target_data}{"$peer|params"} ) {
+            my @params_lists =
+              sort keys %{ $d->{target_data}{"$peer|params"} };
+
+            # It's not impossible that the same function on the same
+            # line might have different params or locals, for example
+            # it could be a different binary.  It's probably rare
+            # enough that we can ignore it however.
+            my @params = split $COMMA, $params_lists[0];
+
+            if ( @params > 0 ) {
+                push @{ $tree->{$peer}->{aux} }, "params";
+            }
+
+            _add_data_to_point_on_tree( $tree, $d, $l, $max_show, $peer,
+                @params );
+
+        }
+
+        if ( defined $d->{target_data}{"$peer|locals"} ) {
+            my @locals_lists =
+              keys %{ $d->{target_data}{"$peer|locals"} };
+
+            # It's not impossible that the same function on the same
+            # line might have different params or locals, for example
+            # it could be a different binary.  In the case of locals
+            # simply load all of them.
+            my @locals = split $COMMA, join( q{,}, @locals_lists );
+
+            if ( @locals > 0 ) {
+                push @{ $tree->{$peer}->{aux} }, "locals";
+            }
+
+            _add_data_to_point_on_tree( $tree, $d, $l, $max_show, $peer,
+                @locals );
+
+        }
+
+        if ( defined $tree->{$peer}->{desc} ) {
+            _add_data_to_tree( $tree->{$peer}->{desc}, $d, "$path,$peer" );
+        }
+    }
+    return;
+}
+
+sub add_data_to_tree {
+    my ( $tree, $d ) = @_;
+    if ( defined $d->{target_data} ) {
+        _add_data_to_tree( $tree, $d, $EMPTY_STRING );
+    }
+    return;
+}
+
+sub _display_tree {
+    my ( $tree, $parent, $indent, $path, $enforce_spec ) = @_;
+
+    my $ret = $EMPTY_STRING;
+
+    # Sort peers by lowest rank of each branch.
+    my @peers =
+      sort { $tree->{$a}->{min} <=> $tree->{$b}->{min} } keys %{$tree};
 
     my $child_enforce_spec = 0;
     foreach my $peer (@peers) {
@@ -3365,134 +3470,25 @@ sub _display_tree {
         }
 
         $ret .= "$indent$peer\n";
-        if ( defined $d->{target_data} ) {
-            my $l = "$path,$peer";
 
-            if ( defined $d->{target_data}{"$peer|params"} ) {
-                my @params_lists =
-                  sort keys %{ $d->{target_data}{"$peer|params"} };
-
-                # It's not impossible that the same function on the same
-                # line might have different params or locals, for example
-                # it could be a different binary.  It's probably rare
-                # enough that we can ignore it however.
-                my @params = split $COMMA, $params_lists[0];
-
-                $ret .= "$indent      params\n" if ( @params > 0 );
-
-                my @all_vars;
-                foreach my $var (@params) {
-                    my @type_list =
-                      sort keys %{ $d->{target_data}{"$peer|param_type|$var"} };
-                    my $type = $type_list[0];
-                    push @all_vars,
-                      {
-                        name => $var,
-                        type => $type,
-                      };
-                }
-
-                format_local_vars( \@all_vars );
-
-                foreach my $vref (@all_vars) {
-                    my $var    = $vref->{name};
-                    my $key    = "$l|var|$var";
-                    my @values = keys %{ $d->{target_data}{$key} };
-                    my $type   = $vref->{type};
-
-                    $child_enforce_spec = 1;
-                    if ( @values == 1 ) {
-                        foreach my $value ( sort @values ) {
-                            $ret .=
-                              "$indent        $vref->{type_name} = '$value' "
-                              . rng_convert_to_user(
-                                $d->{target_data}{$key}{$value} )
-                              . "\n";
-                        }
-                    } elsif ( @values > $max_show ) {
-                        $ret .=
-"$indent        $vref->{type_name}: <more than $max_show distinct values>\n";
-                    } else {
-                        $ret .= "$indent        $vref->{type_name}:\n";
-                        foreach my $value ( sort @values ) {
-                            $ret .=
-                              "$indent            '$value' "
-                              . rng_convert_to_user(
-                                $d->{target_data}{$key}{$value} )
-                              . "\n";
-                        }
-                    }
-                }
-            }
-
-            if ( defined $d->{target_data}{"$peer|locals"} ) {
-                my @locals_lists = keys %{ $d->{target_data}{"$peer|locals"} };
-
-                # It's not impossible that the same function on the same
-                # line might have different params or locals, for example
-                # it could be a different binary.  In the case of locals
-                # simply load all of them.
-                my @locals = split $COMMA, join( q{,}, @locals_lists );
-
-                $ret .= "$indent      locals\n" if ( @locals > 0 );
-
-                my @all_vars;
-                foreach my $var (@locals) {
-                    my @type_list =
-                      sort keys %{ $d->{target_data}{"$peer|var_type|$var"} };
-                    my $type = $type_list[0];
-                    push @all_vars,
-                      {
-                        name => $var,
-                        type => $type,
-                      };
-                }
-
-                format_local_vars( \@all_vars );
-
-                foreach my $vref (@all_vars) {
-                    my $var    = $vref->{name};
-                    my $key    = "$l|var|$var";
-                    my @values = keys %{ $d->{target_data}{$key} };
-                    my $type   = $vref->{type};
-
-                    $child_enforce_spec = 1;
-                    if ( @values == 1 ) {
-                        foreach my $value ( sort @values ) {
-                            $ret .=
-                              "$indent        $vref->{type_name} = '$value' "
-                              . rng_convert_to_user(
-                                $d->{target_data}{$key}{$value} )
-                              . "\n";
-                        }
-                    } elsif ( @values > $max_show ) {
-                        $ret .=
-"$indent        $vref->{type_name}: <more than $max_show distinct values>\n";
-                    } else {
-                        $ret .= "$indent        $vref->{type_name}:\n";
-                        foreach my $value ( sort @values ) {
-                            $ret .=
-                              "$indent            '$value' "
-                              . rng_convert_to_user(
-                                $d->{target_data}{$key}{$value} )
-                              . "\n";
-                        }
-                    }
-                }
+        if ( defined $tree->{$peer}->{aux} ) {
+            $child_enforce_spec = 1;
+            foreach my $line ( @{ $tree->{$peer}->{aux} } ) {
+                $ret .= "$indent      $line\n";
             }
         }
+
         if ( defined $tree->{$peer}->{desc} ) {
             $ret .= _display_tree( $tree->{$peer}->{desc},
-                $d, $vpspec, "$indent  ", "$path,$peer", $child_enforce_spec );
+                $vpspec, "$indent  ", "$path,$peer", $child_enforce_spec );
         }
     }
     return $ret;
 }
 
 sub display_tree {
-    my ( $tree, $d ) = @_;
-    return _display_tree( $tree, $d, "no-parent", $EMPTY_STRING, $EMPTY_STRING,
-        1 );
+    my ( $tree, ) = @_;
+    return _display_tree( $tree, "no-parent", $EMPTY_STRING, $EMPTY_STRING, 1 );
 }
 
 # An experimental new tree format.
@@ -3503,8 +3499,10 @@ sub new_tree {
     foreach my $tag ( sort { $a <=> $b } keys %{$lines} ) {
         add_tag_to_tree( \%tree, $tag, $lines->{$tag} );
     }
-    debug_log( 'tree', undef, 'Formatting the tree' );
-    my $t = display_tree( \%tree, $d );
+    debug_log( 'tree', \%tree, 'Enhancing the tree' );
+    add_data_to_tree( \%tree, $d );
+    debug_log( 'tree', \%tree, 'Formatting the tree' );
+    my $t = display_tree( \%tree, );
     debug_log( 'tree', undef, 'Displaying the tree' );
     print $t;
     debug_log( 'tree', undef, 'Done' );
@@ -7142,7 +7140,7 @@ sub show_stack_vars {
     return unless defined $frame->{$type};
     return if ( @{ $frame->{$type} } == 0 );
 
-    format_local_vars( $frame->{$type} );
+    _format_local_vars( $frame->{$type} );
     output( $vp, "  $type:" );
     foreach my $arg ( @{ $frame->{$type} } ) {
         my $value = ( defined $arg->{value} ? $arg->{value} : '??' );
@@ -7348,7 +7346,7 @@ sub stack_trace_from_pids {
                         my @param_names;
                         foreach my $par ( @{ $frame->{params} } ) {
                             push @param_names, $par->{name};
-                            target_key_pair( $vp, "$l|param_type|$par->{name}",
+                            target_key_pair( $vp, "$l|var_type|$par->{name}",
                                 $par->{type} );
                             if ( length $par->{value} > 70 ) {
                                 target_key_pair(
