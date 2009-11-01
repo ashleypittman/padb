@@ -29,10 +29,40 @@
 # Revision history
 
 # Version 3.?
+#  * Add variables to tree based stack traces.
+#  * Solaris port.  Limited functionality compared to running on Linux
+#    however stack trace mode works fully.
 #  * Add "mpirun" as a resource manager, this causes it walk the local
-#    process list looking for processes called mpirun and to get the pid
-#    and hostlist by reading data from Mpir_Proctable as specified in the
-#    origional paper.  Padb then launches itself via pdsh.
+#    process list looking for processes called mpirun and to get the
+#    pid and hostlist by reading data from Mpir_Proctable as specified
+#    in the original paper.  Padb then launches itself via pdsh.
+#  * For Open-MPI magically dip inside a number of datatypes to print
+#    the name as Open-MPI sees them rather than just the struct
+#    contents.  This allows us to report communicators, datatypes and
+#    reduction operations by name.
+#  * Add a --lstopo option to run the lstopo command for each rank.
+#    http://www.open-mpi.org/projects/hwloc/
+#  * Enhance the integration with gdb, use sequence numbers when
+#    talking to gdb and check that we get back what we give it.
+#    Correctly notice and raise an appropriate error if gdb dies
+#    unexpectedly.
+#  * Intercept pointer values for variables and instead of showing the
+#    pointer value show a description of what it points to using
+#    /proc/pid/maps
+#  * Nicely indent variables when showing stack traces.  Indent no
+#    more than necessary based on the length of the variable name and
+#    the length of the type name.
+#  * Fix an error where error strings were being passed through
+#    sprintf, we now correctly handle errors when the error strings
+#    contain % characters
+#  * Overhauled the minfo code and the way it interacts with padb.
+#    Add significantly better error handling to this code.
+#  * Allow tracing of gdb and minfo interaction to log file.  Debug
+#    options so require enabling at the source level.
+#  * Add a --create-secret-file option to generate the secret file
+#    automatically
+#  * Add SVN tags to the source file and the the revision id to the
+#    output of output of --version
 #
 # Version 3.0
 #  * Full-duplex communication between inner and outer processes, padb no
@@ -51,9 +81,9 @@
 #  * Simplify the slurm_find_pids() function to just return the output of
 #    scontrol listpids
 #  * Take the old process-tree walking code from slurm_find_pids() and make
-#    it independant and call it for all resource managers.  This allows
+#    it independent and call it for all resource managers.  This allows
 #    scripts which call parallel applications to be bypassed and the
-#    applications themselves targetted.
+#    applications themselves targeted.
 #  * Added "port-range" option to limit port usage in case people try and
 #    use padb with firewalls enabled.
 #
@@ -219,7 +249,7 @@
 # * Multi-pass argument handling, --kill also accepts --signal for example,
 #   this should really be done at the getopt layer.  Also proper usage info
 #   for these secondary args.
-# * Paramater checking of secondary args, signal has a hacky implementation
+# * Parameter checking of secondary args, signal has a hacky implementation
 #   and port-range doesn't have any checking currently.
 # * libunwind support?  lighter weight than gdb and possibly more reliable.
 # * Maybe PMI would help?
@@ -725,7 +755,7 @@ my %config_options;
 my %ic_names;
 my %ic_names_cmd;
 
-# Debugging: this function is called periodically with a mode, an abritary
+# Debugging: this function is called periodically with a mode, an arbitrary
 # ref and a string, it can either print simply the string or call dumper on
 # the ref as well.  Enable with --debug=type1,type2=all
 my %debug_modes;
@@ -804,7 +834,7 @@ sub get_process_list {
         next unless ( $pid =~ m{\A\d+\z}xms );
         my ( undef, undef, undef, undef, $owner ) = stat "/proc/$pid";
 
-        # Check the stat worked, it's possible for processes to dissapear
+        # Check the stat worked, it's possible for processes to disappear
         # Take care to check for defined rather than true as root has a uid
         # of zero.
         next unless defined $owner;
@@ -841,7 +871,7 @@ sub get_extended_process_list {
         next unless ( $pid =~ m{\A\d+\z}xms );
         my ( undef, undef, undef, undef, $owner ) = stat "/proc/$pid";
 
-        # Check the stat worked, it's possible for processes to dissapear
+        # Check the stat worked, it's possible for processes to disappear
         # Take care to check for defined rather than true as root has a uid
         # of zero.
         next unless defined $owner;
@@ -2928,7 +2958,7 @@ sub find_any_rmgr {
         return;
     }
 
-    # Multiple resource managers are installed and have jobs, bouce back to
+    # Multiple resource managers are installed and have jobs, bounce back to
     # the user to specify which one they want.
     print
 "Error, multiple active resource managers detected, use -Ormgr=<resource manager>\n";
@@ -3120,8 +3150,8 @@ sub show_mpi_watch {
 }
 
 # Nicely format process information.  XXX: proc-sort-key should probably
-# sort on column headers as well as keys.  Idealy we'd know what format we
-# wanted and only ask the nodes to report relevent info, for now they still
+# sort on column headers as well as keys.  Ideally we'd know what format we
+# wanted and only ask the nodes to report relevant info, for now they still
 # report everything.
 sub show_proc_format {
     my ( $carg, $nlines ) = @_;
@@ -3811,7 +3841,7 @@ sub next_command {
     }
 
     # XXX: Should only send this list over if it makes sense, for example
-    # the deadlock code only works when targetting all ranks.
+    # the deadlock code only works when targeting all ranks.
     if ( defined $rank_rng ) {
         $req->{ranks} = $rank_rng;
     }
@@ -4228,7 +4258,7 @@ sub rng_shift {
 }
 
 # Note the performance of this function is much higher when adding values
-# at the top of the range than at the start, persumably it's easier to make
+# at the top of the range than at the start, presumably it's easier to make
 # an array longer than it is to unshift something onto the start.  Quietly
 # return if the value is already in the range.
 sub rng_add_value {
@@ -5470,7 +5500,7 @@ sub _gdb_new_parse {
 # datatype.  The format gdb uses is documented here:
 # http://sources.redhat.com/gdb/current/onlinedocs/gdb_26.html#SEC275
 #
-# The options $collapse argunment here is for element names that should be
+# The options $collapse argument here is for element names that should be
 # collapsed into an array, for example in the following example each
 # instance if thread-id would over-write the previous one with it's own
 # value so to avoid this thread-ids (note the extra "s" here is passed as
@@ -6468,7 +6498,7 @@ sub custom_expand_var {
 sub gdb_expand_var {
     my ( $gdb, $arg ) = @_;
 
-    # If you try and read a value which claims to be optimized away it
+    # If you try and read a value which claims to be optimised away it
     # will return a value of zero, hard to know how to handle this but
     # not reporting it is probably the better of the two options.
     return
@@ -7159,7 +7189,7 @@ sub show_stack_vars {
 # finding main, with code to detach and try again if we don't.  This served
 # us well on ia64 where gdb isn't very good however it as on most machines
 # gdb gives you results below main (__libc_start_main()) this test fails
-# which causes padb to loop a number of times for each procees on a node.
+# which causes padb to loop a number of times for each process on a node.
 # We still sometimes get garbage (due to hand-rolled memcpy()) so leave the
 # loop in but don't sleep every iteration.  This could be handled better by
 # checking for the presence of one of the stack_strip_below functions in
@@ -7277,7 +7307,7 @@ sub stack_trace_from_pids {
 
             my $strip_below;
 
-            # Find a funtion to strip above.  Only actually enable this if
+            # Find a function to strip above.  Only actually enable this if
             # there is a function present which we are targeting or else no
             # output will be generated!  Do this in reverse order so we
             # strip as much as possible from the stack trace.
@@ -7860,7 +7890,7 @@ sub reply_from_child {
     # Merge this reply into the local one.
     $handle->{child_replys}++;
 
-    # Combine the host responces.
+    # Combine the host responses.
     foreach my $status ( keys %{ $r->{host_responce} } ) {
         foreach my $host ( keys %{ $r->{host_responce}{$status} } ) {
             $handle->{all_replys}->{host_responce}{$status}{$host} =
@@ -7868,7 +7898,7 @@ sub reply_from_child {
         }
     }
 
-    # Combine the target process responces.
+    # Combine the target process responses.
     if ( exists $r->{target_responce} ) {
         foreach my $tp ( keys %{ $r->{target_responce} } ) {
             $handle->{all_replys}->{target_responce}{$tp} =
@@ -7876,7 +7906,7 @@ sub reply_from_child {
         }
     }
 
-    # Combine the target process responces from child.
+    # Combine the target process responses from child.
     if ( exists $r->{target_output} ) {
         foreach my $tp ( keys %{ $r->{target_output} } ) {
             $handle->{all_replys}->{target_output}{$tp} =
@@ -7884,7 +7914,7 @@ sub reply_from_child {
         }
     }
 
-    # Copy the target local responces.
+    # Copy the target local responses.
     if ( exists $handle->{target_responce} ) {
         foreach my $tp ( keys %{ $handle->{target_responce} } ) {
             $handle->{all_replys}->{target_responce}{$tp} =
@@ -7899,7 +7929,7 @@ sub reply_from_child {
 
     %inner_output = ();
 
-    # Copy the network target errors into responce.
+    # Copy the network target errors into response.
     if ( exists $r->{target_data} ) {
         if ( exists $handle->{all_replys}->{target_data} ) {
             foreach my $key ( keys %{ $r->{target_data} } ) {
@@ -7923,7 +7953,7 @@ sub reply_from_child {
         }
     }
 
-    # Merge in local target responces.
+    # Merge in local target responses.
     foreach my $key ( keys %local_target_data ) {
         foreach my $value ( keys %{ $local_target_data{$key} } ) {
             if ( defined $handle->{all_replys}->{target_data}{$key}{$value} ) {
@@ -7960,7 +7990,7 @@ sub reply_from_child {
 
 # Convert from a pid to a command name and do it in a safe manner to avoid
 # warnings.  suid programs tend to have the exe link which is un-readable
-# so if that yeilds nothing then load the name from the status file.
+# so if that yields nothing then load the name from the status file.
 sub pid_to_name {
     my $pid = shift;
     my $exe = readlink "/proc/$pid/exe";
@@ -8039,7 +8069,7 @@ sub convert_pids_to_child_pids {
 
         # The process might have died and we simply didn't find anything,
         # if this is the case then just skip it, the outer will notice the
-        # missing signon and report an approtiate error.
+        # missing signon and report an appropriate error.
         next unless defined $newpid;
 
         my $status = hash_from_status($newpid);
@@ -8499,9 +8529,9 @@ sub to_arg {
 
 sub common_main {
 
-    # The quasi-authorative list of modes padb can operate in.
+    # The quasi-authoritative list of modes padb can operate in.
 
-    # Notes on the callback functions and paramaters.
+    # Notes on the callback functions and parameters.
 
     # handler     Called in the inner for each target process.
     # param:      ??, $vp, $pid
@@ -8511,7 +8541,7 @@ sub common_main {
     #
     #             ??, $vp, $pid
 
-    # These two functions can eitehr return a value, and have it passed to
+    # These two functions can either return a value, and have it passed to
     # the output handler or call output() and use the
     # default_output_handler().
 
@@ -8692,7 +8722,7 @@ sub common_main {
     # These next two don't work currently pending access to a QsNet system
     # for testing.  In the new full-duplex world startup is a little
     # different and these functions need updating.  In particular the
-    # following need to be addressed.  the callback paramaters are probably
+    # following need to be addressed.  the callback parameters are probably
     # wrong.  The shared memory key needs to be calculated.  Config options
     # need to be read locally rather than globally
     $allfns{qsnet_stats} = {
