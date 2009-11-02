@@ -358,19 +358,25 @@ my @inner_conf_cmd = qw(port_range outer);
 # get_active_jobs user List      yes      Return list of all active job for user.
 # is_job_running  job  Bool      no       Check if a given job is running.
 # job_to_key      job  key       no       Convert from jobId to shm key.
-# setup_pcmd      job  cmd|ncpus yes      Command needed to launch shadow jobs.
 # cleanup_pcmd    -    -         no       Cleans up and temporary files.
 # find_pids       job  -         maybe    Called on the inner to locate pids.
 
+# In addition one of these two is preferred setup_job has more
+# flexibility however setup_pcmd is good enough for most cases.  See
+# the setup_jobfunction for full description.
+# setup_pcmd      job  cmd|ncpus yes      Command needed to launch shadow jobs.
+# setup_job       job            no
+
 # inner_rmgr      var  n/a       no       Resource manager to masquerade as.
+# require_inner_callback var n/a no       Resource manager doesn't preserve line
+#                                         ordering of stdout.
 
 my %rmgr;
 
 $rmgr{mpirun} = {
-    get_active_jobs        => \&mpirun_get_jobs,
-    job_is_running         => \&local_job_is_running,
-    setup_pcmd             => \&mpirun_setup_pcmd,
-    require_inner_callback => 1,
+    get_active_jobs => \&mpirun_get_jobs,
+    job_is_running  => \&local_job_is_running,
+    setup_job       => \&mpirun_setup_job,
 };
 
 $rmgr{rms} = {
@@ -788,6 +794,7 @@ $debug_modes{rmgr}        = undef;
 $debug_modes{ctree}       = undef;
 $debug_modes{tdata}       = undef;
 $debug_modes{config}      = undef;
+$debug_modes{pcmd}        = undef;
 
 sub slurp_file {
     my ($file) = @_;
@@ -2775,13 +2782,8 @@ sub mpirun_get_jobs {
     return @jobs;
 }
 
-sub mpirun_setup_pcmd {
+sub mpirun_setup_job {
     my ($job) = @_;
-
-    if ( not find_exe('pdsh') ) {
-        print "mpirun resource manager requires pdsh to be installed\n";
-        return;
-    }
 
     my $gdb = gdb_start();
     if ( not gdb_attach( $gdb, $job ) ) {
@@ -2821,6 +2823,14 @@ sub mpirun_setup_pcmd {
         print "No process data found";
         return;
     }
+
+    my %pcmd;
+    $pcmd{nprocesses}   = $nprocs;
+    $pcmd{nhosts}       = @hosts;
+    $pcmd{process_data} = \%pt;
+    @{ $pcmd{host_list} } = @hosts;
+
+    return %pcmd;
 
     my $cmd = $EMPTY_STRING;
     if ( $hosts[0] ne hostname() or @hosts > 1 ) {
@@ -2997,9 +3007,49 @@ sub job_to_key {
     return;
 }
 
-sub setup_pcmd {
+sub setup_job {
     my $job = shift;
-    return $rmgr{ $conf{rmgr} }{setup_pcmd}($job);
+
+    # If the resource manager provides a setup_pcmd function then use it and
+    # simply convert the list it provides into a hash before returning it.
+    if ( exists $rmgr{ $conf{rmgr} }{setup_pcmd} ) {
+        my ( $cmd, $nprocesses, $nhosts, $pd ) =
+          $rmgr{ $conf{rmgr} }{setup_pcmd}($job);
+        my %pcmd = (
+            command      => $cmd,
+            nprocesses   => $nprocesses,
+            nhosts       => $nhosts,
+            process_data => $pd
+        );
+        return %pcmd;
+    }
+
+    # Otherwise call the more flexible setup_job function.
+    my %pcmd = $rmgr{ $conf{rmgr} }{setup_job}($job);
+
+    # If the resource manager interface is able to give a hostlist but
+    # not able or willing to launch a shadow job natively then use
+    # pdsh to launch the inner processes.  This allows us to be less
+    # dependant on the resource manager and work in a wider variety of
+    # cases.  Using pdsh like this limits us to 32 hosts (More if we
+    # set the FANOUT pdsh environment variable) so perhaps a better
+    # way can be found in the future.
+    if ( defined $pcmd{host_list} and not defined $pcmd{command} ) {
+
+        if ( not find_exe('pdsh') ) {
+            print
+              "$conf{rmgr} resource manager requires pdsh to be installed\n";
+            return;
+        }
+
+        my @hosts = @{ $pcmd{host_list} };
+        if ( $hosts[0] ne hostname() or @hosts > 1 ) {
+            $pcmd{require_inner_callback} = 1;
+            my $hlist = join q{,}, @hosts;
+            $pcmd{command} = "pdsh -w $hlist";
+        }
+    }
+    return %pcmd;
 }
 
 sub cleanup_pcmd {
@@ -4561,11 +4611,38 @@ sub find_padb_secret {
 sub go_job {
     my $jobid = shift;
 
+    $conf{verbose} && print "Attaching to job $jobid\n";
+
+    $rem_jobid = $jobid;
+
+    # Setup whatever is needed for running parallel commands, note this
+    # might involve setting environment variables.
+    my %pcmd = setup_job($jobid);
+
+    debug_log( 'pcmd', \%pcmd, 'Loaded pcmd data' );
+
+    my $cmd    = $pcmd{command};
+    my $ncpus  = $pcmd{nprocesses};
+    my $nhosts = $pcmd{nhosts};
+    my $pd     = $pcmd{process_data};
+
     if ( defined $rmgr{ $conf{rmgr} }{require_inner_callback}
         and $rmgr{ $conf{rmgr} }{require_inner_callback} )
     {
         $conf{inner_callback} = 1;
     }
+
+    if ( defined $pcmd{require_inner_callback} ) {
+        $conf{inner_callback} = $pcmd{require_inner_callback};
+    }
+
+    $conf{verbose} && defined $ncpus  && print "Job has $ncpus process(es)\n";
+    $conf{verbose} && defined $nhosts && print "Job spans $nhosts host(s)\n";
+
+    debug_log( 'verbose', undef, 'There are %d processes over %d hosts',
+        $ncpus, $nhosts );
+
+    $cmd .= " $0 --inner";
 
     if ( $conf{inner_callback} ) {
         $secret = find_padb_secret();
@@ -4578,27 +4655,11 @@ sub go_job {
 
     }
 
-    $conf{verbose} && print "Attaching to job $jobid\n";
-
-    $rem_jobid = $jobid;
-
-    # Setup whatever is needed for running parallel commands, note this
-    # might involve setting environment variables.
-    my ( $cmd, $ncpus, $hosts, $pd ) = setup_pcmd($jobid);
-
-    $conf{verbose} && defined $ncpus && print "Job has $ncpus process(es)\n";
-    $conf{verbose} && defined $hosts && print "Job spans $hosts host(s)\n";
-
-    debug_log( 'verbose', undef, 'There are %d processes over %d hosts',
-        $ncpus, $hosts );
-
-    $cmd .= " $0 --inner";
-
-    if ( not defined $hosts ) {
+    if ( not defined $nhosts ) {
         print "Fatal problem setting up the resource manager: $conf{rmgr}\n";
         return 1;
     }
-    my $errors = go_parallel( $jobid, $cmd, $ncpus, $hosts, $pd );
+    my $errors = go_parallel( $jobid, $cmd, $ncpus, $nhosts, $pd );
 
     debug_log( 'verbose', undef, 'Completed command' );
 
@@ -8389,6 +8450,11 @@ sub inner_loop_for_comms {
         # it up.
         my $signon_text = "connect $hostname $lport $key\n";
         print $signon_text;
+
+        # Add an explicit flush here to ensure the signon is printed,
+        # stdout doesn't automatically get forwarded to through the
+        # resource manager without this here.
+        flush { *STDOUT };
     }
 
     my $netdata;
