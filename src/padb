@@ -860,11 +860,14 @@ sub get_extended_process_list {
         my %procs;
         foreach my $proc (@procs) {
 
-            # A little bit of magic here, ps left pads its output with a
-            # space which the regexp matches so $pid is the second entry
-            # returned from the split command.  I need to verify that Linux
-            # ps and Solaris ps behave the same in this situation.
-            my ( undef, $pid, $ppid ) = split $SPACE, $proc;
+            # A little bit of magic here, ps sometimes left pads its
+            # output with a space which the regexp matches.  To avoid
+            # problems strip leadinging whitespace before we split so
+            # that $pid is the first entry returned from the split
+            # command.
+            $proc =~ s{\A$SPACE}
+	              {}x;
+            my ( $pid, $ppid ) = split $SPACE, $proc;
             $procs{$pid} = $ppid;
         }
         return %procs;
