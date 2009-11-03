@@ -6065,6 +6065,10 @@ sub fetch_mpi_queue {
         );
     }
 
+    if ( defined $carg->{mpi_dbg_dll} ) {
+        $ENV{MPI_DBG_DLL} = $carg->{mpi_dbg_dll};
+    }
+
     if ( defined $carg->{mpi_dll} ) {
         $ENV{MPINFO_DLL} = $carg->{mpi_dll};
     } else {
@@ -6090,6 +6094,10 @@ sub fetch_mpi_queue_gdb {
         target_error( $vp,
             'Process does not appear to be using MPI (No MPIR_dll_name symbol)'
         );
+    }
+
+    if ( defined $carg->{mpi_dbg_dll} ) {
+        $ENV{MPI_DBG_DLL} = $carg->{mpi_dbg_dll};
     }
 
     if ( defined $carg->{mpi_dll} ) {
@@ -8628,8 +8636,10 @@ sub common_main {
         arg_short   => 'q',
         handler     => \&show_queue,
         help        => 'Show the message queues',
-        options_i   => { mpi_dll => undef, }
-
+        options_i   => {
+            mpi_dll     => undef,
+            mpi_dbg_dll => undef,
+        },
     };
 
     $allfns{kill} = {
@@ -8651,7 +8661,10 @@ sub common_main {
         arg_long    => 'mpi-queue',
         arg_short   => 'Q',
         help        => 'Show MPI message queues',
-        options_i   => { mpi_dll => undef, }
+        options_i   => {
+            mpi_dll     => undef,
+            mpi_dbg_dll => undef,
+        },
     };
 
     $allfns{deadlock} = {
@@ -8660,12 +8673,14 @@ sub common_main {
         arg_short    => 'j',
         help         => 'Run deadlock detection algorithm',
         out_handler  => \&mpi_deadlock_detect,
-        options_i    => { mpi_dll => undef, },
         options_bool => {
             show_group_members => 'no',
             show_all_groups    => 'no',
         },
-
+        options_i => {
+            mpi_dll     => undef,
+            mpi_dbg_dll => undef,
+        },
     };
 
     $allfns{pinfo} = {
@@ -8677,8 +8692,7 @@ sub common_main {
             proc_shows_fds  => 'no',
             proc_shows_maps => 'no',
             proc_shows_stat => 'no',
-          }
-
+        },
     };
 
     $allfns{proc_summary} = {
@@ -8698,7 +8712,6 @@ sub common_main {
             proc_shows_maps    => 'no',
             proc_show_header   => 'yes',
             reverse_sort_order => 'no',
-
         },
         secondary => [
             {
@@ -8738,8 +8751,7 @@ sub common_main {
                 type     => '!',
                 default  => 1,
             },
-          ]
-
+        ]
     };
 
     $allfns{stack_long} = {
@@ -8757,8 +8769,9 @@ sub common_main {
         out_handler     => \&show_mpi_watch,
         options_i       => {
             mpi_dll        => undef,
-            mpi_watch_file => undef
-        }
+            mpi_dbg_dll    => undef,
+            mpi_watch_file => undef,
+        },
     };
 
     $allfns{lstopo} = {
@@ -8804,14 +8817,12 @@ sub common_main {
         options_i   => {
             stats_name     => undef,
             stats_sort_key => 'vp',
-
         },
         options_bool => {
             stats_reverse  => 'no',
             stats_short    => 'no',
             show_all_stats => 'no',
-          }
-
+        }
     };
     $allfns{qsnet_groups} = {
         handler_all  => \&inner_show_stats,
