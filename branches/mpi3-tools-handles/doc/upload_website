@@ -1,0 +1,35 @@
+#!/bin/sh
+
+# upload_website: Basic formating and upload script for http://padb.pittman.co.uk
+# $Revision$
+# $Date$
+
+set -e
+
+echo Uploading website to http://padb.pittman.org.uk
+
+# Load the password from a non-public file ;)
+. ~/padb-website-password.txt
+
+FILES="index usage download email extensions modes configuration"
+
+ftp-upload --host padb.pittman.org.uk -u padb@pittman.co.uk --password $PASSWORD layout.css
+
+for FILE in $FILES
+do
+  echo Uploading $FILE
+  TFILE=`mktemp`
+  cat header.html > $TFILE
+  cat $FILE.html >> $TFILE
+  cat footer.html >> $TFILE
+  ftp-upload --host padb.pittman.org.uk -u padb@pittman.co.uk --password $PASSWORD --as $FILE.html $TFILE
+  ftp-upload --host padb.pittman.org.uk -u padb@pittman.co.uk --password $PASSWORD --as $FILE/index.html $TFILE
+  ftp-upload --host padb.pittman.org.uk -u padb@pittman.co.uk --password $PASSWORD --as $FILE/layout.css layout.css
+  rm $TFILE
+done
+
+ftp-upload --host padb.pittman.org.uk -u padb@pittman.co.uk --password $PASSWORD  OpenMPI-padb-groups.patch
+ftp-upload --host padb.pittman.org.uk -u padb@pittman.co.uk --password $PASSWORD --as extensions/OpenMPI-padb-groups.patch OpenMPI-padb-groups.patch
+
+echo All done.
+exit 0
