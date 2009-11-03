@@ -13,6 +13,7 @@
 #include <unistd.h>
 #include <assert.h>
 #include "mpi_interface.h"
+#include "mpihandles_interface.h"
 
 struct dll_entry_points {
     char *(*dll_error_string)           (int);
@@ -31,6 +32,90 @@ struct dll_entry_points {
     int   (*setup_operation_iterator)   (mqs_process *, int);
     int   (*next_operation)             (mqs_process *, mqs_pending_operation *);
 };
+
+struct dbg_dll_entry_points {
+    int   (*init_once)                       (mqs_basic_callbacks *);
+    int   (*interface_version_compatibility) ();
+    char *(*version_string)                  ();
+    int   (*dll_taddr_width)                 ();
+    int   (*init_per_image)                  (mqs_image *,
+					      mqs_image_callbacks *,
+					      struct mpidbg_handle_info_t *);
+    void  (*finalize_per_image)              (mqs_image *,
+					      mqs_image_info *);
+    int   (*init_per_process)                (mqs_process *,
+					      mqs_process_callbacks *,
+					      struct mpidbg_handle_info_t *);
+    void  (*finalize_per_process)            (mqs_process *,
+					      mqs_process_info *);
+    int   (*comm_query)                      (mqs_image *,
+					      mqs_image_info *, 
+					      mqs_process *, 
+					      mqs_process_info *,
+					      mqs_taddr_t, 
+					      struct mpidbg_comm_handle_t **);
+    int   (*comm_handle_free)                (struct mpidbg_comm_handle_t *);
+    int   (*comm_query_basic)                (struct mpidbg_comm_handle_t *,
+					      char comm_name[MPIDBG_MAX_OBJECT_NAME],
+					      enum mpidbg_comm_info_bitmap_t *,
+					      int *,
+					      int *,
+					      int *,
+					      mqs_taddr_t *);
+    int   (*comm_query_procs)                (struct mpidbg_comm_handle_t *,
+					      int *,
+					      struct mpidbg_process_t **,
+					      int *,
+					      struct mpidbg_process_t **);
+    int   (*comm_query_topo)                 (struct mpidbg_comm_handle_t *,
+					      int *,
+					      int **,
+					      int **);
+    int   (*comm_query_attrs)                (struct mpidbg_comm_handle_t *,
+					      int *,
+					      struct mpidbg_attribute_pair_t *);
+    int   (*comm_query_requests)             (struct mpidbg_comm_handle_t *,
+					      int *,
+					      mqs_taddr_t **);
+    int   (*comm_query_derived)              (struct mpidbg_comm_handle_t *,
+					      int *,
+					      mqs_taddr_t **,
+					      int *,
+					      mqs_taddr_t **);
+    int   (*errhandler_query)                (mqs_image *,
+					      mqs_image_info *, 
+					      mqs_process *,
+					      mqs_process_info *,
+					      mqs_taddr_t,
+					      struct mpidbg_errhandler_handle_t **);
+    int   (*errhandler_handle_free)          (struct mpidbg_errhandler_handle_t *);
+    int   (*errhandler_query_basic)          (struct mpidbg_errhandler_handle_t *,
+					      char errhandler_name[MPIDBG_MAX_OBJECT_NAME],
+					      enum mpidbg_errhandler_info_bitmap_t *,
+					      int *,
+					      mqs_taddr_t *);
+    int   (*errhandler_query_handles)        (struct mpidbg_errhandler_handle_t *,
+					      int *,
+					      mqs_taddr_t **);
+    int   (*errhandler_query_callback)       (struct mpidbg_errhandler_handle_t *,
+					      mqs_taddr_t *);
+    int   (*request_query)                   (mqs_image *,
+					      mqs_image_info *,
+					      mqs_process *,
+					      mqs_process_info *,
+					      mqs_taddr_t,
+					      struct mpidbg_request_handle_t **);
+    int   (*request_handle_free)             (struct mpidbg_request_handle_t *);
+    int   (*status_query)                    (mqs_image *, 
+					      mqs_image_info *, 
+					      mqs_process *,
+					      mqs_process_info *,
+					      mqs_taddr_t,
+					      struct mpidbg_status_handle_t **);
+    int   (*status_handle_free)              (struct mpidbg_status_handle_t *);
+};
+
+struct dbg_dll_entry_points dbg_dll_ep = {};
 
 struct image {
     mqs_image_info *blob;
@@ -511,11 +596,11 @@ void load_all_ops (mqs_process *target_process)
     load_ops(target_process,mqs_pending_sends);
 }
 
-#define DLSYM_LAX(VAR,HANDLE,NAME) VAR.NAME = dlsym(HANDLE,"mqs_" #NAME)
+#define DLSYM_LAX(VAR,HANDLE,PREFIX,NAME) VAR.NAME = dlsym(HANDLE,#PREFIX "_" #NAME)
 
-#define DLSYM(VAR,HANDLE,NAME) do {			      \
-	if ( (DLSYM_LAX(VAR,HANDLE,NAME)) == NULL ) {	      \
-	    show_warning("Failed to load symbol mqs_" #NAME); \
+#define DLSYM(VAR,HANDLE,PREFIX,NAME) do {		      \
+	if ( (DLSYM_LAX(VAR,HANDLE,PREFIX,NAME)) == NULL ) {	      \
+	    show_warning("Failed to load symbol " #PREFIX "_" #NAME); \
 	    return -1;					      \
 	}						      \
     } while (0)
@@ -523,34 +608,83 @@ void load_all_ops (mqs_process *target_process)
 /* Try and load the dll from a given filename, returns true if successfull.
  * populates the contents of dll_ep if true.
  */
-int load_msgq_dll(char *filename)
+int load_msgq_dll(void *dlhandle)
 {
-    void *dlhandle;
-    
-    dlhandle = dlopen(filename,RTLD_NOW);
-    if ( ! dlhandle ) 
-	return -1;
-
-    DLSYM(dll_ep,dlhandle,setup_basic_callbacks);
-    DLSYM(dll_ep,dlhandle,setup_image);
-    DLSYM(dll_ep,dlhandle,image_has_queues);
-    DLSYM(dll_ep,dlhandle,setup_process);
-    DLSYM(dll_ep,dlhandle,process_has_queues);
-    DLSYM(dll_ep,dlhandle,dll_error_string);
-    DLSYM(dll_ep,dlhandle,update_communicator_list);
-    DLSYM(dll_ep,dlhandle,setup_communicator_iterator);
-    DLSYM(dll_ep,dlhandle,get_communicator);
-    DLSYM(dll_ep,dlhandle,next_communicator);
-    DLSYM(dll_ep,dlhandle,setup_operation_iterator);
-    DLSYM(dll_ep,dlhandle,next_operation);
+    DLSYM(dll_ep,dlhandle,mqs,setup_basic_callbacks);
+    DLSYM(dll_ep,dlhandle,mqs,setup_image);
+    DLSYM(dll_ep,dlhandle,mqs,image_has_queues);
+    DLSYM(dll_ep,dlhandle,mqs,setup_process);
+    DLSYM(dll_ep,dlhandle,mqs,process_has_queues);
+    DLSYM(dll_ep,dlhandle,mqs,dll_error_string);
+    DLSYM(dll_ep,dlhandle,mqs,update_communicator_list);
+    DLSYM(dll_ep,dlhandle,mqs,setup_communicator_iterator);
+    DLSYM(dll_ep,dlhandle,mqs,get_communicator);
+    DLSYM(dll_ep,dlhandle,mqs,next_communicator);
+    DLSYM(dll_ep,dlhandle,mqs,setup_operation_iterator);
+    DLSYM(dll_ep,dlhandle,mqs,next_operation);
 
     /* "Optional" symbols, these may or may not occour in the dll, if they
      *  are we can make use of them but if they aren't then that's fine too
      */
-    DLSYM_LAX(dll_ep,dlhandle,get_comm_group);
-    DLSYM_LAX(dll_ep,dlhandle,get_global_rank);
-    DLSYM_LAX(dll_ep,dlhandle,get_comm_coll_state);
+    DLSYM_LAX(dll_ep,dlhandle,mqs,get_comm_group);
+    DLSYM_LAX(dll_ep,dlhandle,mqs,get_global_rank);
+    DLSYM_LAX(dll_ep,dlhandle,mqs,get_comm_coll_state);
     return 0;
+}
+
+int load_dbg_dll(void *dlhandle)
+{
+    DLSYM(dbg_dll_ep,dlhandle,mpidbg,init_once);
+    DLSYM(dbg_dll_ep,dlhandle,mpidbg,version_string);
+    DLSYM(dbg_dll_ep,dlhandle,mpidbg,dll_taddr_width);
+    DLSYM(dbg_dll_ep,dlhandle,mpidbg,init_per_image);
+    DLSYM(dbg_dll_ep,dlhandle,mpidbg,finalize_per_image);
+    DLSYM(dbg_dll_ep,dlhandle,mpidbg,init_per_process);
+    DLSYM(dbg_dll_ep,dlhandle,mpidbg,finalize_per_process);
+    DLSYM(dbg_dll_ep,dlhandle,mpidbg,comm_query);
+    DLSYM(dbg_dll_ep,dlhandle,mpidbg,comm_handle_free);
+    DLSYM(dbg_dll_ep,dlhandle,mpidbg,comm_query_basic);
+    DLSYM(dbg_dll_ep,dlhandle,mpidbg,comm_query_procs);
+    DLSYM(dbg_dll_ep,dlhandle,mpidbg,comm_query_topo);
+    DLSYM(dbg_dll_ep,dlhandle,mpidbg,comm_query_attrs);
+    DLSYM(dbg_dll_ep,dlhandle,mpidbg,comm_query_requests);
+    DLSYM(dbg_dll_ep,dlhandle,mpidbg,comm_query_derived);
+    DLSYM(dbg_dll_ep,dlhandle,mpidbg,errhandler_query);
+    DLSYM(dbg_dll_ep,dlhandle,mpidbg,errhandler_handle_free);
+    DLSYM(dbg_dll_ep,dlhandle,mpidbg,errhandler_query_basic);
+    DLSYM(dbg_dll_ep,dlhandle,mpidbg,errhandler_query_handles);
+    DLSYM(dbg_dll_ep,dlhandle,mpidbg,errhandler_query_callback);
+    DLSYM(dbg_dll_ep,dlhandle,mpidbg,request_query);
+    DLSYM(dbg_dll_ep,dlhandle,mpidbg,request_handle_free);
+    DLSYM(dbg_dll_ep,dlhandle,mpidbg,status_query);
+    DLSYM(dbg_dll_ep,dlhandle,mpidbg,status_handle_free);
+
+    return 0;
+}
+
+int load_dll (char *dll_name, int (*load_fn)(void *))
+{
+    void *dlhandle;
+    
+    printf("Trying %s\n",dll_name);
+    dlhandle = dlopen(dll_name,RTLD_NOW);
+    if ( dlhandle == NULL ) {
+	show_warning(dlerror());
+	
+	dlhandle = dlopen(dll_name,RTLD_LAZY);
+	if ( dlhandle == NULL ) {
+	    show_warning(dlerror());
+	    return -1;
+	}
+    }
+    
+    if ( load_fn(dlhandle) == 0 ) {
+	free(dll_name);
+	return mqs_ok;
+    }
+    dlclose(dlhandle);
+    
+    return -1;
 }
 
 #define PATH_MAX 1024
@@ -559,10 +693,11 @@ int load_msgq_dll(char *filename)
  * trying each one in turn.  Return 0 if and when we managed to load one,
  * -1 otherwise
  */
-int find_and_load_dll_from_loc_array() {
+int find_and_load_dll_from_loc_array(char *sym_name, int (*load_fn)(void *))
+{
     void **remote_array;
     char *dll_name;
-    void *locations = find_sym("sym","mpimsgq_dll_locations");
+    void *locations = find_sym("sym",sym_name);
     
     if ( locations == NULL )
 	return -1;
@@ -589,8 +724,7 @@ int find_and_load_dll_from_loc_array() {
 	    goto error_out;
 
 	} else {
-	    if ( load_msgq_dll(dll_name) == 0 ) {
-		free(dll_name);
+	    if ( load_dll(dll_name,load_fn) == mqs_ok ) {
 		return mqs_ok;
 	    }
 	}
@@ -608,14 +742,14 @@ void find_and_load_dll()
 
     dll_name = getenv("MPINFO_DLL");
     if ( dll_name != NULL ) {
-	if ( load_msgq_dll(dll_name) != 0 ) {
+	if ( load_dll(dll_name,load_msgq_dll) != mqs_ok ) {
 	    die("Could not load symbols from dll");
 	}
 	return;
     }
     
     /* Try the new (proposed) dll specification mechanism */
-    if ( find_and_load_dll_from_loc_array() == mqs_ok )
+    if ( find_and_load_dll_from_loc_array("mpimsgq_dll_locations",load_msgq_dll) == mqs_ok )
 	return;
     
     void *base = find_sym("sym","MPIR_dll_name");
@@ -626,9 +760,21 @@ void find_and_load_dll()
     if ( fetch_string(NULL,dll_name,(mqs_taddr_t)base,PATH_MAX) != 0 ) {
 	die("Could not read value of MPIR_dll_name");
     }
-    if ( load_msgq_dll(dll_name) != 0 ) {
+    if ( load_dll(dll_name,load_msgq_dll) != mqs_ok ) {
 	die("Could not load symbols from dll");
     }
+}
+
+int find_and_load_dbg_dll ()
+{
+    char *dll_name = getenv("MPI_DBG_DLL");
+    if ( dll_name != NULL ) {
+	if ( load_dll(dll_name,load_dbg_dll) != mqs_ok ) {
+	    show_warning("Could not load symbols from dbg dll");
+	    return -1;
+	}
+    }
+    return find_and_load_dll_from_loc_array("mpidbg_dll_locations",load_dbg_dll);
 }
 
 int
@@ -644,6 +790,11 @@ main ()
     mqs_process *target_process = (mqs_process *)&process;
 
     find_and_load_dll();
+
+    /* Try the new (proposed) dll specification mechanism */
+    if ( find_and_load_dbg_dll() == mqs_ok ) {
+	printf("Loaded the other dll as well\n");
+    }
 
     assert(dll_ep.setup_basic_callbacks != NULL);
         
