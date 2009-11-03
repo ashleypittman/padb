@@ -11,6 +11,7 @@
 
 #include <dlfcn.h>
 #include <unistd.h>
+#include <assert.h>
 #include "mpi_interface.h"
 
 struct dll_entry_points {
@@ -108,8 +109,9 @@ void die_with_code (int res, char *msg)
 
 #define QUERY_SIZE 1280
 
-/* Query (via proxy) gdb for the answer to a question,
- * store the restult in ans, returns -1 on failure */
+/* Query (via proxy) gdb for the answer to a question, store the result in
+ * ans, returns -1 on failure
+ */
 int ask(char *req, char *ans)
 {
     char buff[QUERY_SIZE+3];
@@ -117,8 +119,10 @@ int ask(char *req, char *ans)
     printf("req: %s\n",req);
     fflush(NULL);    
     nbytes = read(0,buff,QUERY_SIZE+3);
-    if ( nbytes < 0 )
+    if ( nbytes < 0 ) {
+	show_warning("Bad result from read");
 	return -1;
+    }
     if ( memcmp(buff,"ok ",3 ) )
 	return -1;
     buff[nbytes-1] = '\000';
@@ -317,8 +321,9 @@ int _find_data (mqs_process *proc, mqs_taddr_t addr, int size, void *base)
     return mqs_ok;
 }
 
-// Data comes back as 0x?? for each char, space required is (N*5)-1
-// 256 bytes read need 1279 bytes of space
+/* Data comes back as 0x?? for each char, space required is (N*5)-1 256
+ * bytes read need 1279 bytes of space
+ */
 int find_data (mqs_process *proc, mqs_taddr_t addr, int size, void *base)
 {
     char *local = base;
@@ -347,17 +352,22 @@ void convert_data (mqs_process *proc, const void *a, void *b, int size)
     memcpy(b,(void *)a,size);
 }
 
+/* Fetch a string from a remote memory location, making sure there is
+ * enough memory locally to store our copy.  Return mqs_ok on success */
 int fetch_string (void *bc,void *local, mqs_taddr_t remote, int size)
 {
     char req[128];
-    char ans[128];
+    char *ans = malloc(size+16);
     int i;
     
     sprintf(req,"string %d %p",size,(void *)remote);
     i = ask(req,ans);
-    if ( i != 0 )
+    if ( i != 0 ) {
+	free(ans);
 	return -1;
+    }
     strncpy(local,ans,size);
+    free(ans);
     return 0;
 }
 
@@ -533,8 +543,11 @@ int load_msgq_dll(char *filename)
     DLSYM(dll_ep,dlhandle,next_communicator);
     DLSYM(dll_ep,dlhandle,setup_operation_iterator);
     DLSYM(dll_ep,dlhandle,next_operation);
-    DLSYM(dll_ep,dlhandle,get_comm_group);
 
+    /* "Optional" symbols, these may or may not occour in the dll, if they
+     *  are we can make use of them but if they aren't then that's fine too
+     */
+    DLSYM_LAX(dll_ep,dlhandle,get_comm_group);
     DLSYM_LAX(dll_ep,dlhandle,get_global_rank);
     DLSYM_LAX(dll_ep,dlhandle,get_comm_coll_state);
     return 0;
@@ -542,11 +555,86 @@ int load_msgq_dll(char *filename)
 
 #define PATH_MAX 1024
 
+/* Try and load a valid dll from the locations array, loop over the array
+ * trying each one in turn.  Return 0 if and when we managed to load one,
+ * -1 otherwise
+ */
+int find_and_load_dll_from_loc_array() {
+    void **remote_array;
+    char *dll_name;
+    void *locations = find_sym("sym","mpimsgq_dll_locations");
+    
+    if ( locations == NULL )
+	return -1;
+
+    if ( find_data(NULL,(mqs_taddr_t)locations,sizeof(void *),&remote_array) != mqs_ok ) {
+	return -1;
+    }
+    
+    if ( (dll_name = malloc(PATH_MAX)) == NULL )
+	return -1;
+    
+    do {
+	void *remote_entry = NULL;
+
+    	if ( find_data(NULL,(mqs_taddr_t)remote_array,sizeof(void *),&remote_entry) != mqs_ok )
+	    goto error_out;
+	
+	if ( remote_entry == NULL )
+	    goto error_out;
+	
+	memset(dll_name,0,PATH_MAX);	
+	
+	if ( fetch_string(NULL,dll_name,(mqs_taddr_t)remote_entry,PATH_MAX) != mqs_ok ) {
+	    goto error_out;
+
+	} else {
+	    if ( load_msgq_dll(dll_name) == 0 ) {
+		free(dll_name);
+		return mqs_ok;
+	    }
+	}
+	remote_array++;
+    } while ( 1 );
+        
+error_out:
+    free(dll_name);
+    return -1;
+}
+
+void find_and_load_dll()
+{
+    char *dll_name;
+
+    dll_name = getenv("MPINFO_DLL");
+    if ( dll_name != NULL ) {
+	if ( load_msgq_dll(dll_name) != 0 ) {
+	    die("Could not load symbols from dll");
+	}
+	return;
+    }
+    
+    /* Try the new (proposed) dll specification mechanism */
+    if ( find_and_load_dll_from_loc_array() == mqs_ok )
+	return;
+    
+    void *base = find_sym("sym","MPIR_dll_name");
+    if ( base == NULL ) {
+	die("Could not find MPIR_dll_name symbol");
+    }
+    dll_name = malloc(PATH_MAX);
+    if ( fetch_string(NULL,dll_name,(mqs_taddr_t)base,PATH_MAX) != 0 ) {
+	die("Could not read value of MPIR_dll_name");
+    }
+    if ( load_msgq_dll(dll_name) != 0 ) {
+	die("Could not load symbols from dll");
+    }
+}
+
 int
 main ()
 {
     int res;
-    char *dll_name;
     int comm_id = 0;
     
     struct image   image;
@@ -555,22 +643,9 @@ main ()
     mqs_image   *target_image   = (mqs_image   *)&image;
     mqs_process *target_process = (mqs_process *)&process;
 
-    dll_name = getenv("MPINFO_DLL");
-    if ( ! dll_name ) {
-	
-	void *base = find_sym("sym","MPIR_dll_name");
-	if ( ! base ) {
-	    die("Could not find MPIR_dll_name symbol");
-	}
-	dll_name = malloc(PATH_MAX);
-	if ( fetch_string(NULL,dll_name,(mqs_taddr_t)base,PATH_MAX) != 0 ) {
-	    die("Could not read value of MPIR_dll_name");
-	}
-    }
+    find_and_load_dll();
 
-    if ( load_msgq_dll(dll_name) != 0 ) {
-	die("Could not load symbols from dll");
-    }
+    assert(dll_ep.setup_basic_callbacks != NULL);
         
     bcb.mqs_malloc_fp           = malloc;
     bcb.mqs_free_fp             = free;
