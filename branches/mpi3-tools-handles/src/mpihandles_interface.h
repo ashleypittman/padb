@@ -32,7 +32,11 @@
 #ifndef __MPIDBG_INTERFACE_H__
 #define __MPIDBG_INTERFACE_H__ 1
 
+/* This isn't going to work... AMP 
 #include "ompi_config.h"
+*/
+
+#define MPI_MAX_OBJECT_NAME 1024
 
 /*
  * This file provides interface functions for a debugger to gather
@@ -42,9 +46,12 @@
 
 /* Include the Etnus debugger message queue interface so that we can
    use much of its infrastructure (e.g., the mqs_basic_callbacks,
-   mqs_image_callbacks, and mqs_process_callbacks). */
+   mqs_image_callbacks, and mqs_process_callbacks).
+
+   minfo.c already included this AMP.
 #define FOR_MPI2 0
 #include "msgq_interface.h"
+*/
 
 /**************************************************************************
  * Types and macros
