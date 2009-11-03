@@ -7,7 +7,7 @@ CFLAGS=-Wall -g
 
 FILES = Makefile minfo.c mpi_interface.h padb
 
-minfo.x: minfo.c mpi_interface.h
+minfo.x: minfo.c mpi_interface.h mpihandles_interface.h
 	$(CC) minfo.c -o minfo.x -ldl $(CFLAGS)
 
 install: minfo.x
