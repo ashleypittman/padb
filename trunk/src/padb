@@ -3424,6 +3424,18 @@ sub _format_local_vars {
     return;
 }
 
+# Controls how to display "expanded" variables in stack traces, that is
+# where the value display isn't the contents of the variable but some
+# mutation of that, either the name of a MPI Communicator, or a pointer
+# description or that it's value is too long.
+# For text based output <$var> works well IMHO however that isn't valid
+# html, for now this just returns $var but perhaps having a
+# --format-for-html option would be the way to go in future.
+sub pretify_variable {
+    my $var = shift;
+    return $var;
+}
+
 sub _add_data_to_point_on_tree {
     my ( $tree, $d, $l, $max_show, $peer, @vars ) = @_;
 
@@ -3450,8 +3462,8 @@ sub _add_data_to_point_on_tree {
               . rng_convert_to_user( $d->{target_data}{$key}{ $values[0] } );
             push @{ $tree->{$peer}->{aux} }, $line;
         } elsif ( @values > $max_show ) {
-            my $line =
-              "  $vref->{type_name}: <more than $max_show distinct values>";
+            my $line = "  $vref->{type_name}: "
+              . pretify_variable("more than $max_show distinct values");
             push @{ $tree->{$peer}->{aux} }, $line;
         } else {
             push @{ $tree->{$peer}->{aux} }, "  $vref->{type_name}:";
@@ -6494,19 +6506,20 @@ sub describe_pointer {
     my $pval = _hex($ptr);
 
     if ( $ptr eq '0x0' ) {
-        return '<null pointer>';
+        return pretify_variable('null pointer');
     }
 
     foreach my $rgn ( @{ $gdb->{maps} } ) {
         if ( $pval >= $rgn->{start} and $pval <= $rgn->{end} ) {
             if ( defined $rgn->{file} ) {
-                return "<valid pointer perm=$rgn->{perm} ($rgn->{file})>";
+                return pretify_variable(
+                    "valid pointer perm=$rgn->{perm} ($rgn->{file})");
             } else {
-                return "<valid pointer perm=$rgn->{perm}>";
+                return pretify_variable("valid pointer perm=$rgn->{perm}");
             }
         }
     }
-    return "<$ptr (Invalid pointer)>";
+    return pretify_variable("$ptr (Invalid pointer)");
 }
 
 sub expand_var_hash {
@@ -6565,7 +6578,7 @@ sub gdb_expand_var {
     # If you try and read a value which claims to be optimised away it
     # will return a value of zero, hard to know how to handle this but
     # not reporting it is probably the better of the two options.
-    return
+    return pretify_variable('value optimized out')
       if ( defined $arg->{value} and $arg->{value} eq '<value optimized out>' );
 
     # Char * pointers are already correctly handled by gdb with set
@@ -6589,7 +6602,7 @@ sub gdb_expand_var {
         my $expanded_var =
           custom_expand_var( $gdb, $type, $arg->{name}, $addr );
         if ( defined $expanded_var ) {
-            return "<$expanded_var>";
+            return pretify_variable($expanded_var);
         }
     }
 
@@ -6607,7 +6620,7 @@ sub gdb_expand_var {
         }
 
         if ( $pointer eq '0x0' ) {
-            return '<null pointer>';
+            return pretify_variable('null pointer');
         }
 
         # Try and print the contents of the pointer, this works fine
@@ -7422,7 +7435,8 @@ sub stack_trace_from_pids {
                                 target_key_pair(
                                     $vp,
                                     $fl . '|var|' . $loc->{name},
-                                    '<value too long to display>'
+                                    pretify_variable(
+                                        'value too long to display')
                                 );
                             } else {
                                 target_key_pair( $vp,
@@ -7446,7 +7460,8 @@ sub stack_trace_from_pids {
                                 target_key_pair(
                                     $vp,
                                     $fl . '|var|' . $par->{name},
-                                    '<value too long to display>'
+                                    pretify_variable(
+                                        'value too long to display')
                                 );
                             } else {
                                 target_key_pair( $vp,
