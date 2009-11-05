@@ -5678,10 +5678,13 @@ sub gdb_type_size {
     return gdb_strip_value( $p{reason} );
 }
 
+# Add a void * cast here to stop gdb trying to evaluate the type and
+# telling us that the offset isn't a valid pointer.  Without the cast gdb
+# adding extra text after the value which is causing hex to throw warnings.
 sub gdb_type_offset {
     my ( $gdb, $type, $field ) = @_;
     my %p = gdb_send_addr( $gdb,
-        "-data-evaluate-expression \"&(($type *)0)->$field\"" );
+        "-data-evaluate-expression \"(void *)&(($type *)0)->$field\"" );
     return unless ( $p{status} eq 'done' );
     return hex gdb_strip_value( $p{reason} );
 }
