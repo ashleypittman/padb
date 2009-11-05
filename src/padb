@@ -2770,12 +2770,27 @@ sub mpirun_get_jobs {
     map { $mpirun{$_}++ } split $COMMA, $conf{mpirun};
 
     foreach my $pid ( get_process_list($user) ) {
+
+        if ($running_on_solaris) {
+            my $slink = readlink "/proc/$pid/path/a.out";
+            if ( defined $slink ) {
+                if ( defined $mpirun{ basename($slink) } ) {
+                    push @jobs, $pid;
+                }
+            }
+            next;
+        }
+
+        # This test does work on solaris but as it reports a full path
+        # rather than just the basename it'll never pass.  It also
+        # takes a long time to run so skip it.
         my $name = find_from_status( $pid, 'Name' );
         if ( defined $name and defined $mpirun{$name} ) {
             push @jobs, $pid;
             next;
         }
 
+        # Linux only.
         my $link = readlink "/proc/$pid/exe";
         next unless defined $link;
         if ( defined $mpirun{ basename($link) } ) {
