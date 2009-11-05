@@ -528,8 +528,13 @@ int load_msgq_dll(char *filename)
     void *dlhandle;
     
     dlhandle = dlopen(filename,RTLD_NOW);
-    if ( ! dlhandle ) 
-	return -1;
+    if ( ! dlhandle ) {
+	show_warning("Unable to dlopen dll with RTLD_NOW, trying LAZY...");
+	show_warning(dlerror());
+	dlhandle = dlopen(filename,RTLD_LAZY);
+	if ( ! dlhandle )
+	    return -1;
+    }
 
     DLSYM(dll_ep,dlhandle,setup_basic_callbacks);
     DLSYM(dll_ep,dlhandle,setup_image);
