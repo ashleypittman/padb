@@ -2771,15 +2771,15 @@ sub mpirun_get_jobs {
 
     foreach my $pid ( get_process_list($user) ) {
 
-        if ($running_on_solaris) {
-            my $slink = readlink "/proc/$pid/path/a.out";
-            if ( defined $slink ) {
-                if ( defined $mpirun{ basename($slink) } ) {
-                    push @jobs, $pid;
-                }
+        # Works for both solaris and Linux
+        my $link = proc_link($pid);
+        if ( defined $link ) {
+            if ( defined $mpirun{ basename($link) } ) {
+                push @jobs, $pid;
             }
-            next;
         }
+
+        next if ($running_on_solaris);
 
         # This test does work on solaris but as it reports a full path
         # rather than just the basename it'll never pass.  It also
@@ -2788,13 +2788,6 @@ sub mpirun_get_jobs {
         if ( defined $name and defined $mpirun{$name} ) {
             push @jobs, $pid;
             next;
-        }
-
-        # Linux only.
-        my $link = readlink "/proc/$pid/exe";
-        next unless defined $link;
-        if ( defined $mpirun{ basename($link) } ) {
-            push @jobs, $pid;
         }
     }
     return @jobs;
@@ -5825,7 +5818,7 @@ sub minfo_handle_query {
     } elsif ( $cmd eq 'rank' ) {
         $res = $vp;
     } elsif ( $cmd eq 'image' ) {
-        my $image = readlink "/proc/$gdb->{tracepid}/exe";
+        my $image = proc_link( $gdb->{tracepid} );
         if ( defined $image ) {
             $res = $image;
         }
@@ -5894,7 +5887,7 @@ sub run_minfo {
                     $global{$str_name} = $str_value;
 
                     if ( $str_name eq 'ihqm' ) {
-                        my $image = readlink "/proc/$gdb->{tracepid}/exe";
+                        my $image = proc_link( $gdb->{tracepid} );
                         $str_value =~ s{%s}{$image};
                     }
 
@@ -8086,12 +8079,23 @@ sub reply_from_child {
     return;
 }
 
+sub proc_link {
+    my $pid = shift;
+    my $path;
+    if ($running_on_solaris) {
+        $path = "/proc/$pid/path/a.out";
+    } else {
+        $path = "/proc/$pid/exe";
+    }
+    return readlink $path;
+}
+
 # Convert from a pid to a command name and do it in a safe manner to avoid
 # warnings.  suid programs tend to have the exe link which is un-readable
 # so if that yields nothing then load the name from the status file.
 sub pid_to_name {
     my $pid = shift;
-    my $exe = readlink "/proc/$pid/exe";
+    my $exe = proc_link($pid);
     if ( defined $exe ) {
         return basename($exe);
     } else {
