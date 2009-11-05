@@ -141,9 +141,9 @@ void *find_sym (char *type, char *name) {
     if ( i != 0 )
 	return NULL;
     
-    i = sscanf(ans, "%p",&addr);
+    i = sscanf(ans, "%lx",(long *)&addr);
     if ( i != 1 ) {
-	printf("Failed sscanf %d %p\n",i,addr);
+	printf("Failed sscanf %d 0x%lx\n",i,(long)addr);
 	return NULL;
     }
     
@@ -301,7 +301,7 @@ int _find_data (mqs_process *proc, mqs_taddr_t addr, int size, void *base)
     if ( size == 0 )
 	return mqs_ok;
     
-    sprintf(req,"data %p %d",(void *)addr,size);
+    sprintf(req,"data 0x%lx %d",(long)addr,size);
     
     i = ask(req,ans);
     if ( i != 0 )
@@ -360,7 +360,7 @@ int fetch_string (void *bc,void *local, mqs_taddr_t remote, int size)
     char *ans = malloc(size+16);
     int i;
     
-    sprintf(req,"string %d %p",size,(void *)remote);
+    sprintf(req,"string %d 0x%lx",size,(long)remote);
     i = ask(req,ans);
     if ( i != 0 ) {
 	free(ans);
@@ -469,7 +469,7 @@ void show_op (mqs_pending_operation *op, int msgid, int type)
     else
 	printf("msg%d: Tag desired %d\n",msgid, (int)op->desired_tag);
     printf("msg%d: system_buffer %d\n",msgid,op->system_buffer);
-    printf("msg%d: Buffer %p\n",msgid,(void *)op->buffer);
+    printf("msg%d: Buffer 0x%lx\n",msgid,(long)op->buffer);
     
     i = 0;
     do {
