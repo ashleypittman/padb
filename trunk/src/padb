@@ -3039,14 +3039,15 @@ sub setup_job {
     # way can be found in the future.
     if ( defined $pcmd{host_list} and not defined $pcmd{command} ) {
 
-        if ( not find_exe('pdsh') ) {
-            print
-              "$conf{rmgr} resource manager requires pdsh to be installed\n";
-            return;
-        }
-
         my @hosts = @{ $pcmd{host_list} };
         if ( $hosts[0] ne hostname() or @hosts > 1 ) {
+
+            if ( not find_exe('pdsh') ) {
+                print
+"$conf{rmgr} resource manager on multiple or remote hosts requires pdsh to be installed\n";
+                return;
+            }
+
             $pcmd{require_inner_callback} = 1;
             my $hlist = join q{,}, @hosts;
             $pcmd{command} = "pdsh -w $hlist";
