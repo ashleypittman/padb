@@ -32,6 +32,8 @@ table.rmgrs {
 
 #footer {
  clear: both;
+ font-size: 75%;
+ text-align: center;
 }
 
 pre.code {
@@ -42,3 +44,10 @@ padding: 10px;
 border: 1px solid; 
 }
 
+span.menu_heading {
+font-size: 110%;
+}
+
+span.menu_subheading {
+font-size: 80%;
+}

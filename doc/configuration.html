@@ -2,39 +2,44 @@
 
 <h1>Configuration options</h1>
 <i>padb</i> has a number of extended configuration options for tuning
-it's behavior, these can be set in a number of ways.  There are options for
-controlling <i>padb</i> itself and how it start up and find jobs and also
-mode specific options which control individual (or multiple) modes.
+it's behavior, these can be set in a number of ways.  There are
+options for controlling <i>padb</i> itself and how it start up and
+find jobs and also mode specific options which control individual (or
+multiple) modes.
 <p>
-All configuration options have both a name and a value, in some cases the value is a comma separated list.
+All configuration options have both a name and a value, in some cases
+the value is a comma separated list.
 
 <h3>Setting options</h3>
 
 Configuration options can be set in the following ways:
 <ul>
-<li>Command line</li>
-Use the command-line option <b>--config-option &lt;key&gt;=&lt;value&gt;</b>.
-<b>-O</b> can be substituted for <b>--config-option</b>.
-<li>Environment</li>
-Set the environment variable <b>PADB_&lt;KEY&gt;=&lt;value&gt;</b>.  All 
-environment variables should be specified in upper case.
-<li>Config file</li>
-Config is also loaded from <b>/etc/padb.conf</b> and <b>~/.padbrc</b>.  Contact the
-<a href=email.html>mailing lists</a> for help with these files.
+<li>Command line
+<br>Use the command-line option <b>--config-option
+&lt;key&gt;=&lt;value&gt;</b>.
+<b>-O</b> can be substituted for <b>--config-option</b>.</li>
+<li>Environment
+<br>Set the environment
+variable <b>PADB_&lt;KEY&gt;=&lt;value&gt;</b>.  All environment
+variables should be specified in upper case.</li>
+<li>Config file
+<br>Config is also loaded from <b>/etc/padb.conf</b>
+and <b>~/.padbrc</b>.  Contact the
+<a href=email.html>mailing lists</a> for help with these files.</li>
 </ul>
 
-<h3>Viewing active options</h3>
-Running <i>padb</i> with the <b>-v</b> option will show both what options are being loaded
-and also the used values for all mode specific options.
+<h3>Viewing active options</h3> Running <i>padb</i> with the <b>-v</b>
+option will show both what options are being loaded and also the used
+values for all mode specific options.
 
-<h3>Available options</h3>
-A list of configuration options along with their current values can be
-obtained by specifying a key of help with or without a value, i.e. <b>padb -Ohelp</b>
+<h3>Available options</h3> A list of configuration options along with
+their current values can be obtained by specifying a key of help with
+or without a value, i.e. <b>padb -Ohelp</b>
 
-<h2>Example</h2>
-In normal use the resource manager is selected automatically based on what is installed, if
-for some reason <i>padb</i> cannot determine the resource manager you are using you can
-explicitly request one by setting the "rmgr" option.
+<h2>Example</h2> In normal use the resource manager is selected
+automatically based on what is installed, if for some
+reason <i>padb</i> cannot determine the resource manager you are using
+you can explicitly request one by setting the "rmgr" option.
 <pre class=code>
 ashley@alpha:~$ padb --show-jobs
 Error, multiple resource managers detected, use -Ormgr=&lt;resource manager&gt;
@@ -49,9 +54,5 @@ ashley@alpha:~$
 </div>
 <div id="footer">
  <hr>
- <center>
- <font size=-2>
-  <p>Page maintained by Ashley Pittman. $Date: 2009-09-09 13:25:10 +0100 (Wed, 09 Sep 2009) $ $Revision: 223 $</p>
- </font>
- <center>
+ <p>Page maintained by Ashley Pittman. $Date: 2009-09-09 13:25:10 +0100 (Wed, 09 Sep 2009) $ $Revision: 223 $</p>
 </div>
