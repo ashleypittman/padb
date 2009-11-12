@@ -7551,6 +7551,14 @@ sub ping_rank {
 sub show_queue {
     my ( $carg, $vp, $pid ) = @_;
 
+    # If edb isn't installed (this isn't a Quadrics system) don't even try
+    # and run edb as it'll fail, switch straight to minfo for the MPI
+    # message queues instead.
+    if ( !find_exe( $inner_conf{edb} ) ) {
+        show_mpi_queue( $carg, $vp, $pid );
+        return;
+    }
+
     # Nobble the LD_LIBRARY_PATH to give etrace the best chance of working.
     my %remote_env = get_remote_env($pid);
 
