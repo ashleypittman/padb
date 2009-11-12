@@ -371,6 +371,35 @@ my @inner_conf_cmd = qw(port_range outer);
 # require_inner_callback var n/a no       Resource manager doesn't preserve line
 #                                         ordering of stdout.
 
+# Current a single resource manager is assumed which is used for (a)
+# discovering jobs (b) launching the shadow job and (c) finding the target
+# processes from the inner padb processes.  Two caveats to this exist, the
+# "inner_rmgr" setting which allows a resource manager which has specifed
+# (a) and (b) to pass the buck onto a different resource manager for (c).
+# This is typically used for schedulers or software layers which sit on top
+# of the resource manager.  Care need to be taken in this case to convert
+# the jobid when switching from outer to inner (only lsf-rms does this
+# currently and I'm not 100% sure that still works).  Also the setup_job()
+# callback allows resource managers which provide (a) to not provide (b)
+# but to rely on padb to launch a shadow job on the host-list it provides.
+# Padb uses pdsh for this.
+#
+# What would be possible however is to split (b) off completely, many
+# resource managers launch the shadow job simply by taking a hostlist so it
+# would be possible to mix-and-match (a) and (b) from different resource
+# managers, perhaps use mpd to query the job, return a host list and then
+# use orte to launch the actual job.
+#
+# For resource managers which don't provide (b) (currently mpirun only but
+# expected to grow) padb uses pdsh which is limited in the size of job that
+# it can run, one solution to this might be to require say a open-mpi
+# install and use orterun to launch the shadow job.  This could have
+# benefits elsewhere as well, both the speed of (b) and it's ability to
+# interact with padb (for port number forwarding) are crucial for
+# scalability, having a single stack for padb to sit on would allow
+# concentration of tuning effort in a single place which is something everyone
+# could benefit from.
+
 my %rmgr;
 
 $rmgr{mpirun} = {
