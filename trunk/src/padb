@@ -421,28 +421,25 @@ $rmgr{slurm} = {
 };
 
 $rmgr{local} = {
-    get_active_jobs        => \&local_get_jobs,
-    job_is_running         => \&local_job_is_running,
-    setup_pcmd             => \&local_setup_pcmd,
-    find_pids              => \&local_find_pids,
-    require_inner_callback => 1,
+    get_active_jobs => \&local_get_jobs,
+    job_is_running  => \&local_job_is_running,
+    setup_pcmd      => \&local_setup_pcmd,
+    find_pids       => \&local_find_pids,
 };
 
 $rmgr{'local-qsnet'} = {
-    is_installed           => \&local_q_is_installed,
-    get_active_jobs        => \&local_q_get_jobs,
-    job_is_running         => \&local_job_is_running,
-    setup_pcmd             => \&local_setup_pcmd,
-    inner_rmgr             => 'local',
-    require_inner_callback => 1,
+    is_installed    => \&local_q_is_installed,
+    get_active_jobs => \&local_q_get_jobs,
+    job_is_running  => \&local_job_is_running,
+    setup_pcmd      => \&local_setup_pcmd,
+    inner_rmgr      => 'local',
 };
 
 $rmgr{'local-fd'} = {
-    get_active_jobs        => \&local_fd_get_jobs,
-    job_is_running         => \&local_job_is_running,
-    setup_pcmd             => \&local_setup_pcmd,
-    inner_rmgr             => 'local',
-    require_inner_callback => 1,
+    get_active_jobs => \&local_fd_get_jobs,
+    job_is_running  => \&local_job_is_running,
+    setup_pcmd      => \&local_setup_pcmd,
+    inner_rmgr      => 'local',
 };
 
 ###############################################################################
