@@ -29,6 +29,7 @@
 # Revision history
 
 # Version 3.?
+#  * Support of PBS Pro
 #  * Add variables to tree based stack traces.
 #  * Solaris port.  Limited functionality compared to running on Linux
 #    however stack trace mode works fully.
@@ -336,7 +337,7 @@ if ( -d '/proc/1/path' ) {
 
 # Config options the inner knows about, only forward options if they are in
 # this list.
-my @inner_conf = qw(edb edbopt minfo rmgr scripts slurm_job_step);
+my @inner_conf = qw(edb edbopt minfo rmgr scripts slurm_job_step pbs_server);
 
 # More config options the inner knows about, these are forwarded on the
 # command line rather than over the sockets.
@@ -471,6 +472,13 @@ $rmgr{'local-fd'} = {
     inner_rmgr      => 'local',
 };
 
+$rmgr{pbs} = {
+    is_installed    => \&pbs_is_installed,
+    get_active_jobs => \&pbs_get_jobs,
+    setup_job       => \&pbs_setup_job,
+    find_pids       => \&pbs_find_pids,
+};
+
 ###############################################################################
 #
 # Config options
@@ -517,6 +525,8 @@ $conf{prun_exittimeout} = '2m';
 $conf{rmgr}             = undef;
 
 $conf{slurm_job_step} = 0;
+
+$conf{pbs_server} = undef;
 
 # These settings are passed onto inner only.
 $conf{edbopt} = undef;
@@ -2621,6 +2631,115 @@ sub mpd_cleanup_pcmd {
 
 ###############################################################################
 #
+# pbs support.
+#
+###############################################################################
+
+my %pbs_tabjobs;
+
+sub pbs_is_installed {
+    return find_exe("qstat");
+}
+
+# Load a list of jobs from a given server, saving the server and the host list
+# for each one.
+sub pbs_get_lqsub {
+    my ( $user, $server ) = @_;
+    my $job;
+    my $nprocess;
+    my $cmd = "qstat -w -n -u $user \@$server";
+
+    my @output = slurp_cmd($cmd);
+    foreach (@output) {
+        if (/\d+\.$server/i) {
+            $_ =~ s/^ +//;    # suppress leading space(for sure)
+            my @champs = split(/\s+/);    # split by space
+            if ( $champs[9] eq 'R' ) {    # take only Running
+                ($job) = split qr{\.}, $champs[0];
+                $nprocess = $champs[6];
+                push( @{ $pbs_tabjobs{$job}{nproc} }, $nprocess );
+            } else {
+                $job = undef;
+            }
+        } elsif ( defined $job ) {
+            $_ =~ s/^ +//;                # suppress blank in front of line
+            $_ =~ s/^\+//;                # suppress first + sign
+            my @champs = split(/\+/);     # split by '+'
+            if ( defined $pbs_tabjobs{$job}{server} ) {
+                printf("Warning, job $job exists on multiple servers\n");
+                next;
+            }
+            $pbs_tabjobs{$job}{server} = $server;
+            foreach my $word (@champs) {
+                chomp($word);
+                $word =~ s/\/.*//;        # take all from /
+                push( @{ $pbs_tabjobs{$job}{hosts} }, $word );
+            }
+        }
+    }
+}
+
+sub pbs_get_data {
+    my $user = shift;
+    return \%pbs_tabjobs if ( keys %pbs_tabjobs != 0 );
+
+    my @servers;
+
+    # Chose a list of servers to use, if one is specified by the user
+    # it will appear in $conf{pbs_server} here.  If one is not set
+    # load a list of available ones and use that.  It may be possible
+    # to have multiple jobs on different servers with the same jobid,
+    # if that is the case detect it in pbs_get_lqsub() and warn the
+    # user.  This will then force the user to expliciatly chose one
+    # of the servers.
+    if ( defined $conf{pbs_server} ) {
+        push @servers, $conf{pbs_server};
+    } else {
+        my @handle = slurp_cmd('qstat -fB');
+        foreach my $line (@handle) {
+            next if ( $line =~ /^\s+/ );    # skip if line begin with space
+            if ( $line =~ /Server:/ ) {
+                $line =~ s/^ +//;           # take off space at start
+                my @champs = split( /\s+/, $line );    # split buff by space
+                push( @servers, $champs[1] );
+            }
+        }
+    }
+
+    foreach my $server (@servers) {
+        pbs_get_lqsub( $user, $server );               # get job list by qsub
+    }
+    return \%pbs_tabjobs;
+}
+
+sub pbs_get_jobs {
+    my $user = shift;
+
+    my $d = pbs_get_data($user);
+
+    my @jobs = keys %{$d};
+    return @jobs;
+}
+
+sub pbs_setup_job {
+    my $job = shift;
+    my $d   = pbs_get_data($target_user);
+
+    my @hosts  = @{ $d->{$job}{hosts} };
+    my @nprocs = @{ $d->{$job}{nproc} };
+    my $nprocs = $nprocs[0];
+
+    config_set_internal( 'pbs_server', $d->{$job}{server} );
+
+    my %pcmd;
+
+    $pcmd{nprocesses} = $nprocs;
+    $pcmd{nhosts}     = @hosts;
+    @{ $pcmd{host_list} } = @hosts;
+
+    return %pcmd;
+}
+
 # open support.
 #
 ###############################################################################
@@ -6926,6 +7045,57 @@ sub run_command {
     return;
 }
 
+sub get_remote_env_bygdb {
+    my $pid = shift;
+
+    my %env;
+    my ( $fh, $filetmp ) = tempfile("/tmp/padb.XXXXXX");
+    print $fh 'set pagination off';
+    print $fh "\n";
+    print $fh 'set $envp = *(char ***) &__environ';
+    print $fh "\n";
+    print $fh 'while (*$envp != 0)';
+    print $fh "\n";
+    print $fh 'printf "%s\n",*$envp';
+    print $fh "\n";
+    print $fh 'set $envp = $envp + 1';
+    print $fh "\n";
+    print $fh 'end';
+    print $fh "\n";
+    close $fh;
+    my $psg = {
+        rdr => "",
+        wtr => "",
+        err => "",
+    };
+    my $ret_pid;
+    my $cmd = "gdb -nx -batch -x $filetmp -pid=";
+    $cmd .= $pid;
+    $ret_pid = open3( $psg->{wtr}, $psg->{rdr}, $psg->{err}, $cmd );
+    my $handle = $psg->{rdr};
+
+    while (<$handle>) {
+        next if (/^\[/);
+        next if (/^Using\s+/i);
+        next if (/^0x/i);
+        if (/=/) {
+            chomp;
+            my @f   = split "=";
+            my $key = $f[0];
+            if ( $f[1] !~ /^\(\)/ ) {    # not register function
+                shift @f;
+                $env{$key} = join( "=", @f );
+            }
+        }
+    }
+    close $psg->{wtr};
+    close $psg->{rdr};
+    close $psg->{err};
+    waitpid( $ret_pid, 0 );
+    unlink($filetmp);
+    return %env;
+}
+
 sub get_remote_env {
     my $pid = shift;
 
@@ -7913,9 +8083,10 @@ sub hash_from_status {
 }
 
 sub is_resmgr_process {
-    my $pid  = shift;
+    my $pid = shift;
     my $name = find_from_status( $pid, 'Name' );
-    my $mgrs = { rmsloader => 1, slurmd => 1, slurmstepd => 1 };
+    my $mgrs =
+      { rmsloader => 1, slurmd => 1, slurmstepd => 1, pbs_attach => 1 };
     return 1 if ( defined $mgrs->{$name} );
     return;
 }
@@ -7957,6 +8128,46 @@ sub mpd_find_pids {
         maybe_show_pid( $j->{$pid}, $pid );
     }
     return;
+}
+
+#
+# PBS support
+#
+sub pbs_find_pids {
+    my $job = shift;
+
+    if ( defined $inner_conf{pbs_server} ) {
+        $job .= ".$inner_conf{pbs_server}";
+    }
+
+    my %vps;
+
+    # Iterate over all processes for this user
+    foreach my $pid ( get_process_list($target_user) ) {
+
+        # Skip over resource manager processes.
+        next if ( is_resmgr_process($pid) );
+
+        # Skip over ones which aren't direct descendants of a resource manager
+        next unless is_parent_resmgr($pid);
+
+        my $vp;
+        my %env = get_remote_env($pid);
+        if ( !defined( $env{PBS_JOBID} ) || !defined( $env{PMI_RANK} ) ) {
+            %env = get_remote_env_bygdb($pid);
+        }
+
+        if ( $env{PBS_JOBID} eq $job ) {
+            $vp = $env{PMI_RANK};
+        }
+        if ( defined $vp ) {
+            $vps{$vp} = $pid;
+        }
+    }
+    foreach my $vp ( keys %vps ) {
+        my $pid = $vps{$vp};
+        maybe_show_pid( $vp, $pid );
+    }
 }
 
 sub rms_find_pids {
