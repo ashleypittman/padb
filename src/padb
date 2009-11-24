@@ -4658,6 +4658,32 @@ sub find_padb_secret {
     exit 1;
 }
 
+# Find the path to use for padb, previously we just used $0 here however
+# when using pdsh to find jobs $PWD isn't preserved between the inner and
+# the outer so we have to search out the real location of padb.  It would
+# be possible to do this on request, that is only for pdsh rather than
+# globally however there should be no down-side to always executing this.
+# Based on a patch from Thipadin Seng-Long @ Bull.
+
+sub padb_path {
+    my $pwd   = $ENV{PWD};
+    my $dirnm = dirname($0);
+
+    # if padb is launch as padb then dirname is .
+    # if padb is launched with a full path then dir is full
+    # if padb is launched as ../padb then dir is ..
+    # if padb is launched as Dir/padb then dir is Dir
+    my $out;
+    if ( $dirnm eq "." ) {    # started in current dir
+        my $base = basename($0);
+        return "$pwd\/$base";
+    } elsif ( $dirnm =~ m{\A/}x ) {    # started as full path or path known
+        return $0;
+    }
+
+    return "$pwd\/$0";
+}
+
 sub go_job {
     my $jobid = shift;
 
@@ -4692,7 +4718,7 @@ sub go_job {
     debug_log( 'verbose', undef, 'There are %d processes over %d hosts',
         $ncpus, $nhosts );
 
-    $cmd .= " $0 --inner";
+    $cmd .= " " . padb_path() . " --inner";
 
     if ( $conf{inner_callback} ) {
         $secret = find_padb_secret();
