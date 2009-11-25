@@ -2644,7 +2644,7 @@ sub unlink_file {
 my %pbs_tabjobs;
 
 sub pbs_is_installed {
-    return find_exe("qstat");
+    return find_exe('qstat');
 }
 
 # Load a list of jobs from a given server, saving the server and the host list
@@ -2683,6 +2683,7 @@ sub pbs_get_lqsub {
             }
         }
     }
+    return;
 }
 
 sub pbs_get_data {
