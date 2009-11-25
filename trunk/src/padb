@@ -430,8 +430,7 @@ $rmgr{mpd} = {
 $rmgr{orte} = {
     is_installed    => \&open_is_installed,
     get_active_jobs => \&open_get_jobs,
-    setup_pcmd      => \&open_setup_pcmd,
-    cleanup_pcmd    => \&open_cleanup_pcmd,
+    setup_job       => \&open_setup_job,
 };
 
 $rmgr{'lsf-rms'} = {
@@ -2805,9 +2804,7 @@ sub open_get_jobs {
     return keys %open_jobs;
 }
 
-my $open_dfile;
-
-sub open_setup_pcmd {
+sub open_setup_job {
     my $job = shift;
 
     open_get_data();
@@ -2822,17 +2819,25 @@ sub open_setup_pcmd {
     }
     close $fh;
 
-    $open_dfile = $fn;
-
     my $prefix = find_ompi_prefix();
     my $cmd    = "orterun -machinefile $fn -np $i $prefix";
-    my $hosts  = @hosts;
 
-    return ( $cmd, $open_jobs{$job}{nprocs}, $hosts, $open_jobs{$job}{ranks} );
+    my %pcmd;
+    $pcmd{nprocesses}   = $open_jobs{$job}{nprocs};
+    $pcmd{nhosts}       = @hosts;
+    $pcmd{process_data} = $open_jobs{$job}{ranks};
+    $pcmd{command}      = $cmd;
+    @{ $pcmd{host_list} } = @hosts;
+    $pcmd{cleanup_cb}     = \&open_cleanup_job;
+    $pcmd{cleanup_handle} = $fn;
+
+    return %pcmd;
+
 }
 
-sub open_cleanup_pcmd {
-    unlink $open_dfile if ( defined $open_dfile );
+sub open_cleanup_job {
+    my $file = shift;
+    unlink $file;
     return;
 }
 
@@ -4858,7 +4863,12 @@ sub go_job {
 
     debug_log( 'verbose', undef, 'Completed command' );
 
+    if ( defined $pcmd{cleanup_cb} ) {
+        $pcmd{cleanup_cb}( $pcmd{cleanup_handle} );
+    }
+
     cleanup_pcmd();
+
     return $errors;
 }
 
