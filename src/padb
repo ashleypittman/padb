@@ -7345,7 +7345,10 @@ sub show_proc_all {
     if ( $carg->{proc_shows_proc} ) {
         foreach my $proc ( @{$list} ) {
             my $pid = $proc->{pid};
-            open $proc->{handle}, '<', "/proc/$pid/stat";
+            my $handle;
+            if ( open $handle, '<', "/proc/$pid/stat" ) {
+                $proc->{handle} = $handle;
+            }
         }
 
         open $SFD, '<', '/proc/stat';
@@ -7354,8 +7357,8 @@ sub show_proc_all {
         my $stat = <$SFD>;
 
         foreach my $proc ( @{$list} ) {
-            my $pid = $proc->{pid};
-            my $h   = $proc->{handle};
+            next unless ( defined $proc->{handle} );
+            my $h = $proc->{handle};
             $proc->{stat_start} = <$h>;
             seek $proc->{handle}, 0, 0;
         }
@@ -7386,10 +7389,15 @@ sub show_proc_all {
         my $stat = <$SFD>;
 
         foreach my $proc ( @{$list} ) {
-            my $pid = $proc->{pid};
-            my $h   = $proc->{handle};
+            next unless ( defined $proc->{handle} );
+            my $h = $proc->{handle};
             $proc->{stat_end} = <$h>;
             close $proc->{handle};
+	    # Set handle to undef to prepare for future iterations of the
+	    # loop if being run in watch mode.  Without this handle remains
+	    # set but refers to the closed fd which causes errors next time
+	    # round the loop if the open fails.
+	    $proc->{handle} = undef;
         }
 
         seek $SFD, 0, 0;
@@ -7414,6 +7422,12 @@ sub show_proc_all {
         foreach my $proc ( @{$list} ) {
             my $vp = $proc->{vp};
 
+            proc_output( $vp, 'load1',  $l1 );
+            proc_output( $vp, 'load5',  $l15 );
+            proc_output( $vp, 'load15', $l15 );
+
+            next unless defined $proc->{stat_end};
+
             proc_output(
                 $vp, 'pcpu',
                 pcpu_total(
@@ -7435,9 +7449,6 @@ sub show_proc_all {
                     $proc->{stat_start}, $proc->{stat_end}
                 )
             );
-            proc_output( $vp, 'load1',  $l1 );
-            proc_output( $vp, 'load5',  $l15 );
-            proc_output( $vp, 'load15', $l15 );
         }
     }
 
