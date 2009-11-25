@@ -3621,7 +3621,7 @@ sub _add_data_to_point_on_tree {
             }
         }
     }
-
+    return;
 }
 
 sub _add_data_to_tree {
@@ -5508,7 +5508,7 @@ sub _gdb_set_print_address {
     } else {
         _gdb_send_real( $gdb, '-gdb-set print address off' );
     }
-
+    return;
 }
 
 sub gdb_n_send {
@@ -8171,6 +8171,7 @@ sub pbs_find_pids {
         my $pid = $vps{$vp};
         maybe_show_pid( $vp, $pid );
     }
+    return;
 }
 
 sub rms_find_pids {
