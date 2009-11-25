@@ -449,22 +449,21 @@ $rmgr{slurm} = {
 $rmgr{local} = {
     get_active_jobs => \&local_get_jobs,
     job_is_running  => \&local_job_is_running,
-    setup_pcmd      => \&local_setup_pcmd,
-    find_pids       => \&local_find_pids,
+    setup_job       => \&local_setup_job,
 };
 
 $rmgr{'local-qsnet'} = {
     is_installed    => \&local_q_is_installed,
     get_active_jobs => \&local_q_get_jobs,
     job_is_running  => \&local_job_is_running,
-    setup_pcmd      => \&local_setup_pcmd,
+    setup_job       => \&local_setup_job,
     inner_rmgr      => 'local',
 };
 
 $rmgr{'local-fd'} = {
     get_active_jobs => \&local_fd_get_jobs,
     job_is_running  => \&local_job_is_running,
-    setup_pcmd      => \&local_setup_pcmd,
+    setup_job       => \&local_setup_job,
     inner_rmgr      => 'local',
 };
 
@@ -2533,8 +2532,16 @@ sub local_job_is_running {
     return ( -d "/proc/$job" );
 }
 
-sub local_setup_pcmd {
-    return ( $EMPTY_STRING, 1, 1 );
+sub local_setup_job {
+    my $job = shift;
+
+    my $hostname = hostname();
+    my %pcmd;
+    $pcmd{nprocesses}                 = 1;
+    $pcmd{nhosts}                     = 1;
+    $pcmd{process_data}{$hostname}{0} = $job;
+    @{ $pcmd{host_list} } = $hostname;
+    return %pcmd;
 }
 
 ###############################################################################
@@ -8093,15 +8100,6 @@ sub slurm_find_pids {
         next unless ( $step == $inner_conf{slurm_job_step} );
         maybe_show_pid( $global, $pid );
     }
-    return;
-}
-
-# Local processes per node, i.e. no resource manager support, we only have
-# one process in this case so call it process 0.
-sub local_find_pids {
-    my $pid = shift;
-
-    maybe_show_pid( 0, $pid );
     return;
 }
 
