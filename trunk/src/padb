@@ -359,7 +359,6 @@ my @inner_conf_cmd = qw(port_range outer);
 # get_active_jobs user List      yes      Return list of all active job for user.
 # is_job_running  job  Bool      no       Check if a given job is running.
 # job_to_key      job  key       no       Convert from jobId to shm key.
-# cleanup_pcmd    -    -         no       Cleans up and temporary files.
 # find_pids       job  -         maybe    Called on the inner to locate pids.
 
 # In addition one of these two is preferred setup_job has more
@@ -421,9 +420,7 @@ $rmgr{rms} = {
 $rmgr{mpd} = {
     is_installed           => \&mpd_is_installed,
     get_active_jobs        => \&mpd_get_jobs,
-    setup_pcmd             => \&mpd_setup_pcmd,
-    cleanup_pcmd           => \&mpd_cleanup_pcmd,
-    find_pids              => \&mpd_find_pids,
+    setup_job              => \&mpd_setup_job,
     require_inner_callback => 1,
 };
 
@@ -2574,10 +2571,9 @@ sub mpd_get_data {
         }
         if ( $key eq 'pid' ) {
             $pid = $value;
-            $jobs{$job}{pids}{$host}{$value}++;
         }
         if ( $key eq 'rank' ) {
-            $jobs{$job}{pids}{$host}{$pid} = $value;
+            $jobs{$job}{pids}{$host}{$value} = $pid;
             if (   ( not defined $jobs{$job}{lastproc} )
                 or ( $value > $jobs{$job}{lastproc} ) )
             {
@@ -2598,9 +2594,7 @@ sub mpd_get_jobs {
     return @jobs;
 }
 
-my $mpd_dfile;
-
-sub mpd_setup_pcmd {
+sub mpd_setup_job {
     my $job = shift;
 
     my $d = mpd_get_data();
@@ -2614,17 +2608,23 @@ sub mpd_setup_pcmd {
     }
     close $fh;
 
-    $mpd_dfile = $fn;
-
     my $cmd = "mpdrun -machinefile $fn -np $i";
 
-    my $hosts = @hosts;
+    my %pcmd;
+    $pcmd{nprocesses}   = $d->{$job}{lastproc} + 1;
+    $pcmd{nhosts}       = @hosts;
+    $pcmd{process_data} = $d->{$job}{pids};
+    $pcmd{command}      = $cmd;
+    @{ $pcmd{host_list} } = @hosts;
+    $pcmd{cleanup_cb}     = \&unlink_file;
+    $pcmd{cleanup_handle} = $fn;
 
-    return ( $cmd, $d->{$job}{lastproc} + 1, $hosts );
+    return %pcmd;
 }
 
-sub mpd_cleanup_pcmd {
-    unlink $mpd_dfile if ( defined $mpd_dfile );
+sub unlink_file {
+    my $file = shift;
+    unlink $file;
     return;
 }
 
@@ -2828,17 +2828,11 @@ sub open_setup_job {
     $pcmd{process_data} = $open_jobs{$job}{ranks};
     $pcmd{command}      = $cmd;
     @{ $pcmd{host_list} } = @hosts;
-    $pcmd{cleanup_cb}     = \&open_cleanup_job;
+    $pcmd{cleanup_cb}     = \&unlink_file;
     $pcmd{cleanup_handle} = $fn;
 
     return %pcmd;
 
-}
-
-sub open_cleanup_job {
-    my $file = shift;
-    unlink $file;
-    return;
 }
 
 ###############################################################################
@@ -2992,15 +2986,6 @@ sub mpirun_setup_job {
     @{ $pcmd{host_list} } = @hosts;
 
     return %pcmd;
-
-    my $cmd = $EMPTY_STRING;
-    if ( $hosts[0] ne hostname() or @hosts > 1 ) {
-        my $hlist = join q{,}, @hosts;
-        $cmd = "pdsh -w $hlist";
-    }
-
-    my $hc = @hosts;
-    return ( $cmd, $nprocs, $hc, \%pt );
 }
 
 ###############################################################################
@@ -3177,11 +3162,13 @@ sub setup_job {
         my ( $cmd, $nprocesses, $nhosts, $pd ) =
           $rmgr{ $conf{rmgr} }{setup_pcmd}($job);
         my %pcmd = (
-            command      => $cmd,
-            nprocesses   => $nprocesses,
-            nhosts       => $nhosts,
-            process_data => $pd
+            command    => $cmd,
+            nprocesses => $nprocesses,
+            nhosts     => $nhosts,
         );
+        if ( defined $pd ) {
+            $pcmd{process_data} = $pd;
+        }
         return %pcmd;
     }
 
@@ -3212,14 +3199,6 @@ sub setup_job {
         }
     }
     return %pcmd;
-}
-
-sub cleanup_pcmd {
-    my $job = shift;
-    if ( defined $rmgr{ $conf{rmgr} }{cleanup_pcmd} ) {
-        $rmgr{ $conf{rmgr} }{cleanup_pcmd}();
-    }
-    return;
 }
 
 ###############################################################################
@@ -4866,8 +4845,6 @@ sub go_job {
     if ( defined $pcmd{cleanup_cb} ) {
         $pcmd{cleanup_cb}( $pcmd{cleanup_handle} );
     }
-
-    cleanup_pcmd();
 
     return $errors;
 }
@@ -8125,18 +8102,6 @@ sub local_find_pids {
     my $pid = shift;
 
     maybe_show_pid( 0, $pid );
-    return;
-}
-
-sub mpd_find_pids {
-    my $job = shift;
-    my $d   = mpd_get_data();
-
-    my $j = $d->{$job}{pids}{ $inner_conf{hostname} };
-
-    foreach my $pid ( keys %{$j} ) {
-        maybe_show_pid( $j->{$pid}, $pid );
-    }
     return;
 }
 
