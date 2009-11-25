@@ -2960,7 +2960,7 @@ sub mpirun_setup_job {
 
     my $nprocs = gdb_read_value( $gdb, 'MPIR_proctable_size' );
     if ( not defined $nprocs ) {
-        print "No MPIR_proctable_size symbol found, cannot continue";
+        print "No MPIR_proctable_size symbol found, cannot continue\n";
         return;
     }
 
@@ -2983,7 +2983,7 @@ sub mpirun_setup_job {
     my @hosts = keys(%pt);
 
     if ( @hosts == 0 ) {
-        print "No process data found";
+        print "No process data found\n";
         return;
     }
 
