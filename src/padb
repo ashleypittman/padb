@@ -7381,7 +7381,24 @@ sub show_proc_all {
     }
 
     if ( $carg->{proc_shows_proc} ) {
-        sleep 1;
+
+        # We only need to sleep if we are sampling the jiffy count for
+        # this process, otherwise there is no need and it shows padb down
+        # considerably.
+        my $should_sleep = 1;
+        if ( defined $carg->{proc_format} ) {
+            $should_sleep = 0;
+            if (   defined $proc_keys{pcpu}
+                or defined $proc_keys{pucpu}
+                or defined $proc_keys{pscpu} )
+            {
+                $should_sleep = 1;
+            }
+        }
+
+        if ($should_sleep) {
+            sleep 1;
+        }
 
         seek $SFD, 0, 0;
 
@@ -7393,11 +7410,12 @@ sub show_proc_all {
             my $h = $proc->{handle};
             $proc->{stat_end} = <$h>;
             close $proc->{handle};
-	    # Set handle to undef to prepare for future iterations of the
-	    # loop if being run in watch mode.  Without this handle remains
-	    # set but refers to the closed fd which causes errors next time
-	    # round the loop if the open fails.
-	    $proc->{handle} = undef;
+
+            # Set handle to undef to prepare for future iterations of the
+            # loop if being run in watch mode.  Without this handle remains
+            # set but refers to the closed fd which causes errors next time
+            # round the loop if the open fails.
+            $proc->{handle} = undef;
         }
 
         seek $SFD, 0, 0;
