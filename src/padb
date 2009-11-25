@@ -3386,7 +3386,7 @@ sub show_proc_format {
     my $lines = tree_from_namespace( $nlines->{target_data} );
     foreach my $tag ( keys %{$lines} ) {
         my %hash;
-        $hash{vp} = $tag;
+        $hash{rank} = $tag;
         foreach my $key ( keys %{ $lines->{$tag} } ) {
 
             my $value = $lines->{$tag}{$key};
@@ -8911,7 +8911,6 @@ sub common_main {
         handler     => \&show_queue,
         help        => 'Show the message queues',
         options_i   => { mpi_dll => undef, }
-
     };
 
     $allfns{kill} = {
@@ -8947,7 +8946,6 @@ sub common_main {
             show_group_members => 'no',
             show_all_groups    => 'no',
         },
-
     };
 
     $allfns{pinfo} = {
@@ -8959,8 +8957,7 @@ sub common_main {
             proc_shows_fds  => 'no',
             proc_shows_maps => 'no',
             proc_shows_stat => 'no',
-          }
-
+        }
     };
 
     $allfns{proc_summary} = {
@@ -8970,7 +8967,7 @@ sub common_main {
         help        => 'Show process information in top format',
         options_i   => {
             column_seperator => '  ',
-            proc_sort_key    => 'vp',
+            proc_sort_key    => 'rank',
             nprocs_output    => undef,
         },
         options_bool => {
@@ -8980,17 +8977,15 @@ sub common_main {
             proc_shows_maps    => 'no',
             proc_show_header   => 'yes',
             reverse_sort_order => 'no',
-
         },
         secondary => [
             {
                 arg_long => 'proc_format',
                 type     => '=s',
                 default =>
-'vp=vpid,hostname,pid,vmsize,vmrss,stat.state=S,load1=uptime,pcpu=%cpu,stat.processor=lcore,name=command'
+'rank,hostname,pid,vmsize,vmrss,stat.state=S,load1=uptime,pcpu=%cpu,stat.processor=lcore,name=command'
             },
-          ]
-
+        ]
     };
 
     $allfns{stack} = {
