@@ -2662,8 +2662,7 @@ sub pbs_get_lqsub {
             my @champs = split(/\s+/);    # split by space
             if ( $champs[9] eq 'R' ) {    # take only Running
                 ($job) = split qr{\.}, $champs[0];
-                $nprocess = $champs[6];
-                push( @{ $pbs_tabjobs{$job}{nproc} }, $nprocess );
+                $pbs_tabjobs{$job}{nproc} = $champs[6];
             } else {
                 $job = undef;
             }
@@ -2732,15 +2731,13 @@ sub pbs_setup_job {
     my $job = shift;
     my $d   = pbs_get_data($target_user);
 
-    my @hosts  = @{ $d->{$job}{hosts} };
-    my @nprocs = @{ $d->{$job}{nproc} };
-    my $nprocs = $nprocs[0];
+    my @hosts = @{ $d->{$job}{hosts} };
 
     config_set_internal( 'pbs_server', $d->{$job}{server} );
 
     my %pcmd;
 
-    $pcmd{nprocesses} = $nprocs;
+    $pcmd{nprocesses} = $d->{$job}{nproc};
     $pcmd{nhosts}     = @hosts;
     @{ $pcmd{host_list} } = @hosts;
 
