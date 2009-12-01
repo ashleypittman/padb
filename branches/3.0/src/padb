@@ -4154,7 +4154,7 @@ sub create_padb_secret {
         printf("Failed to create secret file: $!\n");
         return;
     }
-    if ( chmod( 0600, $FD ) != 1 ) {
+    if ( chmod( 0600, $filename ) != 1 ) {
         printf("Failed to chmod secret file: $!\n");
         return;
     }
