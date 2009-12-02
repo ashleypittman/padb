@@ -4176,6 +4176,22 @@ sub command_from_inner {
     # The inner process has signed on.
     if ( $comm_data->{current_req}->{mode} eq 'signon' ) {
 
+        # Allow the find_pids function to report back a different job
+        # size to the one the resource manager spotted, potentially
+        # because there is a job running under an allocation and there
+        # may be a discrepancy between the two.
+        if ( defined $d->{target_data}{JOB_SIZE} ) {
+            my @size = keys %{ $d->{target_data}{JOB_SIZE} };
+            if ( @size == 1 ) {
+                $comm_data->{nprocesses} = $size[0];
+            } else {
+                print
+                  "More than one value reported for Job Size, using largest\n";
+                my @s = sort { $a <=> $b } @size;
+                $comm_data->{nprocesses} = $s[-1];
+            }
+        }
+
         # Check the signon messages, reporting minor errors to the user, if
         # no processes are found then don't bother processing any commands
         # but just tell the inner to exit.
