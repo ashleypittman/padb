@@ -441,7 +441,7 @@ $rmgr{slurm} = {
     is_installed           => \&slurm_is_installed,
     get_active_jobs        => \&slurm_get_jobs,
     job_is_running         => \&slurm_job_is_running,
-    setup_pcmd             => \&slurm_setup_pcmd,
+    setup_job              => \&slurm_setup_job,
     find_pids              => \&slurm_find_pids,
     require_inner_callback => 1,
 };
@@ -519,7 +519,7 @@ $conf{prun_timeout}     = '2m';
 $conf{prun_exittimeout} = '2m';
 $conf{rmgr}             = undef;
 
-$conf{slurm_job_step} = 0;
+$conf{slurm_job_step} = undef;
 
 $conf{pbs_server} = undef;
 
@@ -552,6 +552,7 @@ my $COMMA  = qr{,}x;
 my $EQUALS = qr{=}x;
 my $SPACE  = qr{\s+}x;
 my $COLON  = qr{:}x;
+my $PERIOD = qr{\.}x;
 
 my $EMPTY_STRING = q{};
 
@@ -2472,11 +2473,41 @@ sub slurm_job_is_running {
     return ( $status eq 'running' );
 }
 
-sub slurm_setup_pcmd {
-    my $job  = shift;
+sub slurm_setup_job {
+    my $job = shift;
+
+    # After we have selected a job id and decided to target it make a
+    # best-attempt effort to pick a sensible step_id.  List all the
+    # step ids slurm thinks are running and pick the first one.
+    # Previously this value just defaulted to zero.
+    if ( not defined $conf{slurm_job_step} ) {
+        my @all_steps = slurp_cmd("squeue -s -o %i");
+        my @valid_steps;
+        foreach my $step (@all_steps) {
+            chomp $step;
+            next if $step eq "STEPID";
+            my ( $job_id, $job_step ) = split $PERIOD, $step;
+            next unless $job_id == $job;
+            push @valid_steps, $job_step;
+        }
+        if (@valid_steps) {
+            config_set_internal( 'slurm_job_step', $valid_steps[0] );
+        } else {
+            print
+              "Unable to determine any valid job steps, assuming step id 0\n";
+            config_set_internal( 'slurm_job_step', 0 );
+        }
+    }
+
     my $cpus = slurm_job_to_ncpus($job);
     my $nc   = slurm_job_to_nodecount($job);
-    return ( "srun --jobid=$job", $cpus, $nc );
+
+    my %pcmd;
+    $pcmd{nprocesses} = $cpus;
+    $pcmd{nhosts}     = $nc;
+    $pcmd{command}    = "srun --jobid=$job";
+    return %pcmd;
+
 }
 
 ###############################################################################
@@ -5085,7 +5116,13 @@ sub outer_main {
     }
 
     foreach my $co (@conf_int) {
-        check_int( $conf{$co} );
+
+        # Only check for defined values here, for some options only
+        # intergers are valid but the default value is undef which means
+        # padb should attempt to do the right thing.
+        if ( defined $conf{$co} ) {
+            check_int( $conf{$co} );
+        }
     }
 
     # Now go through all the config options and both verify they are
