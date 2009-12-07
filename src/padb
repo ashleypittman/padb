@@ -6140,6 +6140,7 @@ sub run_minfo {
             }
 
         } elsif ( $cmd eq 'out:' ) {
+            $stats{out}++;
             if (
                 $r =~ m{\A
                         out:
@@ -6173,6 +6174,7 @@ sub run_minfo {
                 target_key_pair( $vp, 'UNPARSEABLE MINFO', $r );
             }
         } elsif ( $cmd eq 'zzz:' ) {
+            $stats{zzz}++;
             if (
                 $r =~ m{\A
                         zzz:
@@ -6201,6 +6203,7 @@ sub run_minfo {
             push @cd, dclone( \%cd );
             undef %cd;
         } else {
+            $stats{raw}++;
             push @{ $cd{raw} }, $r;
         }
     }
