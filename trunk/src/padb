@@ -8180,10 +8180,16 @@ sub mpi_watch_all {
     return;
 }
 
-sub maybe_show_pid {
-    my ( $vp, $pid ) = @_;
+# To be called from the find_pids resource manager callback to say
+# that the specified pid is the specified rank.  This process should
+# be one spawned by the resource manager, if wrapper scripts are being
+# used, say "mpirun -n 2 sh -c myapp" then this function should be
+# called with the pid of 'sh', padb will then walk the process tree to
+# find the more interesting child process and target that one.
+sub register_target_process {
+    my ( $rank, $pid ) = @_;
 
-    $inner_conf{rmpids}{$pid}{rank} = $vp;
+    $inner_conf{rmpids}{$pid}{rank} = $rank;
     return;
 }
 
@@ -8257,7 +8263,7 @@ sub slurm_find_pids {
         next unless ( $job eq $jobid );
         next unless ( $step == $inner_conf{slurm_job_step} );
         next if ( is_resmgr_process($pid) );
-        maybe_show_pid( $global, $pid );
+        register_target_process( $global, $pid );
         $found_target = 1;
     }
     return if $found_target;
@@ -8298,7 +8304,7 @@ sub slurm_find_pids {
             target_key_pair( $vp, "JOB_SIZE", $env{OMPI_COMM_WORLD_SIZE} );
         }
 
-        maybe_show_pid( $env{OMPI_COMM_WORLD_RANK}, $pid );
+        register_target_process( $env{OMPI_COMM_WORLD_RANK}, $pid );
     }
 
     return;
@@ -8340,7 +8346,7 @@ sub pbs_find_pids {
     }
     foreach my $vp ( keys %vps ) {
         my $pid = $vps{$vp};
-        maybe_show_pid( $vp, $pid );
+        register_target_process( $vp, $pid );
     }
     return;
 }
@@ -8390,11 +8396,11 @@ sub rms_find_pids {
     foreach my $vp ( keys %vps ) {
         if ( defined $vps{$vp}{actual} ) {
             foreach my $pid ( @{ $vps{$vp}{actual} } ) {
-                maybe_show_pid( $vp, $pid );
+                register_target_process( $vp, $pid );
             }
         } else {
             foreach my $pid ( @{ $vps{$vp}{likely} } ) {
-                maybe_show_pid( $vp, $pid );
+                register_target_process( $vp, $pid );
             }
         }
     }
@@ -8644,7 +8650,7 @@ sub inner_find_pids {
     if ( defined $cmd->{pd} ) {
         my $hostname = $inner_conf{hostname};
         foreach my $rank ( keys %{ $cmd->{pd}{$hostname} } ) {
-            maybe_show_pid( $rank, $cmd->{pd}{$hostname}{$rank} );
+            register_target_process( $rank, $cmd->{pd}{$hostname}{$rank} );
         }
     } else {
 
