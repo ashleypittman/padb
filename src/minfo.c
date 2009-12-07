@@ -371,6 +371,21 @@ int fetch_string (void *bc,void *local, mqs_taddr_t remote, int size)
     return 0;
 }
 
+/* Fetch a string from a remote memory location, making sure there is
+ * enough memory locally to store our copy.  Return mqs_ok on success */
+void *fetch_dll_name ()
+{
+    char ans[1024];
+    int i;
+    
+    i = ask("dll_filename",ans);
+    if ( i != 0 ) {
+
+	return NULL;
+    }
+    return strdup(ans);
+}
+
 int fetch_image (char *local)
 {
     char ans[QUERY_SIZE];
@@ -561,82 +576,28 @@ int load_msgq_dll(char *filename)
     return 0;
 }
 
-#define PATH_MAX 1024
-
-/* Try and load a valid dll from the locations array, loop over the array
- * trying each one in turn.  Return 0 if and when we managed to load one,
- * -1 otherwise
- */
-int find_and_load_dll_from_loc_array() {
-    void **remote_array;
-    char *dll_name;
-    void *locations = find_sym("sym","mpimsgq_dll_locations");
-    
-    if ( locations == NULL )
-	return -1;
-
-    if ( find_data(NULL,(mqs_taddr_t)locations,sizeof(void *),&remote_array) != mqs_ok ) {
-	return -1;
-    }
-    
-    if ( (dll_name = malloc(PATH_MAX)) == NULL )
-	return -1;
-    
-    do {
-	void *remote_entry = NULL;
-
-    	if ( find_data(NULL,(mqs_taddr_t)remote_array,sizeof(void *),&remote_entry) != mqs_ok )
-	    goto error_out;
-	
-	if ( remote_entry == NULL )
-	    goto error_out;
-	
-	memset(dll_name,0,PATH_MAX);	
-	
-	if ( fetch_string(NULL,dll_name,(mqs_taddr_t)remote_entry,PATH_MAX) != mqs_ok ) {
-	    goto error_out;
-
-	} else {
-	    if ( load_msgq_dll(dll_name) == 0 ) {
-		free(dll_name);
-		return mqs_ok;
-	    }
-	}
-	remote_array++;
-    } while ( 1 );
-        
-error_out:
-    free(dll_name);
-    return -1;
-}
-
 void find_and_load_dll()
 {
-    char *dll_name;
+    char *dll_name = fetch_dll_name();
 
-    dll_name = getenv("MPINFO_DLL");
-    if ( dll_name != NULL ) {
-	if ( load_msgq_dll(dll_name) != 0 ) {
-	    die("Could not load symbols from dll");
+    if ( ! dll_name ) {
+	die("No DLL to load");
+    }
+    
+    do {
+
+	if ( load_msgq_dll(dll_name) == mqs_ok )
+	{
+	    free(dll_name);
+	    return;
 	}
-	return;
-    }
+	
+	free(dll_name);
+	dll_name = fetch_dll_name();
+
+    } while ( dll_name != NULL );
     
-    /* Try the new (proposed) dll specification mechanism */
-    if ( find_and_load_dll_from_loc_array() == mqs_ok )
-	return;
-    
-    void *base = find_sym("sym","MPIR_dll_name");
-    if ( base == NULL ) {
-	die("Could not find MPIR_dll_name symbol");
-    }
-    dll_name = malloc(PATH_MAX);
-    if ( fetch_string(NULL,dll_name,(mqs_taddr_t)base,PATH_MAX) != 0 ) {
-	die("Could not read value of MPIR_dll_name");
-    }
-    if ( load_msgq_dll(dll_name) != 0 ) {
-	die("Could not load symbols from dll");
-    }
+    die("Could not find a loadable dll");
 }
 
 int

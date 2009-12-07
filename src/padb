@@ -1087,7 +1087,7 @@ sub _hex {
         return -1;
     } else {
 
-        if ( length $str < 10 ) {
+        if ( length $str < 9 ) {
             return hex $str;
         }
 
@@ -6129,16 +6129,62 @@ sub minfo_handle_query {
 }
 
 sub run_minfo {
-    my ( $gdb, $vp ) = @_;
+    my ( $carg, $gdb, $vp ) = @_;
 
     my $h = {
         hpid     => -1,
         tracepid => -1,
         attached => 0,
-        debug    => 0,
+        debug    => 1,
     };
 
     $h->{fd}{err} = *M_ERROR;
+
+    my @all_dll_filenames;
+
+    if ( defined $carg->{mpi_dll} ) {
+        push @all_dll_filenames, $carg->{mpi_dll};
+    } else {
+        my $loc = gdb_var_addr( $gdb, 'mpimsgq_dll_locations' );
+
+        if ($loc) {
+            my $psize = gdb_type_size( $gdb, 'void *' );
+            my $base = $loc;
+            my $filename;
+
+            $base = gdb_read_pointer( $gdb, $base );
+
+            do {
+                my $strp = gdb_read_pointer( $gdb, $base );
+                $filename = gdb_string( $gdb, 1024, $strp );
+                if ( defined $filename ) {
+                    push @all_dll_filenames, $filename;
+                }
+                $base = _hex($base) + $psize;
+            } while ( defined $filename );
+        }
+
+        my $base = gdb_var_addr( $gdb, 'MPIR_dll_name' );
+        if ( not defined $base ) {
+            target_error( $vp,
+'Process does not appear to be using MPI (No MPIR_dll_name symbol)'
+            );
+            return;
+        }
+        my $filename = gdb_string( $gdb, 1024, $base );
+        push @all_dll_filenames, $filename;
+    }
+
+    my @dll_filenames;
+
+    my %files;
+    foreach my $filename (@all_dll_filenames) {
+        next unless -f ($filename);
+        next if defined $files{$filename};
+
+        push @dll_filenames, $filename;
+        $files{$filename} = 1;
+    }
 
     my $cmd = $inner_conf{minfo};
     $h->{hpid} = open3( $h->{fd}{wtr}, $h->{fd}{rdr}, *M_ERROR, $cmd )
@@ -6206,7 +6252,21 @@ sub run_minfo {
 
         chomp $r;
         my $cmd = substr $r, 0, 4;
-        if ( $cmd eq 'req:' ) {
+        if ( $r eq 'req: dll_filename' ) {
+            $stats{dll_files}++;
+            my $filename = shift @dll_filenames;
+            my $res      = 'fail';
+            if ( defined $filename ) {
+                $res = "ok $filename";
+            }
+
+            print {$out} "$res\n";
+
+            if ( defined $h->{debugfd} ) {
+                print { $h->{debugfd} } "$res\n";
+            }
+
+        } elsif ( $cmd eq 'req:' ) {
             my $res = minfo_handle_query( $gdb, $vp, $r, \%stats );
 
             # Some things *do* fail here, symbol lookups for example,
@@ -6380,24 +6440,8 @@ sub fetch_mpi_queue {
         return;
     }
 
-    my $base = gdb_var_addr( $g, 'MPIR_dll_name' );
-    if ( not defined $base ) {
-        target_error( $vp,
-            'Process does not appear to be using MPI (No MPIR_dll_name symbol)'
-        );
-    }
+    my @mq = fetch_mpi_queue_gdb( $carg, $vp, $pid, $g );
 
-    if ( defined $carg->{mpi_dll} ) {
-        $ENV{MPINFO_DLL} = $carg->{mpi_dll};
-    } else {
-        if ( not defined $base ) {
-            gdb_detach($g);
-            gdb_quit($g);
-            return;
-        }
-    }
-
-    my @mq = run_minfo( $g, $vp );
     gdb_detach($g);
     gdb_quit($g);
     return @mq;
@@ -6406,23 +6450,7 @@ sub fetch_mpi_queue {
 # As above but take a gdb handle
 sub fetch_mpi_queue_gdb {
     my ( $carg, $vp, $pid, $g ) = @_;
-
-    my $base = gdb_var_addr( $g, 'MPIR_dll_name' );
-    if ( not defined $base ) {
-        target_error( $vp,
-            'Process does not appear to be using MPI (No MPIR_dll_name symbol)'
-        );
-    }
-
-    if ( defined $carg->{mpi_dll} ) {
-        $ENV{MPINFO_DLL} = $carg->{mpi_dll};
-    } else {
-        if ( not defined $base ) {
-            return;
-        }
-    }
-
-    my @mq = run_minfo( $g, $vp );
+    my @mq = run_minfo( $carg, $g, $vp );
     return @mq;
 }
 
@@ -6430,7 +6458,7 @@ sub show_mpi_queue {
     my ( $carg, $vp, $pid ) = @_;
 
     my @mq = fetch_mpi_queue( $carg, $vp, $pid );
-    return unless $mq[0];
+
     foreach my $o (@mq) {
         output( $vp, $o );
     }
@@ -6451,7 +6479,6 @@ sub show_mpi_queue_one {
     foreach my $o (@mq) {
         output( $vp, $o );
     }
-
     return;
 }
 
