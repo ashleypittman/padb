@@ -8791,18 +8791,20 @@ sub command_from_parent {
     # or any other rank on this node, we'll have to see if that causes
     # problems or if it's best to clear the target_key_pair() and output()
     # data for this node/rank.
+
+    # Bit of a hack here until I can fix it properly, pass on the
+    # output format so that the stack trace code knows when to do
+    # clever things in tree mode.
+    my $cargs = $cmd->{cargs};
+    if ( defined $cmd->{out_format} ) {
+        $cargs->{out_format} = $cmd->{out_format};
+    } else {
+        $cargs->{out_format} = 'raw';
+    }
+
     if ( defined $allfns{ $cmd->{mode} }{handler_all} ) {
         eval {
 
-            # Bit of a hack here until I can fix it properly, pass on the
-            # output format so that the stack trace code knows when to do
-            # clever things in tree mode.
-            my $cargs = $cmd->{cargs};
-            if ( defined $cmd->{out_format} ) {
-                $cargs->{out_format} = $cmd->{out_format};
-            } else {
-                $cargs->{out_format} = 'raw';
-            }
             $netdata->{target_response} =
               $allfns{ $cmd->{mode} }{handler_all}( $cargs, $pid_list );
             1;
@@ -8821,9 +8823,19 @@ sub command_from_parent {
             my $vp  = $proc->{vp};
             my $pid = $proc->{pid};
             eval {
-                my $res =
-                  $allfns{ $cmd->{mode} }{handler}( $cmd->{cargs}, $vp, $pid );
-                $gres{$vp} = $res if ( defined $res );
+
+                # The only difference here is the type of the first option,
+                # all functions should be converted to a single format here
+                if ( defined $allfns{ $cmd->{mode} }{handler_one} ) {
+                    my $res =
+                      $allfns{ $cmd->{mode} }{handler_one}( $cargs, $proc );
+                    $gres{$vp} = $res if ( defined $res );
+                } else {
+                    my $res =
+                      $allfns{ $cmd->{mode} }{handler}( $cmd->{cargs}, $vp,
+                        $pid );
+                    $gres{$vp} = $res if ( defined $res );
+                }
                 1;
             } or do {
                 my $error = $@;
