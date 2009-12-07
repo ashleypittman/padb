@@ -2956,6 +2956,7 @@ sub mpirun_get_jobs {
         if ( defined $link ) {
             if ( defined $mpirun{ basename($link) } ) {
                 push @jobs, $pid;
+                next;
             }
         }
 
@@ -5147,26 +5148,21 @@ sub outer_main {
 
     if ($list_rmgrs) {
         foreach my $res ( sort keys %rmgr ) {
-            my $working = 'yes';
 
             if ( defined $rmgr{$res}{is_installed}
                 and not $rmgr{$res}{is_installed}() )
             {
-                $working = 'no';
+                print "$res: Not detected on system.\n";
+                next;
             }
-            my $r = $res;
 
-            if ( $working eq 'yes' ) {
-                print "$r: ";
-                my @jobs = $rmgr{$res}{get_active_jobs}($user);
-                if ( @jobs > 0 ) {
-                    my $j = join q{ }, sort { $a <=> $b } @jobs;
-                    print "jobs($j)\n";
-                } else {
-                    print "No active jobs\n";
-                }
+            print "$res: ";
+            my @jobs = $rmgr{$res}{get_active_jobs}($user);
+            if ( @jobs > 0 ) {
+                my $j = join q{ }, sort { $a <=> $b } @jobs;
+                print "$j\n";
             } else {
-                print "$r: not active\n";
+                print "No active jobs.\n";
             }
         }
         exit 0;
