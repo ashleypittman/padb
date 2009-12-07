@@ -8157,10 +8157,16 @@ sub hash_from_status {
 }
 
 sub is_resmgr_process {
-    my $pid = shift;
+    my $pid  = shift;
     my $name = find_from_status( $pid, 'Name' );
-    my $mgrs =
-      { rmsloader => 1, slurmd => 1, slurmstepd => 1, pbs_attach => 1 };
+    my $mgrs = {
+        rmsloader  => 1,
+        slurmd     => 1,
+        slurmstepd => 1,
+        pbs_attach => 1,
+        orted      => 1,
+        mpirun     => 1,
+    };
     return 1 if ( defined $mgrs->{$name} );
     return;
 }
@@ -8173,13 +8179,58 @@ sub slurm_find_pids {
     my @procs =
       slurp_cmd("scontrol listpids $jobid.$inner_conf{slurm_job_step}");
 
+    my $found_target;
+
     foreach my $proc (@procs) {
         my ( $pid, $job, $step, undef, $global ) = split $SPACE, $proc;
         next if ( $global eq '-' );
         next unless ( $job eq $jobid );
         next unless ( $step == $inner_conf{slurm_job_step} );
+        next if ( is_resmgr_process($pid) );
         maybe_show_pid( $global, $pid );
+        $found_target = 1;
     }
+    return if $found_target;
+
+    # Either we didn't find any processes on this node or we only
+    # found processes named orted.  This could be for two reasons:
+    # The job step might not be running on this node.
+    # The job step might be a openmpi salloc/orterun combination.
+    # If it's the latter then this node could either be the "head"
+    # node where the mpirun is running or a "remote" node where the
+    # job will be launched by orted.
+
+    # Search the process list for processes which belong to this job
+    # and either belong to this job step or don't state which job step
+    # they belong to.
+    foreach my $pid ( get_process_list($target_user) ) {
+
+        # Skip over resource manager processes.
+        next if ( is_resmgr_process($pid) );
+
+        # Skip over ones which aren't direct descendants of a resource manager
+        next unless is_parent_resmgr($pid);
+
+        my $vp;
+        my %env = get_remote_env($pid);
+
+        next unless defined $env{SLURM_JOB_ID};
+        next if ( $env{SLURM_JOB_ID} != $jobid );
+
+        next unless defined $env{OMPI_COMM_WORLD_RANK};
+
+        # If this is defined check it's correct, it might be missing though.
+        if ( defined $env{SLURM_JOB_STEP} ) {
+            next if $env{SLURM_JOB_STEP} != $inner_conf{slurm_job_step};
+        }
+
+        if ( defined $env{OMPI_COMM_WORLD_SIZE} ) {
+            target_key_pair( $vp, "JOB_SIZE", $env{OMPI_COMM_WORLD_SIZE} );
+        }
+
+        maybe_show_pid( $env{OMPI_COMM_WORLD_RANK}, $pid );
+    }
+
     return;
 }
 
