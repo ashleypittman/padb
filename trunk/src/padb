@@ -5474,6 +5474,14 @@ sub gdb_attach {
         return;
     }
 
+    gdb_attach_post( $gdb, $pid );
+
+    return $pid;
+}
+
+sub gdb_attach_post {
+    my ( $gdb, $pid ) = @_;
+
     $gdb->{attached} = 1;
     $gdb->{tracepid} = $pid;
 
@@ -5492,6 +5500,52 @@ sub gdb_attach {
     }
 
     gdb_n_send( $gdb, '-gdb-set print address off' );
+
+}
+
+sub gdb_attach_async_start {
+    my ( $gdb, $pid ) = @_;
+
+    if ($running_on_solaris) {
+        my $exe = readlink("/proc/$pid/path/a.out");
+        my %cs = gdb_n_send( $gdb, "file $exe" );
+        if ( $cs{status} ne 'done' ) {
+            croak("Gdb command file $exe failed");
+            return;
+        }
+    }
+
+    send_cont_signal($pid);
+
+    _gdb_send_real_async_start( $gdb, "attach $pid" );
+
+    return;
+}
+
+sub gdb_attach_async_end {
+    my ( $gdb, $pid ) = @_;
+
+    my %p = _gdb_send_real_async_wait( $gdb, "attach $pid" );
+
+    if ( not defined $p{status} ) {
+        $gdb->{error} = 'Failed to attach to process';
+        if ( not find_exe('gdb') ) {
+            $gdb->{error} = 'Failed to attach to process (gdb not installed?)';
+        }
+        return;
+    }
+
+    if ( $p{status} eq 'error' ) {
+        my $r = gdb_parse_reason( $p{reason} );
+        if ( defined $r->{msg} ) {
+            $gdb->{error} = "Failed to attach to process: $r->{msg}";
+        } else {
+            $gdb->{error} = 'Failed to attach to process';
+        }
+        return;
+    }
+
+    gdb_attach_post( $gdb, $pid );
 
     return $pid;
 }
@@ -5531,6 +5585,34 @@ sub _gdb_send_real {
     if ( defined $gdb->{debugfd} ) {
         print { $gdb->{debugfd} } "$seq$cmd\n";
     }
+    my %r = gdb_n_next_result( $gdb, $seq );
+    if ( $gdb->{attached} and $r{seq} ne $seq ) {
+        croak(
+"Invalid sequence number from gdb, expecting $seq got $r{seq} cmd=\"$cmd\""
+        );
+    }
+    $r{cmd} = $cmd;
+    if ( $gdb->{debugfd} and defined $r{status} and $r{status} ne 'done' ) {
+        print Dumper \%r;
+    }
+    return %r;
+}
+
+sub _gdb_send_real_async_start {
+    my ( $gdb, $cmd ) = @_;
+    gdb_wait_for_prompt($gdb);
+    my $handle = $gdb->{wtr};
+    my $seq    = $gdb->{seq}++;
+    print {$handle} "$seq$cmd\n";
+    if ( defined $gdb->{debugfd} ) {
+        print { $gdb->{debugfd} } "$seq$cmd\n";
+    }
+    return;
+}
+
+sub _gdb_send_real_async_wait {
+    my ( $gdb, $cmd ) = @_;
+    my $seq = $gdb->{seq};
     my %r = gdb_n_next_result( $gdb, $seq );
     if ( $gdb->{attached} and $r{seq} ne $seq ) {
         croak(
