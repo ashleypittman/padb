@@ -4065,14 +4065,15 @@ sub next_command {
     }
 
     my $cmd;
+    my $req;
 
     if ($watch) {
         $cmd = $commands[0];
+        $req->{detach_after_callback} = 1;
     } else {
         $cmd = shift @commands;
     }
 
-    my $req;
     $req->{mode} = $cmd->{mode};
 
     if ( defined $cmd->{args} ) {
@@ -7649,6 +7650,67 @@ sub show_stack_vars {
     return;
 }
 
+# Attach to all local processes in preperation for calling the mode
+# callback.  This function, along with the corresponding one below it
+# handles persistent attachment between modes: modes specify if they
+# want gdb handles or not, if they do then this function attaches for
+# it, if they don't and gdb is attached this function will detach.
+sub global_attach {
+    my ( $mode, $procs ) = @_;
+
+    if ( not $allfns{$mode}{needs_gdb} ) {
+        global_detach($procs);
+        return;
+    }
+
+    foreach my $proc ( @{$procs} ) {
+        my $vp  = $proc->{vp};
+        my $pid = $proc->{pid};
+
+        next if defined $proc->{gdb_handle};
+
+        $proc->{gdb_tmp} = gdb_start();
+        gdb_attach_async_start( $proc->{gdb_tmp}, $pid );
+    }
+
+    foreach my $proc ( @{$procs} ) {
+
+        next if defined $proc->{gdb_handle};
+
+        my $vp  = $proc->{vp};
+        my $pid = $proc->{pid};
+        my $gdb = $proc->{gdb_tmp};
+
+        delete $proc->{gdb_tmp};
+
+        if ( gdb_attach_async_end( $gdb, $pid ) ) {
+            $proc->{gdb_handle} = $gdb;
+        } else {
+            if ( defined $gdb->{error} ) {
+                target_error( $vp, $gdb->{error} );
+            } else {
+                target_error( $vp, 'Failed to attach to process' );
+            }
+            gdb_quit($gdb);
+        }
+    }
+
+    return;
+}
+
+# Detach from all local processes, this function is called from both
+# global_attach and also when padb is exiting.
+sub global_detach {
+    my ($procs) = @_;
+
+    foreach my $proc ( @{$procs} ) {
+        if ( defined $proc->{gdb_handle} ) {
+            gdb_detach( $proc->{gdb_handle} );
+            delete $proc->{gdb_handle};
+        }
+    }
+}
+
 # Try and be clever here, attach to each and every process on this node
 # first, then go back and query them each in turn, should mean that some
 # processes are not spinning whilst gdb is doing it's thing which will mean
@@ -8742,6 +8804,7 @@ sub command_from_parent {
     }
 
     if ( $cmd->{mode} eq 'exit' ) {
+        global_detach( $inner_conf{all_pids} );
         $netdata->{shutdown} = 1;
         return;
     }
@@ -8802,6 +8865,10 @@ sub command_from_parent {
         $cargs->{out_format} = 'raw';
     }
 
+    # Ensure that we are attached to the target processes if required
+    # and that we are not if not required.
+    global_attach( $cmd->{mode}, $pid_list );
+
     if ( defined $allfns{ $cmd->{mode} }{handler_all} ) {
         eval {
 
@@ -8848,6 +8915,11 @@ sub command_from_parent {
         if (%gres) {
             $netdata->{target_response} = \%gres;
         }
+    }
+
+    # Detach from all processes if the outer requested us to.
+    if ( defined $cmd->{detach_after_callback} ) {
+        global_detach( $cmd->{mode}, $pid_list );
     }
 
     return;
