@@ -6441,91 +6441,35 @@ sub show_mpi_queue {
     return;
 }
 
-sub show_mpi_queue_all {
-    my ( $carg, $list ) = @_;
+sub show_mpi_queue_one {
+    my ( $carg, $proc ) = @_;
 
-    my @all;
+    my $vp  = $proc->{vp};
+    my $pid = $proc->{pid};
+    my $gdb = $proc->{gdb_handle};
 
-    foreach my $proc ( @{$list} ) {
-        my $vp  = $proc->{vp};
-        my $pid = $proc->{pid};
+    return unless $gdb;
 
-        my $gdb = gdb_start();
-        if ( gdb_attach( $gdb, $pid ) ) {
-            $proc->{gdb} = $gdb;
-            push @all, $proc;
-        } else {
-            if ( defined $gdb->{error} ) {
-                target_error( $vp, $gdb->{error} );
-            } else {
-                target_error( $vp, 'Failed to attach to process' );
-            }
-        }
+    my @mq = fetch_mpi_queue_gdb( $carg, $vp, $pid, $gdb );
 
+    foreach my $o (@mq) {
+        output( $vp, $o );
     }
 
-    foreach my $proc (@all) {
-
-        my $vp  = $proc->{vp};
-        my $pid = $proc->{pid};
-        my $gdb = $proc->{gdb};
-
-        my @mq = fetch_mpi_queue_gdb( $carg, $vp, $pid, $gdb );
-        if ( $mq[0] ) {
-            foreach my $o (@mq) {
-                output( $vp, $o );
-            }
-        }
-    }
-
-    foreach my $proc (@all) {
-        my $gdb = $proc->{gdb};
-        gdb_detach($gdb);
-        gdb_quit($gdb);
-    }
     return;
 }
 
-# Ideally handle all this at a higher level...
-sub show_mpi_queue_for_deadlock_all {
-    my ( $carg, $list ) = @_;
+sub show_mpi_queue_for_deadlock_one {
+    my ( $carg, $proc ) = @_;
 
-    my $ret;
-    my @all;
+    my $vp  = $proc->{vp};
+    my $pid = $proc->{pid};
+    my $gdb = $proc->{gdb_handle};
 
-    foreach my $proc ( @{$list} ) {
-        my $vp  = $proc->{vp};
-        my $pid = $proc->{pid};
+    return unless $gdb;
 
-        my $gdb = gdb_start();
-        if ( gdb_attach( $gdb, $pid ) ) {
-            $proc->{gdb} = $gdb;
-            push @all, $proc;
-        } else {
-            output( $vp, 'Failed to attach to to process' );
-        }
-
-    }
-
-    foreach my $proc (@all) {
-        my $tries = 0;
-
-        my @threads;
-
-        my $vp  = $proc->{vp};
-        my $pid = $proc->{pid};
-        my $gdb = $proc->{gdb};
-
-        my @mq = fetch_mpi_queue_gdb( $carg, $vp, $pid, $gdb );
-        $ret->{$vp} = \@mq;
-    }
-
-    foreach my $proc (@all) {
-        my $gdb = $proc->{gdb};
-        gdb_detach($gdb);
-        gdb_quit($gdb);
-    }
-    return $ret;
+    my @mq = fetch_mpi_queue_gdb( $carg, $vp, $pid, $gdb );
+    return \@mq;
 }
 
 sub mpi_queue_output_handler {
@@ -6659,8 +6603,8 @@ sub mpi_go_deadlock_detect {
 
         my $gstr = "Information for group '$gid' ($ad{$gid}{name})\n";
 
-        # Maybe show the group members, hope that the user doesn't turn
-        # this on unless also setting target_groups!
+        # Maybe show the group members, hope that the user doesn't
+        # turn this on unless also setting target_groups!
         if ( $carg->{show_group_members} ) {
             $gstr .= "group has $ad{$gid}{size} members\n";
             if ( defined $ad{$gid}{size} ) {
@@ -7726,8 +7670,8 @@ sub global_detach {
 # loop in but don't sleep every iteration.  This could be handled better by
 # checking for the presence of one of the stack_strip_below functions in
 # the stack trace.
-sub stack_trace_from_pids {
-    my ( $carg, $list ) = @_;
+sub stack_trace_from_pid {
+    my ( $carg, $proc ) = @_;
 
     my @all;
 
@@ -7747,201 +7691,180 @@ sub stack_trace_from_pids {
         $below{$_} = 1;
     }
 
-    foreach my $proc ( @{$list} ) {
-        my $vp  = $proc->{vp};
-        my $pid = $proc->{pid};
+    return unless defined $proc->{gdb_handle};
 
-        my $gdb = gdb_start();
-        if ( gdb_attach( $gdb, $pid ) ) {
-            $proc->{gdb} = $gdb;
-            push @all, $proc;
-        } else {
-            if ( defined $gdb->{error} ) {
-                target_error( $vp, $gdb->{error} );
+    my $tries = 0;
+
+    my @threads;
+
+    my $vp  = $proc->{vp};
+    my $pid = $proc->{pid};
+    my $gdb = $proc->{gdb_handle};
+
+    my $ok;
+    do {
+
+        # The first time round the loop we will have a gdb handle from
+        # above, only re-attach if we have already failed on the first
+        # try and are here a second time.
+        if ( $tries > 0 ) {
+            gdb_detach($gdb);
+            gdb_quit($gdb);
+            delete $proc->{gdb_handle};
+            send_cont_signal($pid);
+            $gdb = gdb_start();
+            if ( gdb_attach( $gdb, $pid ) ) {
+                $proc->{gdb_attach} = $gdb;
             } else {
-                target_error( $vp, 'Failed to attach to process' );
-            }
-        }
-
-    }
-
-    foreach my $proc (@all) {
-        my $tries = 0;
-
-        my @threads;
-
-        my $vp  = $proc->{vp};
-        my $pid = $proc->{pid};
-        my $gdb = $proc->{gdb};
-
-        my $ok;
-        do {
-
-            # The first time round the loop we will have a gdb handle from
-            # above, only re-attach if we have already failed on the first
-            # try and are here a second time.
-            if ( not defined $gdb ) {
-                send_cont_signal($pid);
-                my $g = gdb_start();
-                if ( gdb_attach( $g, $pid ) ) {
-                    $gdb = $g;
+                if ( defined $gdb->{error} ) {
+                    target_error( $vp, $gdb->{error} );
                 } else {
-                    if ( defined $g->{error} ) {
-                        target_error( $vp, $g->{error} );
-                    } else {
-                        target_error( $vp, 'Failed to attach to process' );
-                    }
+                    target_error( $vp, 'Failed to attach to process' );
                 }
-            }
-
-            if ( defined $gdb ) {
-                if (   $carg->{stack_shows_params}
-                    or $carg->{stack_shows_locals} )
-                {
-                    @threads = gdb_dump_frames_per_thread( $gdb, 1 );
-                } else {
-                    @threads = gdb_dump_frames_per_thread($gdb);
-                }
-                gdb_detach($gdb);
                 gdb_quit($gdb);
-                $gdb = undef;
-                if ( defined $threads[0]->{frames} ) {
-                    my @frames = @{ $threads[0]->{frames} };
-                    foreach my $frame (@frames) {
-                        if (    defined $frame->{func}
-                            and defined $below{ $frame->{func} } )
-                        {
-                            $ok = 1;
-                            last;
-                        }
-                    }
-                }
+                return;
             }
-          } while ( ( not $ok )
-            and ( $tries++ < $carg->{gdb_retry_count} ) );
-
-        if ( not defined $threads[0]{id} ) {
-            target_error( $vp,
-                'Could not extract stack trace from application' );
-            next;
         }
 
-        if ( defined $threads[0]{error} ) {
-            target_error( $vp, $threads[0]{error} );
-            next;
+        if (   $carg->{stack_shows_params}
+            or $carg->{stack_shows_locals} )
+        {
+            @threads = gdb_dump_frames_per_thread( $gdb, 1 );
+        } else {
+            @threads = gdb_dump_frames_per_thread($gdb);
         }
 
-        foreach my $thread ( sort { $a->{id} <=> $b->{id} } @threads ) {
-            next unless defined $thread->{frames};
-            my @frames = @{ $thread->{frames} };
-
-            output( $vp, "ThreadId: $thread->{id}" ) if ( @threads != 1 );
-
-            my $strip_below;
-
-            # Find a function to strip above.  Only actually enable this if
-            # there is a function present which we are targeting or else no
-            # output will be generated!  Do this in reverse order so we
-            # strip as much as possible from the stack trace.
-            if ( $carg->{strip_below_main} ) {
-                foreach my $frame ( reverse @frames ) {
-                    next unless exists $frame->{func};
-                    if ( defined $below{ $frame->{func} } ) {
-                        $strip_below = $frame->{func};
-                    }
-                }
-            }
-
-            my @fl = $EMPTY_STRING;
-            foreach my $frame ( reverse @frames ) {
-
-                target_error( $vp, "error from gdb: $frame->{error}" )
-                  if exists $frame->{error};
-
-                next unless exists $frame->{level};
-                next unless exists $frame->{func};
-
-                # This seemingly always gets set by gdb even if it is
-                # sometimes set to '??'
-                my $function = $frame->{func};
-
-                next if ( defined $strip_below and $strip_below ne $function );
-
-                $strip_below = undef;
-
-                my $l = sprintf "%s() at %s:%s",
-                  $function,
-                  ( $frame->{file} || '?' ),
-                  ( $frame->{line} || '?' );
-
-                output( $vp, $l );
-
-                if ( $carg->{out_format} eq 'tree' ) {
-                    push @fl, $l;
-                    my $fl = join( ",", @fl );
-                    if ( $carg->{stack_shows_locals} ) {
-                        my @local_names;
-                        foreach my $loc ( @{ $frame->{locals} } ) {
-                            push @local_names, $loc->{name};
-                            target_key_pair( $vp, "$l|var_type|$loc->{name}",
-                                $loc->{type} );
-
-                            if ( length $loc->{value} > 70 ) {
-                                target_key_pair(
-                                    $vp,
-                                    $fl . '|var|' . $loc->{name},
-                                    pretify_variable(
-                                        'value too long to display')
-                                );
-                            } else {
-                                target_key_pair( $vp,
-                                    $fl . '|var|' . $loc->{name},
-                                    $loc->{value} );
-                            }
-                        }
-                        if ( @local_names > 0 ) {
-                            target_key_pair( $vp, "$l|locals",
-                                join( q{,}, sort @local_names ) );
-                        }
-                    }
-                    if ( $carg->{stack_shows_params} ) {
-
-                        my @param_names;
-                        foreach my $par ( @{ $frame->{params} } ) {
-                            push @param_names, $par->{name};
-                            target_key_pair( $vp, "$l|var_type|$par->{name}",
-                                $par->{type} );
-                            if ( length $par->{value} > 70 ) {
-                                target_key_pair(
-                                    $vp,
-                                    $fl . '|var|' . $par->{name},
-                                    pretify_variable(
-                                        'value too long to display')
-                                );
-                            } else {
-                                target_key_pair( $vp,
-                                    $fl . '|var|' . $par->{name},
-                                    $par->{value} );
-                            }
-                        }
-                        if ( @param_names > 0 ) {
-                            target_key_pair( $vp, "$l|params",
-                                join( q{,}, @param_names ) );
-                        }
-                    }
-                } else {
-                    if ( $carg->{stack_shows_params} ) {
-                        show_stack_vars( $vp, $frame, 'params' );
-                    }
-                    if ( $carg->{stack_shows_locals} ) {
-                        show_stack_vars( $vp, $frame, 'locals' );
-                    }
-                }
-
-                # Strip below this function if we need to.
-                if ( defined $above{$function} ) {
+        if ( defined $threads[0]->{frames} ) {
+            my @frames = @{ $threads[0]->{frames} };
+            foreach my $frame (@frames) {
+                if (    defined $frame->{func}
+                    and defined $below{ $frame->{func} } )
+                {
+                    $ok = 1;
                     last;
                 }
+            }
+        }
+
+      } while ( ( not $ok )
+        and ( $tries++ < $carg->{gdb_retry_count} ) );
+
+    if ( not defined $threads[0]{id} ) {
+        target_error( $vp, 'Could not extract stack trace from application' );
+        return;
+    }
+
+    if ( defined $threads[0]{error} ) {
+        target_error( $vp, $threads[0]{error} );
+        return;
+    }
+
+    foreach my $thread ( sort { $a->{id} <=> $b->{id} } @threads ) {
+        next unless defined $thread->{frames};
+        my @frames = @{ $thread->{frames} };
+
+        output( $vp, "ThreadId: $thread->{id}" ) if ( @threads != 1 );
+
+        my $strip_below;
+
+        # Find a function to strip above.  Only actually enable this if
+        # there is a function present which we are targeting or else no
+        # output will be generated!  Do this in reverse order so we
+        # strip as much as possible from the stack trace.
+        if ( $carg->{strip_below_main} ) {
+            foreach my $frame ( reverse @frames ) {
+                next unless exists $frame->{func};
+                if ( defined $below{ $frame->{func} } ) {
+                    $strip_below = $frame->{func};
+                }
+            }
+        }
+
+        my @fl = $EMPTY_STRING;
+        foreach my $frame ( reverse @frames ) {
+
+            target_error( $vp, "error from gdb: $frame->{error}" )
+              if exists $frame->{error};
+
+            next unless exists $frame->{level};
+            next unless exists $frame->{func};
+
+            # This seemingly always gets set by gdb even if it is
+            # sometimes set to '??'
+            my $function = $frame->{func};
+
+            next if ( defined $strip_below and $strip_below ne $function );
+
+            $strip_below = undef;
+
+            my $l = sprintf "%s() at %s:%s",
+              $function,
+              ( $frame->{file} || '?' ),
+              ( $frame->{line} || '?' );
+
+            output( $vp, $l );
+
+            if ( $carg->{out_format} eq 'tree' ) {
+                push @fl, $l;
+                my $fl = join( ",", @fl );
+                if ( $carg->{stack_shows_locals} ) {
+                    my @local_names;
+                    foreach my $loc ( @{ $frame->{locals} } ) {
+                        push @local_names, $loc->{name};
+                        target_key_pair( $vp, "$l|var_type|$loc->{name}",
+                            $loc->{type} );
+
+                        if ( length $loc->{value} > 70 ) {
+                            target_key_pair(
+                                $vp,
+                                $fl . '|var|' . $loc->{name},
+                                pretify_variable('value too long to display')
+                            );
+                        } else {
+                            target_key_pair( $vp, $fl . '|var|' . $loc->{name},
+                                $loc->{value} );
+                        }
+                    }
+                    if ( @local_names > 0 ) {
+                        target_key_pair( $vp, "$l|locals",
+                            join( q{,}, sort @local_names ) );
+                    }
+                }
+                if ( $carg->{stack_shows_params} ) {
+
+                    my @param_names;
+                    foreach my $par ( @{ $frame->{params} } ) {
+                        push @param_names, $par->{name};
+                        target_key_pair( $vp, "$l|var_type|$par->{name}",
+                            $par->{type} );
+                        if ( length $par->{value} > 70 ) {
+                            target_key_pair(
+                                $vp,
+                                $fl . '|var|' . $par->{name},
+                                pretify_variable('value too long to display')
+                            );
+                        } else {
+                            target_key_pair( $vp, $fl . '|var|' . $par->{name},
+                                $par->{value} );
+                        }
+                    }
+                    if ( @param_names > 0 ) {
+                        target_key_pair( $vp, "$l|params",
+                            join( q{,}, @param_names ) );
+                    }
+                }
+            } else {
+                if ( $carg->{stack_shows_params} ) {
+                    show_stack_vars( $vp, $frame, 'params' );
+                }
+                if ( $carg->{stack_shows_locals} ) {
+                    show_stack_vars( $vp, $frame, 'locals' );
+                }
+            }
+
+            # Strip below this function if we need to.
+            if ( defined $above{$function} ) {
+                last;
             }
         }
     }
@@ -9229,7 +9152,8 @@ sub common_main {
     };
 
     $allfns{mqueue} = {
-        handler_all => \&show_mpi_queue_all,
+        handler_one => \&show_mpi_queue_one,
+        needs_gdb   => 1,
         arg_long    => 'mpi-queue',
         arg_short   => 'Q',
         help        => 'Show MPI message queues',
@@ -9237,7 +9161,8 @@ sub common_main {
     };
 
     $allfns{deadlock} = {
-        handler_all  => \&show_mpi_queue_for_deadlock_all,
+        handler_one  => \&show_mpi_queue_for_deadlock_one,
+        needs_gdb    => 1,
         arg_long     => 'deadlock',
         arg_short    => 'j',
         help         => 'Run deadlock detection algorithm',
@@ -9290,7 +9215,8 @@ sub common_main {
     };
 
     $allfns{stack} = {
-        handler_all => \&stack_trace_from_pids,
+        handler_one => \&stack_trace_from_pid,
+        needs_gdb   => 1,
         arg_long    => 'stack-trace',
         arg_short   => 'x',
         help        => 'Show stack trace (see also -t)',
