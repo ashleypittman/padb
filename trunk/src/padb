@@ -7957,17 +7957,23 @@ sub kill_proc {
     return;
 }
 
-# Experimental, currently reports on what's on the node rather than what
-# the specific process is attached to, hopefully this functionality will be
-# added in the future.
+# Experimental, currently reports on what's on the node rather than
+# what the specific process is attached to, hopefully this
+# functionality will be added in the future.
 
 # https://svn.open-mpi.org/trac/hwloc/ticket/21
 sub lstopo {
     my ( $cargs, $vp, $pid ) = @_;
 
-    target_error( $vp, "Reporting per node rather than per process" );
+    if ( $cargs->{lstopo_show_warning} ) {
+        target_error( $vp, "Reporting per node rather than per process" );
+    }
 
-    my @output = slurp_cmd("lstopo --whole-system");
+    my $cmd = $cargs->{lstopo_command};
+
+    $cmd =~ s{%p}{$pid}g;
+
+    my @output = slurp_cmd($cmd);
 
     # Check the return code, if it's not found then there won't be any
     # output, if it was found but returned an error then do report the
@@ -7982,6 +7988,21 @@ sub lstopo {
         }
     }
 
+    chomp @output;
+    foreach my $line (@output) {
+        output( $vp, $line );
+    }
+    return;
+}
+
+sub run_cmd_against_target {
+    my ( $cargs, $vp, $pid ) = @_;
+
+    my $cmd = $cargs->{command};
+
+    $cmd =~ s{%p}{$pid}g;
+
+    my @output = slurp_cmd($cmd);
     chomp @output;
     foreach my $line (@output) {
         output( $vp, $line );
@@ -9351,9 +9372,18 @@ sub common_main {
     };
 
     $allfns{lstopo} = {
-        handler  => \&lstopo,
-        arg_long => 'lstopo',
-        help     => 'Show CPU topology',
+        handler      => \&lstopo,
+        arg_long     => 'lstopo',
+        help         => 'Show CPU topology using lstopo',
+        options_i    => { lstopo_command => 'lstopo --whole-system -', },
+        options_bool => { lstopo_show_warning => 'yes', },
+    };
+
+    $allfns{command} = {
+        handler   => \&run_cmd_against_target,
+        arg_long  => 'command',
+        help      => 'Run command on target node',
+        options_i => { command => 'readlink /proc/%p/exe', }
     };
 
     $allfns{ping} = {
