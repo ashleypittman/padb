@@ -6202,13 +6202,15 @@ sub run_minfo {
         push @all_dll_filenames, $carg->{mpi_dll};
     } else {
         my $loc = gdb_var_addr( $gdb, 'mpimsgq_dll_locations' );
-
+        my $base;
         if ($loc) {
-            my $psize = gdb_type_size( $gdb, 'void *' );
-            my $base = $loc;
-            my $filename;
+            $base = gdb_read_pointer( $gdb, $loc );
+        }
 
-            $base = gdb_read_pointer( $gdb, $base );
+        if ( defined $base and $base ne '0x0' ) {
+            my $psize = gdb_type_size( $gdb, 'void *' );
+
+            my $filename;
 
             do {
                 my $strp = gdb_read_pointer( $gdb, $base );
@@ -6220,7 +6222,7 @@ sub run_minfo {
             } while ( defined $filename );
         }
 
-        my $base = gdb_var_addr( $gdb, 'MPIR_dll_name' );
+        $base = gdb_var_addr( $gdb, 'MPIR_dll_name' );
         if ( not defined $base ) {
             target_error( $vp,
 'Process does not appear to be using MPI (No MPIR_dll_name symbol)'
