@@ -2994,15 +2994,58 @@ sub mpirun_setup_job {
     }
 
     my %pt;
-    foreach my $proc ( 0 .. ( $nprocs - 1 ) ) {
-        my $hostp = gdb_read_value_addr( $gdb,
-            "(void *)MPIR_proctable[$proc].host_name" );
-        my $host = gdb_string( $gdb, 1024, $hostp );
-        my $pid = gdb_read_value( $gdb, "MPIR_proctable[$proc].pid" );
-        if ( defined $host and defined $pid ) {
-            $pt{$host}{$proc} = $pid;
-        } else {
-            print "Failed to extract process info for rank $proc\n";
+
+    # Whilst it's possible to dip inside the struct in the process to
+    # extract this information some builds don't associate a type with
+    # MPIR_proctable which means in those cases this methhod won't work.
+    # Instead use a set of hardcoded values for offset and size as defined
+    # by the interface and do the maths for finding each element ourselves.
+
+    # I've left the old code here for now as I suspect this is going to be
+    # something that causes trouble in the future.
+
+    if (1) {
+        my $word_size = gdb_type_size( $gdb, 'void *' );
+        my $table_size = ( $word_size * 2 ) + 4;
+
+        # On 64 bit systems the struct is 20 bytes in size but needs to be
+        # 8 byte alligned.
+        if ( $word_size == 8 ) {
+            $table_size += 4;
+        }
+
+        my $host_offset    = 0;
+        my $pid_offset     = $word_size * 2;
+        my $proctable_addr = gdb_var_addr( $gdb, 'MPIR_proctable' );
+        my $proctable      = gdb_read_pointer( $gdb, $proctable_addr );
+        my $base           = _hex($proctable);
+
+        foreach my $proc ( 0 .. ( $nprocs - 1 ) ) {
+
+            my $struct_base = $base + ( $table_size * $proc );
+            my $hostp = gdb_read_pointer( $gdb, $struct_base + $host_offset );
+            my $host = gdb_string( $gdb, 1024, $hostp );
+
+            my $pid = gdb_read_int( $gdb, $struct_base + $pid_offset );
+            if ( defined $host and defined $pid ) {
+                $pt{$host}{$proc} = $pid;
+            } else {
+                print "Failed to extract process info for rank $proc\n";
+            }
+        }
+    } else {
+
+        foreach my $proc ( 0 .. ( $nprocs - 1 ) ) {
+
+            my $hostp = gdb_read_value_addr( $gdb,
+                "(void *)MPIR_proctable[$proc].host_name" );
+            my $host = gdb_string( $gdb, 1024, $hostp );
+            my $pid = gdb_read_value( $gdb, "MPIR_proctable[$proc].pid" );
+            if ( defined $host and defined $pid ) {
+                $pt{$host}{$proc} = $pid;
+            } else {
+                print "Failed to extract process info for rank $proc\n";
+            }
         }
     }
 
@@ -6056,6 +6099,19 @@ sub gdb_read_pointer {
     return;
 }
 
+sub gdb_read_int {
+    my ( $gdb, $addr ) = @_;
+
+    # Quote the request in case it contains spaces.
+    my %t =
+      gdb_send_addr( $gdb, "-data-evaluate-expression \"*(int *)$addr\"" );
+    if ( $t{status} eq 'done' ) {
+        my $v = gdb_parse_reason( $t{reason} );
+        return $v->{value};
+    }
+    return;
+}
+
 sub gdb_read_value {
     my ( $gdb, $name ) = @_;
 
@@ -6135,7 +6191,7 @@ sub run_minfo {
         hpid     => -1,
         tracepid => -1,
         attached => 0,
-        debug    => 1,
+        debug    => 0,
     };
 
     $h->{fd}{err} = *M_ERROR;
