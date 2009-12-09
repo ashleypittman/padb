@@ -7642,16 +7642,19 @@ sub show_proc {
 
     if ( -d "/proc/$pid/task" and $carg->{proc_shows_proc} ) {
 
-        my $threads = 0;
-
         # 2.6 kernel. (ntpl)
         my @tasks = slurp_dir("/proc/$pid/task");
         foreach my $task (@tasks) {
             next if ( $task eq '.' );
             next if ( $task eq '..' );
             show_task_dir( $carg, $vp, $pid, "/proc/$pid/task/$task" );
-            $threads++;
+            if ( defined $carg->{proc_format} ) {
+                last;
+            }
         }
+
+        # We have to deduct 2 here to account for . and ..
+        my $threads = @tasks - 2;
         proc_output( $vp, 'threads', $threads );
     } else {
         show_task_dir( $carg, $vp, $pid, "/proc/$pid" );
