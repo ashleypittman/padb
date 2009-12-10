@@ -6537,8 +6537,19 @@ sub send_cont_signal {
     return;
 }
 
-sub fetch_mpi_queue {
+# Returns the MPI queues for this process given a gdb handle.
+sub fetch_mpi_queue_gdb {
+    my ( $carg, $vp, $pid, $g ) = @_;
+    my @mq = run_minfo( $carg, $g, $vp );
+    return @mq;
+}
+
+# Called as a backoff from the qsnet_show_tport_queue() function if it gets
+# called but can't show the queues for any reason - most likely because it
+# isn't actually a quadrics system.
+sub show_mpi_queue {
     my ( $carg, $vp, $pid ) = @_;
+
     my $g = gdb_start();
     my $p = gdb_attach( $g, $pid );
     if ( !$p ) {
@@ -6554,20 +6565,6 @@ sub fetch_mpi_queue {
 
     gdb_detach($g);
     gdb_quit($g);
-    return @mq;
-}
-
-# As above but take a gdb handle
-sub fetch_mpi_queue_gdb {
-    my ( $carg, $vp, $pid, $g ) = @_;
-    my @mq = run_minfo( $carg, $g, $vp );
-    return @mq;
-}
-
-sub show_mpi_queue {
-    my ( $carg, $vp, $pid ) = @_;
-
-    my @mq = fetch_mpi_queue( $carg, $vp, $pid );
 
     foreach my $o (@mq) {
         output( $vp, $o );
@@ -6575,6 +6572,7 @@ sub show_mpi_queue {
     return;
 }
 
+# The mode handler for message queue or deadlock detection mode.
 sub show_mpi_queue_one {
     my ( $carg, $proc ) = @_;
 
@@ -6590,19 +6588,6 @@ sub show_mpi_queue_one {
         output( $vp, $o );
     }
     return;
-}
-
-sub show_mpi_queue_for_deadlock_one {
-    my ( $carg, $proc ) = @_;
-
-    my $vp  = $proc->{vp};
-    my $pid = $proc->{pid};
-    my $gdb = $proc->{gdb_handle};
-
-    return unless $gdb;
-
-    my @mq = fetch_mpi_queue_gdb( $carg, $vp, $pid, $gdb );
-    return \@mq;
 }
 
 sub mpi_queue_output_handler {
@@ -6831,8 +6816,8 @@ sub mpi_deadlock_detect {
     # XXX This is a bit of a hack to make the deadlock code work with input
     # files, the whole thing is due a tidy-up on the full-duplex branch
     # where this should be solved properly.
-    if ( defined $lines->{target_response} ) {
-        $data = $lines->{target_response};
+    if ( defined $lines->{target_output} ) {
+        $data = $lines->{target_output};
     } else {
         $data = $lines->{lines};
     }
@@ -8074,7 +8059,7 @@ sub ping_rank {
     return;
 }
 
-sub show_queue {
+sub qsnet_show_tport_queue {
     my ( $carg, $vp, $pid ) = @_;
 
     # If edb isn't installed (this isn't a Quadrics system) don't even try
@@ -9295,7 +9280,7 @@ sub common_main {
         arg_long    => 'message-queue',
         qsnet       => 1,
         arg_short   => 'q',
-        handler     => \&show_queue,
+        handler     => \&qsnet_show_tport_queue,
         help        => 'Show the message queues',
         options_i   => { mpi_dll => undef, }
     };
@@ -9324,7 +9309,7 @@ sub common_main {
     };
 
     $allfns{deadlock} = {
-        handler_one  => \&show_mpi_queue_for_deadlock_one,
+        handler_one  => \&show_mpi_queue_one,
         needs_gdb    => 1,
         arg_long     => 'deadlock',
         arg_short    => 'j',
