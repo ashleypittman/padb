@@ -30,9 +30,15 @@
 
 # Version 3.?
 #  * Support of PBS Pro
-#  * Add variables to tree based stack traces.
+#  * Support for OpenMPI jobs run by mpirun under a slurm allocation.
+#  * Modify the Slurm resouce manager code to automatically select a
+#    step_id based on what's running on the system currently.
+#  * Modify the mpd resource manager code to only call mpdlistjobs on
+#    the front-end, it provides all the information we need so record
+#    this and send it over the network to the inner processes.
 #  * Solaris port.  Limited functionality compared to running on Linux
 #    however stack trace mode works fully.
+#  * Add variables to tree based stack traces.
 #  * Add "mpirun" as a resource manager, this causes it walk the local
 #    process list looking for processes called mpirun and to get the
 #    pid and hostlist by reading data from Mpir_Proctable as specified
@@ -43,6 +49,7 @@
 #    reduction operations by name.
 #  * Add a --lstopo option to run the lstopo command for each rank.
 #    http://www.open-mpi.org/projects/hwloc/
+#  * Add a 'command' mode to run abritary commands on the target node.
 #  * Enhance the integration with gdb, use sequence numbers when
 #    talking to gdb and check that we get back what we give it.
 #    Correctly notice and raise an appropriate error if gdb dies
@@ -64,6 +71,26 @@
 #    automatically
 #  * Add SVN tags to the source file and the the revision id to the
 #    output of output of --version
+#  * Make proc-format report data for the first thread in a process
+#    rather than a random one.
+#  * Add support for the proposed new standard for finding the Message
+#    queue plugin in MPI programs.
+#  * Have padb handle attaching to programs rather than having the mode
+#    callback handle it.  This means that persistent attachments can
+#    be used in full-report mode.
+#  * Speed up attaching gdb to the target job greatly by attaching to
+#    all target processes on a not simultanously rather than one at
+#    a time.
+#  * Better handling of jobs that dissapear whilst we are monitoring them,
+#    there should be no perl errors shown if this happens.
+#  * Detect where padb is being run from and specify the full path to the
+#    inner processes.  This helps with resource managers which don't
+#    preserve $PWD and padb isn't on $PATH
+#  * Add proper two-pass argunment handling, secondary options are only
+#    accepted if the mode they are relevent to is selected.
+#  * Widespread code cleanups to conform with stricter coding standards.
+#  * Enable type checking of command line options, all boolean flags can be
+#    set yes|no|1|0|true|false now.
 #
 # Version 3.0
 #  * Full-duplex communication between inner and outer processes, padb no
@@ -677,7 +704,10 @@ XXXX
 -t --tree              Use tree based output for stack traces.
 -i --input-file=FILE   Read input from file.
 
-   --watch             
+   --watch
+
+   --debug=<mode>,<mode1>  Enable debug for mode, use mode=all for all debugging.
+   --debug-file=file   Log debug information to file.
 
 -O [opt1=val,<opt2=val>] Set internal config options for padb, advanced use only.
   Options in this version (these are liable to change)
@@ -798,6 +828,22 @@ my %ic_names_cmd;
 # the ref as well.  Enable with --debug=type1,type2=all
 my %debug_modes;
 my $start_time = time;
+my $debug_fd;
+
+sub set_debug_file {
+    my ($filename) = @_;
+
+    if ( defined $filename ) {
+        if ( not open $debug_fd, '>', $filename ) {
+            print "Unable to open log file for writing: $!\n";
+            $debug_fd = *STDOUT;
+        }
+    } else {
+        $debug_fd = *STDOUT;
+    }
+
+    return;
+}
 
 sub debug_log {
     my ( $type, $handle, $str, @params ) = @_;
@@ -807,10 +853,10 @@ sub debug_log {
     }
     return unless $debug_modes{$type};
     my $time = time - $start_time;
-    printf "DEBUG ($type): %3d: $str\n", $time, @params;
+    printf {$debug_fd} "DEBUG ($type): %3d: $str\n", $time, @params;
     return if $debug_modes{$type} eq 'basic';
     return unless defined $handle;
-    print Data::Dumper->Dump( [$handle], [$type] );
+    print {$debug_fd} Data::Dumper->Dump( [$handle], [$type] );
     return;
 }
 
@@ -930,6 +976,7 @@ sub parse_args_outer {
 
     Getopt::Long::Configure( 'bundling', 'pass_through' );
     my $debugflag;
+    my $debugfile;
 
     my @ranks;
 
@@ -957,6 +1004,7 @@ sub parse_args_outer {
         'norc'                => \$norc,
         'config-file=s'       => \$configfile,
         'debug=s'             => \$debugflag,
+        'debug-file=s'        => \$debugfile,
         'create-secret-file'  => \$create_secret,
     );
 
@@ -972,6 +1020,8 @@ sub parse_args_outer {
     # Parse the options once to pick up the mode and any single letter
     # options which might be bundled with it.
     GetOptions(%optionhash);
+
+    set_debug_file($debugfile);
 
     Getopt::Long::Configure( 'default', 'bundling' );
 
@@ -4491,7 +4541,9 @@ sub handle_event_from_port {
 
 # rng_user_verify()
 # is_value_in_range()
-# nvalues_in_range()
+# nvalues_in_range()  - Return the number of values in a range.
+# rng_min()           - Return the minimum value in a range.
+# rng_common()        - Take two ranges and return the common values.
 # rng_find_missing()
 #   Take two ranges and return all that are in the first but not in the
 #   second. (see check_signon).
