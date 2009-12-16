@@ -131,13 +131,24 @@ int ask(char *req, char *ans)
 }
 
 void *find_sym (char *type, char *name) {
-    char req[128];
+    char *req;
     char ans[128];
     int i;
     void *addr = NULL;
+    size_t len = 2;
+    len += strlen(type);
+    len += strlen(name);
+    
+    req = malloc(len);
+
+    if ( ! req ) {
+	return NULL;
+    }
+    
     sprintf(req,"%s %s",type,name);
     
     i = ask(req,ans);
+    free(req);
     if ( i != 0 )
 	return NULL;
     
@@ -238,31 +249,48 @@ int req_to_int (char *req,int *res)
 
 mqs_type *find_type (mqs_image *image, char *name, mqs_lang_code lang)
 {
-    char req[128];
+    char *req;
     int i;
     struct type *t = malloc(sizeof(struct type));
     if ( ! t )
+	return NULL;
+    
+    req = malloc (strlen(name)+6);
+    if ( ! req )
 	return NULL;
     
     strncpy(t->name,name,128);
     sprintf(req,"size %s",name);
     
     i = req_to_int(req,&t->size);
-    if ( i != 0 )
+    free(req);
+    if ( i != 0 ) {
+	free(t);
 	return NULL;
+    }
     
     return (mqs_type *)t;
 }
 
 int find_offset (mqs_type *type, char *name)
 {
-    char req[128];
+    char *req;
     int i,offset;
+    size_t len = 9;
     struct type *t = (struct type *)type;
     
+    len += strlen(t->name);
+    len += strlen(name);
+    req = malloc(len);
+    
+    if ( ! req ) {
+	return -1;
+    }
+
     sprintf(req,"offset %s %s",t->name,name);
     
     i = req_to_int(req,&offset);
+    free(req);
     if ( i != 0 )
 	return -1;
     
