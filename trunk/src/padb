@@ -547,6 +547,7 @@ $conf{prun_exittimeout} = '2m';
 $conf{rmgr}             = undef;
 
 $conf{slurm_job_step} = undef;
+$conf{orte_job_step}  = undef;
 
 $conf{pbs_server} = undef;
 
@@ -568,7 +569,7 @@ my @conf_bool = qw(watch_clears_screen inner_callback);
 my @conf_time = qw(prun_exittimeout prun_timeout interval);
 
 # Config options which take an integer.
-my @conf_int = qw(lsf_job_offset slurm_job_step tree_width);
+my @conf_int = qw(lsf_job_offset slurm_job_step orte_job_step tree_width);
 
 my $norc       = 0;
 my $configfile = '/etc/padb.conf';
@@ -2865,18 +2866,21 @@ sub open_get_data {
         if ( @elems == 4 ) {
             my $nprocs = $elems[3];
             my $name   = $elems[0];
-            if ( $name =~ m{\A\[(\d+)\,\d+]\z}x ) {
-                $open_jobs{$1}{nprocs} = $nprocs;
+            if ( $name =~ m{\A\[(\d+)\,(\d+)]\z}x ) {
+                my $job  = $1;
+                my $step = $2;
+                $open_jobs{$job}{$step}{nprocs} = $nprocs;
             }
         } elsif ( @elems == 6 ) {
             my $name = $elems[1];
-            if ( $name =~ m{\A\[\[(\d+)\,\d+\]\,(\d+)\]}x ) {
+            if ( $name =~ m{\A\[\[(\d+)\,(\d+)\]\,(\d+)\]}x ) {
                 my $job  = $1;
-                my $rank = $2;
+                my $step = $2;
+                my $rank = $3;
                 my $pid  = $elems[3];
                 my $host = $elems[4];
-                $open_jobs{$job}{hosts}{$host}++;
-                $open_jobs{$job}{ranks}{$host}{$rank} = $pid;
+                $open_jobs{$job}{$step}{hosts}{$host}++;
+                $open_jobs{$job}{$step}{ranks}{$host}{$rank} = $pid;
             }
         }
     }
@@ -2895,7 +2899,22 @@ sub open_setup_job {
 
     open_get_data();
 
-    my @hosts = keys %{ $open_jobs{$job}{hosts} };
+    my $step = $conf{orte_job_step};
+    if ( not defined $step ) {
+        my @steps = keys %{ $open_jobs{$job} };
+
+        my @ordered = sort { $a <=> $b } @steps;
+
+        $step = $ordered[0];
+
+    }
+
+    if ( not defined $open_jobs{$job}{$step} ) {
+        printf("Job $job (step $step) does not exist\n");
+        return;
+    }
+
+    my @hosts = keys %{ $open_jobs{$job}{$step}{hosts} };
     my $i     = @hosts;
 
     my ( $fh, $fn ) = tempfile('/tmp/padb.XXXXXXXX');
@@ -2909,9 +2928,9 @@ sub open_setup_job {
     my $cmd    = "orterun -machinefile $fn -np $i $prefix";
 
     my %pcmd;
-    $pcmd{nprocesses}   = $open_jobs{$job}{nprocs};
+    $pcmd{nprocesses}   = $open_jobs{$job}{$step}{nprocs};
     $pcmd{nhosts}       = @hosts;
-    $pcmd{process_data} = $open_jobs{$job}{ranks};
+    $pcmd{process_data} = $open_jobs{$job}{$step}{ranks};
     $pcmd{command}      = $cmd;
     @{ $pcmd{host_list} } = @hosts;
     $pcmd{cleanup_cb}     = \&unlink_file;
