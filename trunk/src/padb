@@ -8057,16 +8057,17 @@ sub lstopo {
 }
 
 sub run_cmd_against_target {
-    my ( $cargs, $vp, $pid ) = @_;
+    my ( $cargs, $rank, $pid ) = @_;
 
     my $cmd = $cargs->{command};
 
     $cmd =~ s{%p}{$pid}g;
+    $cmd =~ s{%r}{$rank}g;
 
     my @output = slurp_cmd($cmd);
     chomp @output;
     foreach my $line (@output) {
-        output( $vp, $line );
+        output( $rank, $line );
     }
     return;
 }
