@@ -50,8 +50,8 @@
 #  * Add a --lstopo option to run the lstopo command for each rank.
 #    http://www.open-mpi.org/projects/hwloc/
 #  * Add a 'command' mode to run abritary commands on the target node.
-#  * Add a 'thread-list' mode to report a comma seperated list of threads
-#    for each target process.
+#  * Add a 'list-threads' mode to report a comma seperated list of
+#    threads for each target process.
 #  * Add a 'thread-id' configuration option for when collecting stack
 #    traces.  This isn't a complete solution which will have to wait
 #    for 3.2 but does allow the user to specify which thread within an
@@ -9406,7 +9406,7 @@ sub common_main {
     $allfns{threads} = {
         handler_one => \&thread_list_from_pid,
         needs_gdb   => 1,
-        arg_long    => 'thread-list',
+        arg_long    => 'list-threads',
         help        => 'List threads in target processes',
     };
 
