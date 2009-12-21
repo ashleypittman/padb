@@ -6,13 +6,14 @@
  <h2>Selecting the Resource Manager (Job Launcher)</h2>
 </div>
 <i>Padb</i> supports many resource managers and should select the
-appropriate one for your cluster, if you have more than one resource
+appropriate one for your machine, if you have more than one resource
 manager installed or <i>padb</i> can't detect the correct one use
-the <b>rmgr</b> <a href=configuration.html>configuration option</a>.
+the <b>rmgr</b> <a href=configuration.html>configuration option</a> to
+set machine-wide defaults.
 
-<p>If no resource manager is found you can use <b>-O rmgr=local</b>
-and process identifiers (pids) will be used instead of job ids.
-
+<p>If your resource manager or scheduler is not supported you can also
+use <b>local</b> and process identifiers (pids) will be used instead
+of job ids.
 
 <center>
 <table class=rmgrs border=1 width="90%">
@@ -27,7 +28,7 @@ and process identifiers (pids) will be used instead of job ids.
   <td>Works with any resource manager or software stack that is
   compliant with
   the <a href="http://www.mcs.anl.gov/research/projects/mpi/mpi-debug/">MPI
-  debugger interface</a>.  It is recommended to use support for your
+  debugger interface</a>.  It is preferable to use support for your
   specific resource manager if it exists.</td>
  </tr>
  <tr>
@@ -46,7 +47,7 @@ and process identifiers (pids) will be used instead of job ids.
   <td>Fully supported</td>
  </tr>
  <tr>
-  <td>MPICH2/mpd</td>
+  <td>MPICH2 mpd</td>
   <td>mpd</td>
   <td>Fully supported in 3.0 and above</td>
  </tr>
@@ -67,13 +68,15 @@ treats that process as a single process job.</td>
   <td>None</td>
   <td>local-qsnet</td>
   <td>as local-fd with local-fd-name set to /proc/qsnet/elan/user to
-  automatially select network jobs on the local node.</td>
+  automatically select network jobs on the local node.</td>
  </tr>
 </table>
 </center>
 
 <p>The <b>--list-rmgrs</b> option can be used to show a list of
 detected resource managers and their active jobs.
+
+<hr>
 
 <div class=mode>
  <a name=job></a>
@@ -86,6 +89,10 @@ only a identifier provided by the underlying resource manager.  The
 default is to target jobs of the current user, this can be over-ridden
 with the <b>--user</b> flag.
 
+<h2>To target a specific job</h2> To target a specific job specify the
+numeric jobid for the job on the command line, after all other
+options.
+
 <h3>Showing list of current jobs</h3>
 To show a list of currently running jobs for a given user use the
 <b>--show-jobs</b> option.  Alternatively the <b>--list-rmgrs</b>
@@ -95,23 +102,10 @@ currently active jobs for each of them.
 <h3>To target all jobs</h3> To target all jobs currently running for a
 given user use the <b>--all</b> (<b>-a</b>) flag.
 
-<h3>To target any jobs</h3> To target "any" job currently running for
-a given user use the <b>--any</b> (<b>-A</b>) flag.  This differs from
+<h3>To target any jobs</h3> To target any job currently running for a
+given user use the <b>--any</b> (<b>-A</b>) flag.  This differs from
 targeting all jobs as it will exit with an error if more than one job
 is running.
-
-<h3>To target a specific job</h3> To target a specific job specify the
-jobid for the job on the command line, after all other options.
-
-<div class=mode>
- <a name=full-report></a>
- <h3>To target a specific job (Full report option)</h3>
-</div>
-If trying to diagnose a problem or gather information there is another
-option, <b>--full-report=&lt;jobid&gt;</b>, this tells padb to target
-the job specified and to report all information about the job it knows
-how to collect.  This option is typically used when creating bug
-reports to send to third parties or to inspect a job for anomalies.
 
 <hr>
 
@@ -119,31 +113,20 @@ reports to send to third parties or to inspect a job for anomalies.
 data for each process is reported separately it is possible to
 restrict which ranks are queried, this is done via the <b>--rank</b>
 option.  Multiple ranks can be selected by specifying <b>--rank</b>
-multiple times.
+multiple times or by specifying a rank list using
+the <b>[&lt;low&gt;-&lt;high&gt;,&lt;value&gt;]</b> notation.  Eg, to specify ranks
+0,2 and 3 use <b>--rank [0,2-3]</b>
 
 <hr>
 
 <h1>Selecting which mode to run in.</h1>
 <i>Padb</i> can present an array of different information about your
 select jobs and it can present it in a number of different ways.  With
-the exception of Full Report only one mode can be selected, if you
-need more information about the program run <i>padb</i> more than
-once.
-
-<div class=mode>
- <a name=full-report></a>
- <h2>Full Report</h2>
-</div>
-If you are just starting with <i>padb</i> or are creating an error
-report for somebody else then the <b>--full-report=&lt;jobid&gt;</b>
-option is a good place to start, this will complete a full diagnostic
-report for the job iterating over the more common padb options.  For
-large jobs this can generate a lot of output so redirecting to a file
-is recommended.
-
-<p>
-
-A list of avaliable modes and their descriptions can be found on the <a href=modes.html>modes</a> page.
+the exception of <a href="full-report.html">full Report</a> only one
+mode can be selected, if you need more information about the program
+<i>padb</i> has to be run more than once.  A list of available modes
+and their descriptions can be found on
+the <a href="modes.html">modes</a> page.
 
 </div>
 <div id="footer">

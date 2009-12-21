@@ -1,0 +1,355 @@
+<div id="content">
+<h1>Full-report mode</h1>
+
+<div class=mode>
+ <a name=full-report></a>
+ <h3>To target a specific job (full-report option)</h3>
+</div>
+
+<p>Whilst <i>padb</i> can be used to collect very specific information
+from an application, unless you know what you are looking for or know
+the application very well this may not be what you want.  For cases
+such as this <i>padb</i> has a "full report" mode in which it collects
+such information from a job as is likely to be useful.  This will
+create a full diagnostic report for a given job iterating over the
+more common <i>padb</i> modes and options.  If you are just starting
+out debugging with <i>padb</i> or are creating an error report for a
+third party then the full-report option is a good place to start.  For
+large jobs this can generate a lot of output so redirecting to a file
+is recommended.
+
+<p>To run in this mode simply invoke <i>padb</i> with the option
+<b>--full-report=&lt;jobid&gt;</b>.
+
+<p>The full-report mode is also very useful if you are automatically
+creating trace files for later inspection or collecting information
+for inspection by a third party.  End-users can be instructed to run
+it and mail a log back to a remote support team, for example or it can
+be integrated into automatic test suites.
+
+<p>More detailed information on using <i>padb</i> and about the type
+of information padb can collect about a job can be found on
+the <a href=modes.html>modes</a> page.
+
+<table class="example">
+<tr><td>
+<pre class="code">
+$ padb --show-jobs
+45882
+$ padb --full-report=45882
+</pre>
+</td></tr>
+<tr><td>
+<pre class="code">
+padb version 3.n (Revision 325)
+full job report for job 45882
+
+----------------
+[0]
+----------------
+comm0: name: 'MPI_COMM_WORLD'
+comm0: rank: '0'
+comm0: size: '4'
+comm0: id: '0'
+comm0: Rank: local 0 global 0
+comm0: Rank: local 1 global 1
+comm0: Rank: local 2 global 2
+comm0: Rank: local 3 global 3
+comm1: name: 'MPI_COMM_SELF'
+comm1: rank: '0'
+comm1: size: '1'
+comm1: id: '0x1'
+comm2: name: 'MPI_COMM_NULL'
+comm2: size: '0'
+comm2: id: '0x2'
+comm3: name: 'MPI COMMUNICATOR 3 DUP FROM 0'
+comm3: rank: '0'
+comm3: size: '4'
+comm3: id: '0x3'
+comm3: Rank: local 0 global 0
+comm3: Rank: local 1 global 1
+comm3: Rank: local 2 global 2
+comm3: Rank: local 3 global 3
+comm4: name: 'MPI COMMUNICATOR 4 DUP FROM 0'
+comm4: rank: '0'
+comm4: size: '4'
+comm4: id: '0x4'
+comm4: Rank: local 0 global 0
+comm4: Rank: local 1 global 1
+comm4: Rank: local 2 global 2
+comm4: Rank: local 3 global 3
+comm5: name: 'MPI COMMUNICATOR 5 SPLIT FROM 3'
+comm5: rank: '0'
+comm5: size: '2'
+comm5: id: '0x5'
+comm5: Rank: local 0 global 0
+comm5: Rank: local 1 global 2
+----------------
+[1]
+----------------
+comm0: name: 'MPI_COMM_WORLD'
+comm0: rank: '1'
+comm0: size: '4'
+comm0: id: '0'
+comm0: Rank: local 0 global 0
+comm0: Rank: local 1 global 1
+comm0: Rank: local 2 global 2
+comm0: Rank: local 3 global 3
+comm1: name: 'MPI_COMM_SELF'
+comm1: rank: '0'
+comm1: size: '1'
+comm1: id: '0x1'
+comm2: name: 'MPI_COMM_NULL'
+comm2: size: '0'
+comm2: id: '0x2'
+comm3: name: 'MPI COMMUNICATOR 3 DUP FROM 0'
+comm3: rank: '1'
+comm3: size: '4'
+comm3: id: '0x3'
+comm3: Rank: local 0 global 0
+comm3: Rank: local 1 global 1
+comm3: Rank: local 2 global 2
+comm3: Rank: local 3 global 3
+comm4: name: 'MPI COMMUNICATOR 4 DUP FROM 0'
+comm4: rank: '1'
+comm4: size: '4'
+comm4: id: '0x4'
+comm4: Rank: local 0 global 0
+comm4: Rank: local 1 global 1
+comm4: Rank: local 2 global 2
+comm4: Rank: local 3 global 3
+comm5: name: 'MPI COMMUNICATOR 5 SPLIT FROM 3'
+comm5: rank: '0'
+comm5: size: '2'
+comm5: id: '0x5'
+comm5: Rank: local 0 global 1
+comm5: Rank: local 1 global 3
+----------------
+[2]
+----------------
+comm0: name: 'MPI_COMM_WORLD'
+comm0: rank: '2'
+comm0: size: '4'
+comm0: id: '0'
+comm0: Rank: local 0 global 0
+comm0: Rank: local 1 global 1
+comm0: Rank: local 2 global 2
+comm0: Rank: local 3 global 3
+comm1: name: 'MPI_COMM_SELF'
+comm1: rank: '0'
+comm1: size: '1'
+comm1: id: '0x1'
+comm2: name: 'MPI_COMM_NULL'
+comm2: size: '0'
+comm2: id: '0x2'
+comm3: name: 'MPI COMMUNICATOR 3 DUP FROM 0'
+comm3: rank: '2'
+comm3: size: '4'
+comm3: id: '0x3'
+comm3: Rank: local 0 global 0
+comm3: Rank: local 1 global 1
+comm3: Rank: local 2 global 2
+comm3: Rank: local 3 global 3
+comm4: name: 'MPI COMMUNICATOR 4 DUP FROM 0'
+comm4: rank: '2'
+comm4: size: '4'
+comm4: id: '0x4'
+comm4: Rank: local 0 global 0
+comm4: Rank: local 1 global 1
+comm4: Rank: local 2 global 2
+comm4: Rank: local 3 global 3
+comm5: name: 'MPI COMMUNICATOR 5 SPLIT FROM 3'
+comm5: rank: '1'
+comm5: size: '2'
+comm5: id: '0x5'
+comm5: Rank: local 0 global 0
+comm5: Rank: local 1 global 2
+----------------
+[3]
+----------------
+comm0: name: 'MPI_COMM_WORLD'
+comm0: rank: '3'
+comm0: size: '4'
+comm0: id: '0'
+comm0: Rank: local 0 global 0
+comm0: Rank: local 1 global 1
+comm0: Rank: local 2 global 2
+comm0: Rank: local 3 global 3
+comm1: name: 'MPI_COMM_SELF'
+comm1: rank: '0'
+comm1: size: '1'
+comm1: id: '0x1'
+comm2: name: 'MPI_COMM_NULL'
+comm2: size: '0'
+comm2: id: '0x2'
+comm3: name: 'MPI COMMUNICATOR 3 DUP FROM 0'
+comm3: rank: '3'
+comm3: size: '4'
+comm3: id: '0x3'
+comm3: Rank: local 0 global 0
+comm3: Rank: local 1 global 1
+comm3: Rank: local 2 global 2
+comm3: Rank: local 3 global 3
+comm4: name: 'MPI COMMUNICATOR 4 DUP FROM 0'
+comm4: rank: '3'
+comm4: size: '4'
+comm4: id: '0x4'
+comm4: Rank: local 0 global 0
+comm4: Rank: local 1 global 1
+comm4: Rank: local 2 global 2
+comm4: Rank: local 3 global 3
+comm5: name: 'MPI COMMUNICATOR 5 SPLIT FROM 3'
+comm5: rank: '1'
+comm5: size: '2'
+comm5: id: '0x5'
+comm5: Rank: local 0 global 1
+comm5: Rank: local 1 global 3
+Total: 10 communicators of which 0 are in use.
+No data was recorded for 24 communicators
+-----------------
+[0-3] (4 processes)
+-----------------
+main() at deadlock.c:42
+      locals
+        MPI_Comm alpha = 'MPI COMMUNICATOR 3 DUP FROM 0' [0-3]
+        MPI_Comm  beta = 'MPI COMMUNICATOR 4 DUP FROM 0' [0-3]
+        MPI_Comm *  mb = '' [0-3]
+        char *       p = 'Address 0xffffffff out of bounds' [0-3]
+        MPI_Comm split = 'MPI COMMUNICATOR 5 SPLIT FROM 3' [0-3]
+  -----------------
+  [0-3] (4 processes)
+  -----------------
+  PMPI_Barrier() at pbarrier.c:62
+        params
+          MPI_Comm comm:
+              'MPI COMMUNICATOR 3 DUP FROM 0' [1-3]
+              'MPI COMMUNICATOR 4 DUP FROM 0' [0]
+        locals
+          int err = '0' [0-3]
+    -----------------
+    [0-3] (4 processes)
+    -----------------
+    ompi_coll_tuned_barrier_intra_dec_fixed() at coll_tuned_decision_fixed.c:206
+          params
+            struct ompi_communicator_t * comm:
+                'MPI COMMUNICATOR 3 DUP FROM 0' [1-3]
+                'MPI COMMUNICATOR 4 DUP FROM 0' [0]
+            mca_coll_base_module_t *   module = 'valid pointer perm=rw-p ([heap])' [0-3]
+          locals
+            int communicator_size = '0' [0-3]
+      -----------------
+      [0-3] (4 processes)
+      -----------------
+      ompi_coll_tuned_barrier_intra_recursivedoubling() at coll_tuned_barrier.c:172
+            params
+              struct ompi_communicator_t * comm:
+                  'MPI COMMUNICATOR 3 DUP FROM 0' [1-3]
+                  'MPI COMMUNICATOR 4 DUP FROM 0' [0]
+              mca_coll_base_module_t *   module = 'valid pointer perm=rw-p ([heap])' [0-3]
+            locals
+              int adjsize = '4' [0-3]
+              int     err = '0' [0-3]
+              int    line: more than 3 distinct values
+              int    mask:
+                  '2' [0-1]
+                  '4' [2-3]
+              int    rank: more than 3 distinct values
+              int  remote:
+                  '0' [1-2]
+                  '1' [0,3]
+              int    size = '4' [0-3]
+        -----------------
+        [0-3] (4 processes)
+        -----------------
+        ompi_coll_tuned_sendrecv_actual() at coll_tuned_util.c:54
+              params
+                void *                    sendbuf = 'null pointer' [0-3]
+                int                        scount = '0' [0-3]
+                ompi_datatype_t *       sdatatype = 'MPI_BYTE' [0-3]
+                int                          dest:
+                    '0' [1-2]
+                    '1' [0,3]
+                int                          stag = '-16' [0-3]
+                void *                    recvbuf = 'null pointer' [0-3]
+                int                        rcount = '0' [0-3]
+                ompi_datatype_t *       rdatatype = 'MPI_BYTE' [0-3]
+                int                        source:
+                    '0' [1-2]
+                    '1' [0,3]
+                int                          rtag = '-16' [0-3]
+                struct ompi_communicator_t * comm:
+                    'MPI COMMUNICATOR 3 DUP FROM 0' [1-3]
+                    'MPI COMMUNICATOR 4 DUP FROM 0' [0]
+                ompi_status_public_t *     status = 'null pointer' [0-3]
+              locals
+                int                           err = '0' [0-3]
+                int                          line = '0' [0-3]
+                ompi_request_t *[2]          reqs = '{, }' [0-3]
+                ompi_status_public_t [2] statuses = 'value too long to display' [0-3]
+          -----------------
+          [0-3] (4 processes)
+          -----------------
+          ompi_request_default_wait_all() at request/req_wait.c:262
+                params
+                  size_t                    count = '2' [0-3]
+                  ompi_request_t **      requests: more than 3 distinct values
+                  ompi_status_public_t * statuses = 'valid pointer perm=rw-p ([stack])' [0-3]
+                locals
+                  char [30] __PRETTY_FUNCTION__ = '"ompi_request_default_wait_all"' [0-3]
+                  size_t              completed = '1' [0-3]
+                  size_t                      i = '2' [0-3]
+                  int                 mpi_error = '0' [0-3]
+                  size_t                pending = '1' [0-3]
+                  ompi_request_t *      request = 'valid pointer perm=rw-p ([heap])' [0-3]
+                  ompi_request_t **        rptr = '' [0-3]
+                  size_t                  start:
+                      '53' [0-1]
+                      '55' [2-3]
+            -----------------
+            [0-3] (4 processes)
+            -----------------
+            opal_condition_wait() at ../opal/threads/condition.h:99
+                  params
+                    opal_condition_t * c = 'valid pointer perm=rw-p' [0-3]
+                    opal_mutex_t *     m = 'valid pointer perm=rw-p' [0-3]
+                  locals
+                    int rc = '0' [0-3]
+              -----------------
+              [0,3] (2 processes)
+              -----------------
+              opal_progress() at runtime/opal_progress.c:206
+                    locals
+                      int events = '0' [0,3]
+                      size_t   i = '0' [0,3]
+              -----------------
+              [1] (1 processes)
+              -----------------
+              opal_progress() at runtime/opal_progress.c:181
+                    locals
+                      int       events = '0' [1]
+                      size_t         i = '2' [1]
+                      opal_timer_t now = '135914459801112' [1]
+                -----------------
+                [1] (1 processes)
+                -----------------
+                opal_timer_base_get_cycles() at ../opal/mca/timer/linux/timer_linux.h:31
+                  opal_sys_timer_get_cycles() at ../opal/include/opal/sys/ia32/timer.h:33
+                        locals
+                          opal_timer_t ret = '135914459801112' [1]
+              -----------------
+              [2] (1 processes)
+              -----------------
+              opal_progress() at runtime/opal_progress.c:166
+                    locals
+                      int events = '0' [2]
+                      size_t   i = '2' [2]
+</pre>
+</td></tr>
+</table>
+
+
+</div>
+<div id="footer">
+ <hr>
+ <p>Page maintained by Ashley Pittman. $Date: 2009-11-09 15:45:01 +0000 (Mon, 09 Nov 2009) $ $Revision: 326 $</p>
+</div>
