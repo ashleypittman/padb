@@ -561,7 +561,7 @@ $conf{pbs_server} = undef;
 $conf{edbopt} = undef;
 
 $conf{edb}   = find_edb();
-$conf{minfo} = find_minfo();
+$conf{minfo} = undef;
 
 # Option to define a list of ports used by padb.
 $conf{port_range} = undef;
@@ -669,8 +669,13 @@ sub find_edb {
 
 # Look for minfo.x in the same directory as padb.
 sub find_minfo {
-    my $dir = dirname($0);
-    return "$dir/minfo.x";
+    my $self = $0;
+    if ( $self =~ m{\A(.+)/bin/padb\z} ) {
+        my $dir = $1;
+        return "$dir/libexec/minfo";
+    }
+    my $dir = dirname($self);
+    return "$dir/minfo";
 }
 
 ###############################################################################
