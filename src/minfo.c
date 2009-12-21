@@ -3,8 +3,11 @@
  * Copyright (c) 2009, Ashley Pittman.
  */
 
-#ident "elfN.c,v 1.14 2005-11-03 11:23:04 ashley Exp"
-/*             /cvs/master/quadrics/elan4lib/edb/elfN.c,v */
+/*
+ * $URL$
+ * $Date$
+ * $Revision$
+ */
 
 #include <string.h>
 #include <stdlib.h>
