@@ -52,6 +52,10 @@
 #  * Add a 'command' mode to run abritary commands on the target node.
 #  * Add a 'thread-list' mode to report a comma seperated list of threads
 #    for each target process.
+#  * Add a 'thread-id' configuration option for when collecting stack
+#    traces.  This isn't a complete solution which will have to wait
+#    for 3.2 but does allow the user to specify which thread within an
+#    application is reported on.
 #  * Enhance the integration with gdb, use sequence numbers when
 #    talking to gdb and check that we get back what we give it.
 #    Correctly notice and raise an appropriate error if gdb dies
@@ -7098,7 +7102,7 @@ sub gdb_dump_frames {
 }
 
 sub gdb_dump_frames_per_thread {
-    my ( $gdb, $detail ) = @_;
+    my ( $gdb, $detail, $thread_id ) = @_;
     my @th = ();
     my %result = gdb_n_send( $gdb, '-thread-list-ids' );
     if ( $result{status} ne 'done' ) {
@@ -7108,6 +7112,11 @@ sub gdb_dump_frames_per_thread {
     if ( not defined $data->{'thread-ids'} ) {
         return;
     }
+
+    # I honestly don't know what this code is here for, presumably at
+    # some point in the past I've experienced a version of gdb which
+    # reports the number-of-threads as zero!  No harm in leaving the
+    # code here however.
     if ( $data->{'number-of-threads'} == 0 ) {
         my %t = ( id => 0 );
         @{ $t{frames} } = gdb_dump_frames( $gdb, $detail );
@@ -7128,6 +7137,9 @@ sub gdb_dump_frames_per_thread {
     }
     foreach my $thread ( @{ $data->{'thread-ids'} } ) {
         my $id = $thread->{'thread-id'};
+        if ( defined $thread_id ) {
+            next unless $thread_id eq $id;
+        }
         my %t = ( id => $id );
         gdb_send( $gdb, "-thread-select $id" );
         @{ $t{frames} } = gdb_dump_frames( $gdb, $detail );
@@ -7871,9 +7883,11 @@ sub stack_trace_from_pid {
         if (   $carg->{stack_shows_params}
             or $carg->{stack_shows_locals} )
         {
-            @threads = gdb_dump_frames_per_thread( $gdb, 1 );
+            @threads =
+              gdb_dump_frames_per_thread( $gdb, 1, $carg->{thread_id} );
         } else {
-            @threads = gdb_dump_frames_per_thread($gdb);
+            @threads =
+              gdb_dump_frames_per_thread( $gdb, undef, $carg->{thread_id} );
         }
 
         if ( defined $threads[0]->{frames} ) {
@@ -7892,7 +7906,13 @@ sub stack_trace_from_pid {
         and ( $tries++ < $carg->{gdb_retry_count} ) );
 
     if ( not defined $threads[0]{id} ) {
-        target_error( $vp, 'Could not extract stack trace from application' );
+        if ( $carg->{thread_id} ) {
+            target_error( $vp,
+                'Could not extract stack trace for specified thread' );
+        } else {
+            target_error( $vp,
+                'Could not extract stack trace from application' );
+        }
         return;
     }
 
@@ -9430,6 +9450,7 @@ sub common_main {
             stack_strip_above =>
 'elan_waitWord,elan_pollWord,elan_deviceCheck,opal_condition_wait,opal_progress',
             stack_strip_below => 'main,__libc_start_main,start_thread',
+            thread_id         => undef,
         },
         options_bool => {
             stack_shows_params => 'yes',
