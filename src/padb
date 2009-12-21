@@ -50,6 +50,8 @@
 #  * Add a --lstopo option to run the lstopo command for each rank.
 #    http://www.open-mpi.org/projects/hwloc/
 #  * Add a 'command' mode to run abritary commands on the target node.
+#  * Add a 'thread-list' mode to report a comma seperated list of threads
+#    for each target process.
 #  * Enhance the integration with gdb, use sequence numbers when
 #    talking to gdb and check that we get back what we give it.
 #    Correctly notice and raise an appropriate error if gdb dies
@@ -8011,6 +8013,33 @@ sub stack_trace_from_pid {
     return;
 }
 
+sub thread_list_from_pid {
+    my ( $carg, $proc ) = @_;
+
+    return unless defined $proc->{gdb_handle};
+
+    my $gdb = $proc->{gdb_handle};
+
+    my %result = gdb_n_send( $gdb, '-thread-list-ids' );
+    if ( $result{status} ne 'done' ) {
+        return;
+    }
+    my $data = gdb_parse_reason( $result{reason}, 'thread-ids' );
+    if ( not defined $data->{'thread-ids'} ) {
+        return;
+    }
+
+    my @threads;
+    foreach my $thread ( @{ $data->{'thread-ids'} } ) {
+        my $id = $thread->{'thread-id'};
+        push @threads, $id;
+    }
+
+    my $thread_list = join q{,}, sort { $a <=> $b } @threads;
+
+    output( $proc->{vp}, $thread_list );
+}
+
 sub kill_proc {
     my ( $cargs, $vp, $pid ) = @_;
     my $signal = uc $cargs->{signal};
@@ -9352,6 +9381,13 @@ sub common_main {
             proc_shows_maps => 'no',
             proc_shows_stat => 'no',
         }
+    };
+
+    $allfns{threads} = {
+        handler_one => \&thread_list_from_pid,
+        needs_gdb   => 1,
+        arg_long    => 'thread-list',
+        help        => 'List threads in target processes',
     };
 
     $allfns{proc_summary} = {
