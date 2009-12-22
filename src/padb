@@ -370,7 +370,7 @@ if ( -d '/proc/1/path' ) {
 
 # Config options the inner knows about, only forward options if they are in
 # this list.
-my @inner_conf = qw(edb edbopt minfo rmgr scripts slurm_job_step pbs_server);
+my @inner_conf = qw(edb edbopt rmgr scripts slurm_job_step pbs_server);
 
 # More config options the inner knows about, these are forwarded on the
 # command line rather than over the sockets.
@@ -560,8 +560,7 @@ $conf{pbs_server} = undef;
 # These settings are passed onto inner only.
 $conf{edbopt} = undef;
 
-$conf{edb}   = find_edb();
-$conf{minfo} = undef;
+$conf{edb} = find_edb();
 
 # Option to define a list of ports used by padb.
 $conf{port_range} = undef;
@@ -667,12 +666,17 @@ sub find_edb {
     return 'edb';
 }
 
-# Look for minfo.x in the same directory as padb.
+# Look for minfo in the filesystem.  If it appears that padb has been
+# installed then look for minfo in the directory where it would have been
+# installed to.  If that's not the case or it's not there then look in the
+# same directory as padb is running from.
 sub find_minfo {
     my $self = $0;
     if ( $self =~ m{\A(.+)/bin/padb\z} ) {
         my $dir = $1;
-        return "$dir/libexec/minfo";
+        if ( -f "$dir/libexec/minfo" ) {
+            return "$dir/libexec/minfo";
+        }
     }
     my $dir = dirname($self);
     return "$dir/minfo";
@@ -6280,6 +6284,14 @@ sub run_minfo {
 
     my @all_dll_filenames;
 
+    # If supplied with a value of minfo then use it otherwise pick the
+    # version that was installed with padb.
+    my $minfo = $carg->{minfo};
+
+    if ( not defined $minfo ) {
+        $minfo = find_minfo();
+    }
+
     if ( defined $carg->{mpi_dll} ) {
         push @all_dll_filenames, $carg->{mpi_dll};
     } else {
@@ -6326,8 +6338,7 @@ sub run_minfo {
         $files{$filename} = 1;
     }
 
-    my $cmd = $inner_conf{minfo};
-    $h->{hpid} = open3( $h->{fd}{wtr}, $h->{fd}{rdr}, *M_ERROR, $cmd )
+    $h->{hpid} = open3( $h->{fd}{wtr}, $h->{fd}{rdr}, *M_ERROR, $minfo )
       or confess "Unable to popen() h: $!\n";
 
     if ( $h->{debug} ) {
@@ -6498,7 +6509,7 @@ sub run_minfo {
         $stderr .= $_;
     }
     if ($have_error_messages) {
-        target_error( $vp, "Stderr from minfo: $stderr" );
+        target_error( $vp, "Stderr from minfo:\n$stderr" );
     }
 
     my $sc = keys %stats;
@@ -6511,18 +6522,16 @@ sub run_minfo {
     if ( $sc == 0 ) {
 
         # No interaction was had with minfo, abort with nothing.
-        target_error( $vp, "Error running $inner_conf{minfo}: No contact" );
+        target_error( $vp, "Error running $minfo: No contact" );
         return;
     }
 
     if ( $global{exit} ne 'ok' ) {
         if ( $global{exit} eq 'die' ) {
-            target_error( $vp,
-                "Error message from $inner_conf{minfo}: $global{dmsg}" );
+            target_error( $vp, "Error message from $minfo: $global{dmsg}" );
 
         } else {
-            target_error( $vp,
-                "Error running $inner_conf{minfo}: Bad exit code $?" );
+            target_error( $vp, "Error running $minfo: Bad exit code $?" );
         }
     }
 
@@ -9276,8 +9285,7 @@ sub inner_main {
 
     # Over-ride the defaults for these two as minfo might not exist on the
     # front end.
-    $inner_conf{edb}   = find_edb();
-    $inner_conf{minfo} = find_minfo();
+    $inner_conf{edb} = find_edb();
 
     # Load the command line options.
     my %optionhash;
@@ -9356,7 +9364,10 @@ sub common_main {
         arg_short   => 'q',
         handler     => \&qsnet_show_tport_queue,
         help        => 'Show the message queues',
-        options_i   => { mpi_dll => undef, }
+        options_i   => {
+            minfo   => undef,
+            mpi_dll => undef,
+        }
     };
 
     $allfns{kill} = {
@@ -9379,17 +9390,23 @@ sub common_main {
         arg_long    => 'mpi-queue',
         arg_short   => 'Q',
         help        => 'Show MPI message queues',
-        options_i   => { mpi_dll => undef, }
+        options_i   => {
+            minfo   => undef,
+            mpi_dll => undef,
+        }
     };
 
     $allfns{deadlock} = {
-        handler_one  => \&show_mpi_queue_one,
-        needs_gdb    => 1,
-        arg_long     => 'deadlock',
-        arg_short    => 'j',
-        help         => 'Run deadlock detection algorithm',
-        out_handler  => \&mpi_deadlock_detect,
-        options_i    => { mpi_dll => undef, },
+        handler_one => \&show_mpi_queue_one,
+        needs_gdb   => 1,
+        arg_long    => 'deadlock',
+        arg_short   => 'j',
+        help        => 'Run deadlock detection algorithm',
+        out_handler => \&mpi_deadlock_detect,
+        options_i   => {
+            mpi_dll => undef,
+            minfo   => undef,
+        },
         options_bool => {
             show_group_members => 'no',
             show_all_groups    => 'no',
@@ -9490,8 +9507,9 @@ sub common_main {
         pre_out_handler => \&pre_mpi_watch,
         out_handler     => \&show_mpi_watch,
         options_i       => {
+            minfo          => undef,
             mpi_dll        => undef,
-            mpi_watch_file => undef
+            mpi_watch_file => undef,
         }
     };
 
