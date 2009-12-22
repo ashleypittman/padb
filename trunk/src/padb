@@ -6353,13 +6353,14 @@ sub run_minfo {
     my %stats;
 
     # Communicator data.
-    my %cd;
+    my %communicator_descriptor;
+    my %message_descriptor;
 
     my %global;
 
     $global{exit} = 'unknown';
 
-    my @cd;
+    my @communicator_list;
     my $bytes_to_read;
     my $str_name;
     my $str_value = $EMPTY_STRING;
@@ -6393,7 +6394,7 @@ sub run_minfo {
                         target_key_pair( $vp, 'minfo_msg', $str_name );
                     }
                 } else {
-                    $cd{$str_name} = $str_value;
+                    $communicator_descriptor{$str_name} = $str_value;
                 }
                 $bytes_to_read = undef;
                 $str_value     = "";
@@ -6455,13 +6456,40 @@ sub run_minfo {
                     $str_name      = $name;
                     $str_global    = 0;
                 } elsif ( $key eq 'rt' ) {
-                    push @{ $cd{rt} }, $value;
+                    push @{ $communicator_descriptor{rt} }, $value;
                 } else {
-                    $cd{$key} = $value;
-                    $cd{mid} = $cid;
+                    $communicator_descriptor{$key} = $value;
+                    $communicator_descriptor{mid} = $cid;
                 }
             } else {
-                target_key_pair( $vp, 'UNPARSEABLE MINFO', $r );
+                target_error( $vp, "UNPARSEABLE MINFO: $r" );
+            }
+        } elsif ( $cmd eq 'Msg:' ) {
+            $stats{msg}++;
+            if (
+                $r =~ m{\A
+                        Msg:
+                        [ ]
+                        (\w+):
+                        (-?\d+)
+                        \z
+                        }x
+              )
+            {
+                my $key   = $1;
+                my $value = $2;
+
+                if ( $key eq 'start' ) {
+                    undef %message_descriptor;
+                } elsif ( $key eq 'done' ) {
+                    push @{ $communicator_descriptor{messages} },
+                      dclone( \%message_descriptor );
+                    undef %message_descriptor;
+                } else {
+                    $message_descriptor{$key} = $value;
+                }
+            } else {
+                target_error( $vp, "UNPARSEABLE MINFO: $r" );
             }
         } elsif ( $cmd eq 'zzz:' ) {
             $stats{zzz}++;
@@ -6487,14 +6515,14 @@ sub run_minfo {
                     $str_global    = 1;
                 }
             } else {
-                target_key_pair( $vp, 'UNPARSEABLE MINFO', $r );
+                target_error( $vp, "UNPARSEABLE MINFO: $r" );
             }
         } elsif ( $cmd eq 'done' ) {
-            push @cd, dclone( \%cd );
-            undef %cd;
+            push @communicator_list, dclone( \%communicator_descriptor );
+            undef %communicator_descriptor;
         } else {
             $stats{raw}++;
-            push @{ $cd{raw} }, $r;
+            push @{ $message_descriptor{raw} }, $r;
         }
     }
 
@@ -6535,7 +6563,7 @@ sub run_minfo {
         }
     }
 
-    return minfo_to_array( \@cd );
+    return minfo_to_array( \@communicator_list );
 
 }
 
@@ -6545,7 +6573,6 @@ sub minfo_to_array {
     my @mq;
     foreach my $comm ( @{$cd} ) {
 
-        #print Dumper $comm;
         push @mq, "comm$comm->{mid}: name: '$comm->{name}'";
         if ( defined $comm->{rank} ) {
             push @mq, "comm$comm->{mid}: rank: '$comm->{rank}'";
@@ -6558,8 +6585,43 @@ sub minfo_to_array {
             push @mq, "comm$comm->{mid}: Rank: local $i global $comm->{rt}[$i]";
         }
 
-        foreach my $l ( @{ $comm->{raw} } ) {
-            push @mq, $l;
+        my $mid = 0;
+
+        foreach my $m ( @{ $comm->{messages} } ) {
+            my @op_desc = qw(pending_send pending_receive unexpected_message);
+            my @status_desc = qw(pending matched complete);
+            my $op = "Operation $m->{op_type} ($op_desc[$m->{op_type}])";
+            $op .= " status $m->{status} ($status_desc[$m->{status}])";
+            push @mq, "msg$mid: $op";
+            push @mq,
+"msg$mid: Rank local $m->{desired_local_rank} global $m->{desired_global_rank}";
+            if ( defined $m->{actual_global_rank} ) {
+                push @mq,
+"msg$mid: Actual local $m->{actual_local_rank} global $m->{actual_global_rank}";
+            }
+
+            if ( defined $m->{actual_length} ) {
+                push @mq,
+"msg$mid: Size desired $m->{desired_length} actual $m->{actual_length}";
+            } else {
+                push @mq, "msg$mid: Size desired $m->{desired_length}";
+            }
+            push @mq, "msg$mid: tag_wild $m->{tag_wild}";
+
+            if ( defined $m->{actual_tag} ) {
+                push @mq,
+"msg$mid: Tag desired $m->{desired_tag} actual $m->{actual_tag}";
+            } else {
+                push @mq, "msg$mid: Tag desired $m->{desired_tag}";
+            }
+
+            push @mq, "msg$mid: system_buffer $m->{system_buffer}";
+
+            foreach my $l ( @{ $m->{raw} } ) {
+                push @mq, "msg$mid: $l";
+            }
+
+            $mid++;
         }
     }
     return @mq;

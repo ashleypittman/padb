@@ -487,6 +487,11 @@ void show_comm_coll_state (mqs_process *target_process, mqs_communicator *comm, 
     }
 }
 
+void show_msg_op (char *name, int value)
+{
+    printf("Msg: %s:%d\n",name,value);
+}
+
 void show_op (mqs_pending_operation *op, int msgid, int type)
 {
     int i;
@@ -494,36 +499,37 @@ void show_op (mqs_pending_operation *op, int msgid, int type)
     
     if ( type == mqs_pending_sends || op->status == mqs_st_matched || op->status == mqs_st_complete )
 	all = 1;
+
+    show_msg_op("start",1);
     
-    printf("msg%d: Operation %d (%s) status %d (%s)\n",
-	   msgid,type,op_types[type],op->status,op_status[op->status]);
-    printf("msg%d: Rank local %d global %d\n",
-	   msgid,(int)op->desired_local_rank, (int)op->desired_global_rank);
-    if ( all )
-	printf("msg%d: Actual local %d global %d\n",
-	       msgid, (int)op->actual_local_rank, (int)op->actual_global_rank);
-    if ( all ) 
-	printf("msg%d: Size desired %d actual %d\n",
-	       msgid, (int)op->desired_length, (int)op->actual_length);
-    else
-	printf("msg%d: Size desired %d\n",
-	       msgid, (int)op->desired_length);
-    printf("msg%d: tag_wild %d\n",msgid,op->tag_wild);
-    if ( all ) 
-	printf("msg%d: Tag desired %d actual %d\n",
-	       msgid, (int)op->desired_tag, (int)op->actual_tag);
-    else
-	printf("msg%d: Tag desired %d\n",msgid, (int)op->desired_tag);
-    printf("msg%d: system_buffer %d\n",msgid,op->system_buffer);
-    printf("msg%d: Buffer 0x%lx\n",msgid,(long)op->buffer);
+    show_msg_op("op_type",type);
+    show_msg_op("status",op->status);
+
+    show_msg_op("desired_local_rank",op->desired_local_rank);
+    show_msg_op("desired_global_rank",op->desired_global_rank);
+    show_msg_op("desired_length",op->desired_length);
+    show_msg_op("desired_tag",op->desired_tag);
+    if ( all ) {
+	show_msg_op("actual_local_rank",op->actual_local_rank);
+	show_msg_op("actual_global_rank",op->actual_global_rank);
+	show_msg_op("actual_length",op->actual_length);
+	show_msg_op("actual_tag",op->actual_tag);
+    }
+    
+    show_msg_op("tag_wild",op->tag_wild);
+    show_msg_op("system_buffer",op->system_buffer);
+    
+    printf("Buffer 0x%lx\n",(long)op->buffer);
     
     i = 0;
     do {
 	if ( op->extra_text[i][0] )
-	    printf("msg%d: '%s'\n",msgid,op->extra_text[i]);
+	    printf("'%s'\n",op->extra_text[i]);
 	else
 	    i = 10;
     } while ( i++ < 5 );
+
+    show_msg_op("done",1);    
 }
 
 void load_ops (mqs_process *target_process,int type)
