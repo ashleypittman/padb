@@ -7,20 +7,22 @@ CFLAGS=-Wall -g
 
 FILES = Makefile minfo.c mpi_interface.h padb
 
-minfo.x: minfo.c mpi_interface.h
-	$(CC) minfo.c -o minfo.x -ldl $(CFLAGS)
+minfo: minfo.c mpi_interface.h
+	$(CC) minfo.c -o minfo -ldl $(CFLAGS)
 
-install: minfo.x
+install: minfo
 	/bin/mkdir -p ${INSTALL_DIR}/bin
-	/bin/cp minfo.x ${INSTALL_DIR}/bin/
 	/bin/cp padb ${INSTALL_DIR}/bin/
+	/bin/mkdir -p ${INSTALL_DIR}/libexec
+	/bin/cp minfo ${INSTALL_DIR}/libexec/
+
 
 make config_install:
 	/bin/mkdir -p ${CONFIG_DIR}
 	/bin/cp padb.conf ${CONFIG_DIR}/
 
 clean:
-	/bin/rm -f minfo.x
+	/bin/rm -f minfo
 
 tarfile:
 	/bin/rm -f padb-${VERSION}.tgz
