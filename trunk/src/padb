@@ -2749,7 +2749,6 @@ sub pbs_is_installed {
 sub pbs_get_lqsub {
     my ( $user, $server ) = @_;
     my $job;
-    my $nprocess;
     my $cmd = "qstat -w -n -u $user \@$server";
 
     my @output = slurp_cmd($cmd);
@@ -5574,7 +5573,6 @@ sub gdb_attach {
         my $exe = readlink("/proc/$pid/path/a.out");
         my %cs = gdb_n_send( $gdb, "file $exe" );
         if ( $cs{status} ne 'done' ) {
-            croak("Gdb command file $exe failed");
             return;
         }
     }
@@ -5627,6 +5625,7 @@ sub gdb_attach_post {
 
     gdb_n_send( $gdb, '-gdb-set print address off' );
 
+    return;
 }
 
 sub gdb_attach_async_start {
@@ -5636,7 +5635,6 @@ sub gdb_attach_async_start {
         my $exe = readlink("/proc/$pid/path/a.out");
         my %cs = gdb_n_send( $gdb, "file $exe" );
         if ( $cs{status} ne 'done' ) {
-            croak("Gdb command file $exe failed");
             return;
         }
     }
@@ -7883,6 +7881,7 @@ sub global_detach {
             delete $proc->{gdb_handle};
         }
     }
+    return;
 }
 
 # Try and be clever here, attach to each and every process on this node
@@ -8134,6 +8133,7 @@ sub thread_list_from_pid {
     my $thread_list = join q{,}, sort { $a <=> $b } @threads;
 
     output( $proc->{vp}, $thread_list );
+    return;
 }
 
 sub kill_proc {
