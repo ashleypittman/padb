@@ -3087,6 +3087,21 @@ sub mpirun_setup_job {
     # I've left the old code here for now as I suspect this is going to be
     # something that causes trouble in the future.
 
+    # If the datatype is readable then verify it's as expected, no
+    # issue if we can't read it however, then we just have to trust
+    # the resource manager.
+    my $proctable_type = gdb_load_type( $gdb, 'MPIR_proctable' );
+
+    if ( defined $proctable_type ) {
+        if ( defined $proctable_type->{pid}
+            and $proctable_type->{pid} ne 'int' )
+        {
+            print
+"MPIR_proctable.pid is of wrong type: \'$proctable_type->{pid}\'.";
+            print "  Attempting to continue anyway...\n";
+        }
+    }
+
     if (1) {
         my $word_size = gdb_type_size( $gdb, 'void *' );
         my $table_size = ( $word_size * 2 ) + 4;
@@ -6227,6 +6242,35 @@ sub gdb_read_value_addr {
         return $v->{value};
     }
     return;
+}
+
+# For a given type load it's type!  Takes a type name and returns (if
+# possible) a hash representing the underlying type in the target.
+# Works best if calls on structs where it returns the names and types
+# if the struct entries.
+sub gdb_load_type {
+    my ( $gdb, $type ) = @_;
+
+    my %t = gdb_n_send( $gdb, "-var-create - * $type" );
+
+    return unless ( defined $t{status} and $t{status} eq 'done' );
+
+    my $reason = gdb_parse_reason( $t{reason} );
+
+    my %v = gdb_n_send( $gdb, "-var-list-children 1 $reason->{name}" );
+    return unless ( defined $v{status} and $v{status} eq 'done' );
+
+    my $z = gdb_parse_reason( $v{reason} );
+
+    my %type;
+
+    foreach my $c ( @{ $z->{children} } ) {
+        my $child = $c->{child};
+
+        $type{ $child->{exp} } = $child->{type};
+    }
+
+    return \%type;
 }
 
 sub minfo_handle_query {
