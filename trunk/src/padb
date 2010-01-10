@@ -3109,6 +3109,13 @@ sub mpirun_setup_job {
             my $hostp = gdb_read_pointer( $gdb, $struct_base + $host_offset );
             my $host = gdb_string( $gdb, 1024, $hostp );
 
+	    # Ideally this won't happen but it can and does, for example if
+	    # the user supplies a hostsfile with localhost specified the
+	    # resource manager can leave this value unmodified.
+	    if ( defined $host and $host eq 'localhost' ) {
+                $host = hostname();
+            }
+
             my $pid = gdb_read_int( $gdb, $struct_base + $pid_offset );
             if ( defined $host and defined $pid ) {
                 $pt{$host}{$proc} = $pid;
