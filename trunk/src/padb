@@ -741,8 +741,8 @@ XXXX
 
   Stack trace options:
   gdb-retry-count      Number of times to try getting a 'good' stack trace from gdb.
-  stack-show-params    Show function parameters in stack traces.
-  stack-show-locals    Show locals in stack traces.
+  stack-shows-params    Show function parameters in stack traces.
+  stack-shows-locals    Show locals in stack traces.
 
   Statistics options:
   stats-short          Turn on "one process per line" stats reporting code.
