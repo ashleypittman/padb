@@ -3109,10 +3109,10 @@ sub mpirun_setup_job {
             my $hostp = gdb_read_pointer( $gdb, $struct_base + $host_offset );
             my $host = gdb_string( $gdb, 1024, $hostp );
 
-	    # Ideally this won't happen but it can and does, for example if
-	    # the user supplies a hostsfile with localhost specified the
-	    # resource manager can leave this value unmodified.
-	    if ( defined $host and $host eq 'localhost' ) {
+            # Ideally this won't happen but it can and does, for example if
+            # the user supplies a hostsfile with localhost specified the
+            # resource manager can leave this value unmodified.
+            if ( defined $host and $host eq 'localhost' ) {
                 $host = hostname();
             }
 
@@ -5339,7 +5339,9 @@ sub outer_main {
         push_command('deadlock');
 
         my $c = $conf{mode_options}{stack};
-        $c->{strip_above_wait} = 0;
+        $c->{strip_above_wait}   = 0;
+        $c->{stack_shows_params} = 1;
+        $c->{stack_shows_locals} = 1;
         push_command( 'stack', 'tree', $c );
 
         go_job($full_report);
@@ -9544,8 +9546,8 @@ sub common_main {
             thread_id         => undef,
         },
         options_bool => {
-            stack_shows_params => 'yes',
-            stack_shows_locals => 'yes',
+            stack_shows_params => 'no',
+            stack_shows_locals => 'no',
         },
         secondary => [
             {
