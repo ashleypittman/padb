@@ -3861,9 +3861,13 @@ sub _add_data_to_tree {
 }
 
 sub add_data_to_tree {
-    my ( $tree, $d ) = @_;
+    my ( $tree, $ns, $d ) = @_;
+    my $prefix = $EMPTY_STRING;
+    if ( defined $ns ) {
+        $prefix = "$ns|";
+    }
     if ( defined $d->{target_data} ) {
-        _add_data_to_tree( $tree, $d, $EMPTY_STRING );
+        _add_data_to_tree( $tree, $d, $prefix );
     }
     return;
 }
@@ -3913,15 +3917,41 @@ sub display_tree {
 sub new_tree {
     my ( $lines, $d ) = @_;
     my %tree;
-    debug_log( 'tree', undef, 'Making the tree' );
+    debug_log( 'tree', $d, 'Making the tree' );
     foreach my $tag ( sort { $a <=> $b } keys %{$lines} ) {
         add_tag_to_tree( \%tree, $tag, $lines->{$tag} );
     }
     debug_log( 'tree', \%tree, 'Enhancing the tree' );
-    add_data_to_tree( \%tree, $d );
+    add_data_to_tree( \%tree, undef, $d );
     debug_log( 'tree', \%tree, 'Formatting the tree' );
     my $t = display_tree( \%tree, );
     debug_log( 'tree', undef, 'Displaying the tree' );
+    print $t;
+    debug_log( 'tree', undef, 'Done' );
+    return;
+}
+
+# An experimental new tree format.
+sub new_ns_tree {
+    my ( $d, $ns ) = @_;
+
+    my %tree;
+    debug_log( 'tree', undef, 'Making the tree' );
+    my @tags;
+    foreach my $tag ( keys %{ $d->{target_ns_output} } ) {
+        if ( defined $d->{target_ns_output}->{$tag}->{$ns} ) {
+            push @tags, $tag;
+        }
+    }
+    foreach my $tag ( sort { $a <=> $b } @tags ) {
+        add_tag_to_tree( \%tree, $tag, $d->{target_ns_output}->{$tag}->{$ns} );
+    }
+    debug_log( 'tree', \%tree, 'Enhancing the tree' );
+    add_data_to_tree( \%tree, $ns, $d );
+    debug_log( 'tree', \%tree, 'Formatting the tree' );
+    my $t = display_tree( \%tree, );
+    debug_log( 'tree', undef, 'Displaying the tree' );
+    print "Stack trace(s) for thread: $ns\n";
     print $t;
     debug_log( 'tree', undef, 'Done' );
     return;
@@ -3931,7 +3961,17 @@ sub complex_output_handler {
     my ( $output, $lines, $d ) = @_;
 
     if ( $output eq 'tree' ) {
-        new_tree( $lines, $d );
+        if ( not defined $d->{target_ns_output} ) {
+            new_tree( $lines, $d );
+            return;
+        }
+
+        foreach
+          my $ns ( sort { $a <=> $b } keys %{ $d->{target_data}{thread_id} } )
+        {
+            new_ns_tree( $d, $ns );
+        }
+
     } elsif ( $output eq 'compress' ) {
 
         foreach my $tag ( sort { $a <=> $b } ( keys %{$lines} ) ) {
@@ -4419,6 +4459,14 @@ sub command_from_inner {
             'Target data %s',
             format_target_data( $d->{target_data} )
         );
+    }
+
+    if ( defined $d->{target_output} ) {
+        debug_log( 'tdata', $d->{target_output}, 'Target output' );
+    }
+
+    if ( defined $d->{target_ns_output} ) {
+        debug_log( 'tdata', $d->{target_ns_output}, 'Target namespace output' );
     }
 
     maybe_clear_screen();
@@ -5497,7 +5545,15 @@ sub outer_main {
 my %inner_conf;
 
 my %inner_output;
+my %inner_ns_output;
 my %local_target_data;
+
+sub output_namespace {
+    my ( $rank, $ns, $str ) = @_;
+
+    push @{ $inner_ns_output{$rank}{$ns} }, $str;
+    return;
+}
 
 sub output {
     my ( $vp, $str ) = @_;
@@ -8054,6 +8110,9 @@ sub stack_trace_from_pid {
         my @frames = @{ $thread->{frames} };
 
         output( $vp, "ThreadId: $thread->{id}" ) if ( @threads != 1 );
+        if ( $carg->{out_format} eq 'tree' ) {
+            target_key_pair( $vp, 'thread_id', $thread->{id} );
+        }
 
         my $strip_below;
 
@@ -8095,8 +8154,11 @@ sub stack_trace_from_pid {
             output( $vp, $l );
 
             if ( $carg->{out_format} eq 'tree' ) {
+
+                output_namespace( $vp, $thread->{id}, $l );
                 push @fl, $l;
                 my $fl = join( ",", @fl );
+                $fl = "$thread->{id}|$fl";
                 if ( $carg->{stack_shows_locals} ) {
                     my @local_names;
                     foreach my $loc ( @{ $frame->{locals} } ) {
@@ -8797,6 +8859,14 @@ sub reply_from_child {
         }
     }
 
+    # Combine the target process responses from child.
+    if ( exists $r->{target_ns_output} ) {
+        foreach my $tp ( keys %{ $r->{target_ns_output} } ) {
+            $handle->{all_replys}->{target_ns_output}{$tp} =
+              $r->{target_ns_output}{$tp};
+        }
+    }
+
     # Copy the target local responses.
     if ( exists $handle->{target_response} ) {
         foreach my $tp ( keys %{ $handle->{target_response} } ) {
@@ -8811,6 +8881,13 @@ sub reply_from_child {
     }
 
     %inner_output = ();
+
+    # Save any output we've got from this node.
+    foreach my $key ( keys %inner_ns_output ) {
+        $handle->{all_replys}->{target_ns_output}{$key} =
+          $inner_ns_output{$key};
+    }
+    %inner_ns_output = ();
 
     # Copy the network target errors into response.
     if ( exists $r->{target_data} ) {
@@ -9260,6 +9337,11 @@ sub command_from_outer {
             $res->{target_output}{$key} = $inner_output{$key};
         }
 
+        # Save any output we've got from this node.
+        foreach my $key ( keys %inner_ns_output ) {
+            $res->{target_ns_output}{$key} = $inner_ns_output{$key};
+        }
+
         if (%local_target_data) {
             $res->{target_data} = \%local_target_data;
         }
@@ -9268,6 +9350,7 @@ sub command_from_outer {
 
         # Clear down the local inputs.
         %inner_output               = ();
+        %inner_ns_output            = ();
         %local_target_data          = ();
         $netdata->{target_response} = undef;
 
