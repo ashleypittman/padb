@@ -328,7 +328,7 @@ int _find_data (mqs_process *proc, mqs_taddr_t addr, int size, void *base)
     int i;
     char *local = base;
     
-    char *ptr;
+    char *ptr = NULL;
     if ( size == 0 )
 	return mqs_ok;
     
