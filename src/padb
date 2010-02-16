@@ -916,7 +916,7 @@ sub slurp_cmd {
 
 sub slurp_remote_cmd {
     my ( $host, $cmd ) = @_;
-    return slurm_cmd("ssh $host $cmd");
+    return slurp_cmd("ssh $host $cmd");
 }
 
 sub slurp_dir {
