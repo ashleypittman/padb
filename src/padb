@@ -2937,7 +2937,7 @@ sub lsfmpi_get_mpiproc {
 
     #get ps from the leading host(the one that start mpirun.lsf)
     my @handle =
-      slurp_remote_cmd( $host, "ps -o pid=,ppid=,cmd= -u $target_user" );
+      slurp_remote_cmd( $host, "ps -o pid= -o ppid= -o cmd= -u $target_user" );
 
     $count_line = @handle;
     for ( my $i = 0 ; $i < $count_line ; $i++ ) {    # to avoid loop
