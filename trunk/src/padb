@@ -10158,8 +10158,8 @@ sub common_main {
         handler      => \&lstopo,
         arg_long     => 'lstopo',
         help         => 'Show CPU topology using lstopo',
-        options_i    => { lstopo_command => 'lstopo --whole-system -', },
-        options_bool => { lstopo_show_warning => 'yes', },
+        options_i    => { lstopo_command => 'lstopo --pid %p -', },
+        options_bool => { lstopo_show_warning => 'no', },
     };
 
     $allfns{command} = {
