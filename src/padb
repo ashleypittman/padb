@@ -5984,6 +5984,16 @@ sub gdb_start {
 
 sub gdb_quit {
     my ($gdb) = @_;
+    if ( $gdb->{seq} == 1 ) {
+        foreach my $fdname (qw(rdr wtr err)) {
+            next unless exists $gdb->{$fdname};
+            close $gdb->{$fdname};
+        }
+        if ( defined $gdb->{debugfd} ) {
+            close $gdb->{debugfd};
+        }
+        return;
+    }
     gdb_send( $gdb, 'quit' );
     waitpid $gdb->{gdbpid}, 0;
     foreach my $fdname (qw(rdr wtr err)) {
