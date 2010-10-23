@@ -9066,6 +9066,64 @@ sub slurm_find_pids {
 #
 # PBS support
 #
+# Find if parent is resource manager or not 
+# there's two cases:
+# 1- parent immediately is pbs_attach, Ok it's true
+# 2- no parent immediately is pbs_attach, so find until mpd & parent is root
+#
+# take care of no existing process or immediate parent is 1 or 0
+# or proc itself is 'pbs_attach'
+# 
+# reason to write this:
+#    in new version of pbspro there's no more pbs_attach
+#    and in this case padb fails to find any rank procs
+# 
+# example:
+#UID        PID  PPID  C STIME TTY   TIME     CMD
+#thipa    23562     1  0 13:28 ?     00:00:00 python /opt/mpi/mpibull2-1.3.7-1.t/bin/mpd.py
+#thipa    23563 23562  0 13:28 ?     00:00:00 python /opt/mpi/mpibull2-1.3.7-1.t/bin/mpd.py
+#thipa    23564 23562  0 13:28 ?     00:00:00 python /opt/mpi/mpibull2-1.3.7-1.t/bin/mpd.py
+#thipa    23565 23563  0 13:28 ?     00:00:00 ./pp_sndrcv_spbl
+#thipa    23566 23564  0 13:28 ?     00:00:00 ./pp_sndrcv_spbl
+#
+#
+sub is_parent_resmgr_pbs {
+    my $input_pid = shift;
+    my $result;
+    my $parent_pid = find_from_status( $input_pid, 'PPid' );
+    my $name_pid = find_from_status( $input_pid, 'Name');
+    return if (!defined ($parent_pid) || $parent_pid == 1 || $parent_pid == 0 || $name_pid eq 'pbs_attach');
+    # loop to find its parents
+    my $pid = $parent_pid;
+    my $loop = 0;
+    for (;;) {
+       # find PPid of this pid
+       my $ppid = find_from_status( $pid, 'PPid' );
+       my @name = slurp_file("/proc/$pid/cmdline");
+       $loop++;
+       my $line = $name[0];
+       my @champs = split(/\0+/,$line);
+       if ($loop == 1 ) {
+          if ($champs[0] eq 'pbs_attach') {
+             $result = 1; # OK parent is resm
+             last;
+          }
+          if ($ppid == 1 || $ppid == 0) {
+             last; # parent is root last anyway
+          }
+       } elsif ($loop >= 2) {
+          if ($ppid == 1 || $ppid == 0) {
+             if (defined($champs[1]) && $champs[1] =~ /mpd.py/) {
+                $result = 1 # OK parent is resm
+             }
+             last; # parent is root last anyway
+          }
+       }
+       $pid=$ppid;
+    }
+    return ($result);
+}
+#
 sub pbs_find_pids {
     my $job = shift;
 
@@ -9082,7 +9140,7 @@ sub pbs_find_pids {
         next if ( is_resmgr_process($pid) );
 
         # Skip over ones which aren't direct descendants of a resource manager
-        next unless is_parent_resmgr($pid);
+        next unless is_parent_resmgr_pbs($pid);
 
         my $vp;
         my %env = get_remote_env($pid);
@@ -9090,7 +9148,7 @@ sub pbs_find_pids {
             %env = get_remote_env_bygdb($pid);
         }
 
-        if ( $env{PBS_JOBID} eq $job ) {
+        if ( defined( $env{PBS_JOBID} ) && $env{PBS_JOBID} eq $job ) {
             $vp = $env{PMI_RANK};
         }
         if ( defined $vp ) {
