@@ -3414,7 +3414,7 @@ sub mpirun_setup_job {
     my $gdb = gdb_start();
     if ( not gdb_attach( $gdb, $job ) ) {
         if ( defined $gdb->{error} ) {
-            print "Failed to attach to process: $gdb->{error}\n";
+            print "$gdb->{error}\n";
         } else {
             print "Failed to attach to process\n";
         }
@@ -6040,6 +6040,14 @@ sub gdb_attach {
         my $r = gdb_parse_reason( $p{reason} );
         if ( defined $r->{msg} ) {
             $gdb->{error} = "Failed to attach to process: $r->{msg}";
+            my $yama_file = "/proc/sys/kernel/yama/ptrace_scope";
+            if ( -f $yama_file ) {
+                my $yama = slurp_file($yama_file);
+                if ( $yama != '0' ) {
+                    $gdb->{error} =
+"Failed to attach to process: $r->{msg} (try echo 0 > $yama_file)";
+                }
+            }
         } else {
             $gdb->{error} = 'Failed to attach to process';
         }
@@ -6111,6 +6119,15 @@ sub gdb_attach_async_end {
         my $r = gdb_parse_reason( $p{reason} );
         if ( defined $r->{msg} ) {
             $gdb->{error} = "Failed to attach to process: $r->{msg}";
+            my $yama_file = "/proc/sys/kernel/yama/ptrace_scope";
+            if ( -f $yama_file ) {
+                my $yama = slurp_file($yama_file);
+                if ( $yama != '0' ) {
+                    $gdb->{error} =
+"Failed to attach to process!: $r->{msg} (try echo 0 > $yama_file)";
+                }
+            }
+
         } else {
             $gdb->{error} = 'Failed to attach to process';
         }
