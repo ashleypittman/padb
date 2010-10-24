@@ -13,7 +13,7 @@ echo Uploading website to http://padb.pittman.org.uk
 
 FILES="index usage download email extensions modes full-report configuration"
 
-ftp-upload --host padb.pittman.org.uk -u padb@pittman.co.uk --password $PASSWORD layout.css
+ftp-upload --passive --host padb.pittman.org.uk -u padb@pittman.co.uk --password $PASSWORD layout.css
 
 for FILE in $FILES
 do
@@ -22,13 +22,13 @@ do
   cat header.html > $TFILE
   cat $FILE.html >> $TFILE
   cat footer.html >> $TFILE
-  ftp-upload --host padb.pittman.org.uk -u padb@pittman.co.uk --password $PASSWORD --as $FILE.html $TFILE
+  ftp-upload --passive --host padb.pittman.org.uk -u padb@pittman.co.uk --password $PASSWORD --as $FILE.html $TFILE
   # ftp-upload --host padb.pittman.org.uk -u padb@pittman.co.uk --password $PASSWORD --as $FILE/index.html $TFILE
   #ftp-upload --host padb.pittman.org.uk -u padb@pittman.co.uk --password $PASSWORD --as $FILE/layout.css layout.css
   rm $TFILE
 done
 
-ftp-upload --host padb.pittman.org.uk -u padb@pittman.co.uk --password $PASSWORD  OpenMPI-padb-groups.patch
+ftp-upload --passive --host padb.pittman.org.uk -u padb@pittman.co.uk --password $PASSWORD  OpenMPI-padb-groups.patch
 #ftp-upload --host padb.pittman.org.uk -u padb@pittman.co.uk --password $PASSWORD --as extensions/OpenMPI-padb-groups.patch OpenMPI-padb-groups.patch
 
 echo All done.
