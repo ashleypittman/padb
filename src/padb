@@ -5953,7 +5953,14 @@ sub is_parent_resmgr {
 # number of years however so lets try not doing it for a while and see
 # where that gets us.
 
-# $SIG{PIPE} = 'IGNORE';
+# Enabling this again until I can fix things properly as it's causing problems.
+# if gdb isn't installed then we get a SIGPIPE (which is normally fatal) when
+# starting it, previously this would happen inside an eval block but now with
+# the global attach it doesn't.  Ideally we should catch the case where gdb isn't
+# there and pass the error back up but that is tricky to do so for now simply
+# catch the signal, we won't then be able to attach and will report a sensible
+# error message to the user.
+$SIG{PIPE} = 'IGNORE';
 
 sub gdb_start {
     my ( $exe, $core ) = @_;
@@ -6024,7 +6031,7 @@ sub gdb_attach {
     if ( not defined $p{status} ) {
         $gdb->{error} = 'Failed to attach to process';
         if ( not find_exe('gdb') ) {
-            $gdb->{error} = 'Failed to attach to process (gdb not installed?)';
+            $gdb->{error} = 'Failed to attach to process (is gdb installed?)';
         }
         return;
     }
@@ -6095,7 +6102,7 @@ sub gdb_attach_async_end {
     if ( not defined $p{status} ) {
         $gdb->{error} = 'Failed to attach to process';
         if ( not find_exe('gdb') ) {
-            $gdb->{error} = 'Failed to attach to process (gdb not installed?)';
+            $gdb->{error} = 'Failed to attach to process (is gdb installed?)';
         }
         return;
     }
