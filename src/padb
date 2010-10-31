@@ -9608,6 +9608,25 @@ sub inner_find_pids {
 
     if ( defined $cmd->{pd} ) {
         my $hostname = $inner_conf{hostname};
+
+  # Check for this host having any processes, if it doesn't appear to on first
+  # inspection then try removing any domain name from the hostname and see if
+  # we have a match then.  This allows for the case where hostnames are reported
+  # the resource manager without domain names but hostnames are set with domain
+  # names.
+  # Note this is probably not 'safe' for strict definitions of hostnames and
+  # domain names but for clusters it's highly unlikely to have two nodes with
+  # matching hostnames but different domains.
+
+        if ( not defined $cmd->{pd}{$hostname} ) {
+
+            my ($new_name) = split $PERIOD, $hostname;
+
+            if ( not defined $new_name ) {
+                return;
+            }
+            $hostname = $new_name;
+        }
         foreach my $rank ( keys %{ $cmd->{pd}{$hostname} } ) {
             register_target_process( $rank, $cmd->{pd}{$hostname}{$rank} );
         }
