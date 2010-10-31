@@ -9627,6 +9627,20 @@ sub inner_find_pids {
             }
             $hostname = $new_name;
         }
+
+        # We didn't match on the hostname and we haven't matched by removing
+        # a domainname from our hostname so now try walking to list of specified
+        # hosts to see if any of them shorten to the current hostname.
+        if ( not defined $cmd->{pd}{$hostname} ) {
+            foreach my $target_host ( keys %{ $cmd->{pd} } ) {
+                my ($short_target) = split $PERIOD, $target_host;
+                if ( $short_target eq $hostname ) {
+                    $hostname = $target_host;
+                }
+            }
+
+        }
+
         foreach my $rank ( keys %{ $cmd->{pd}{$hostname} } ) {
             register_target_process( $rank, $cmd->{pd}{$hostname}{$rank} );
         }
