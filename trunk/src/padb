@@ -9878,7 +9878,7 @@ sub command_from_parent {
 
     # Detach from all processes if the outer requested us to.
     if ( defined $cmd->{detach_after_callback} ) {
-        global_detach( $cmd->{mode}, $pid_list );
+        global_detach($pid_list);
     }
 
     return;
