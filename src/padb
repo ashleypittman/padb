@@ -373,9 +373,9 @@ if ( -d '/proc/1/path' ) {
 my @inner_conf =
   qw(edb edbopt rmgr scripts slurm_job_step pbs_server lsf_mode lsfmpi_server lsfmpi_mpirpid lsfmpi_port);
 
-# More config options the inner knows about, these are forwarded on the
+# More options the inner knows about, these are forwarded on the
 # command line rather than over the sockets.
-my @inner_conf_cmd = qw(port_range outer);
+my @inner_conf_cmd = qw(port_range outer interval);
 
 ###############################################################################
 #
@@ -5697,11 +5697,11 @@ sub outer_main {
     }
 
     foreach my $co (@conf_bool) {
-        $conf{$co} = check_and_convert_bool( $conf{$co} );
+        config_set_internal( $co, check_and_convert_bool( $conf{$co} ) );
     }
 
     foreach my $co (@conf_time) {
-        $conf{$co} = check_and_convert_time( $conf{$co} );
+        config_set_internal( $co, check_and_convert_time( $conf{$co} ) );
     }
 
     foreach my $co (@conf_int) {
@@ -9984,6 +9984,8 @@ sub inner_loop_for_comms {
     my $hostname = $inner_conf{hostname};
     my $key      = rand;
 
+    my $outer_timeout = $inner_conf{interval} * 2;
+
     if ( defined $outerloc ) {
         my ( $ohost, $oport ) = split $COLON, $outerloc;
         my $os = IO::Socket::INET->new(
@@ -10019,8 +10021,14 @@ sub inner_loop_for_comms {
 
     my $stime = time;
 
+    # "Last seen time" of another process.  This is the time we last had any
+    # communication from the outer, if it becomes too far in the past then
+    # we should probably exit.
+    my $ltime = $stime;
+
     while ( $sel->count() > 0 ) {
         while ( my @data = $sel->can_read(5) ) {
+            $ltime = time;
             foreach my $s (@data) {
                 if ( $s == $server ) {
                     my $new = $server->accept() or confess('Failed accept');
@@ -10069,6 +10077,16 @@ sub inner_loop_for_comms {
         # signons for whatever reason silently die as it's probably the best
         # thing do to.
         if ( ( $sel->count() == 1 ) and ( ( $time - $stime ) > 30 ) ) {
+            exit 0;
+        }
+
+        # If we are (were) connected but haven't heard anything for a while then
+        # the outer process has likely died so we should also exit cleanly.
+        # There doesn't seem to be another way to detect this so just abort
+        # if we haven't heard anything for a while.  This value needs to be
+        # greater than the maximum reasonable value for 'interval' in the
+        # outer process.
+        if ( ( $time - $ltime ) > $outer_timeout ) {
             exit 0;
         }
     }
