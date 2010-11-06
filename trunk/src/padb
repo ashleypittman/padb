@@ -575,6 +575,8 @@ $conf{port_range} = undef;
 
 $conf{tree_width} = '4';
 
+$conf{launch_mode} = 'local,rmgr,ssh,pdsh';
+
 # Config options which take boolean values.
 my @conf_bool = qw(watch_clears_screen inner_callback);
 
@@ -3711,30 +3713,66 @@ sub setup_job {
     # Otherwise call the more flexible setup_job function.
     my %pcmd = $rmgr{ $conf{rmgr} }{setup_job}($job);
 
-    # If the resource manager interface is able to give a hostlist but
-    # not able or willing to launch a shadow job natively then use
-    # pdsh to launch the inner processes.  This allows us to be less
-    # dependant on the resource manager and work in a wider variety of
-    # cases.  Using pdsh like this limits us to 32 hosts (More if we
-    # set the FANOUT pdsh environment variable) so perhaps a better
-    # way can be found in the future.
-    if ( defined $pcmd{host_list} and not defined $pcmd{command} ) {
+# Now we have a either a command capable of launching using the selected resource
+# manager, a list of hosts or both.  At this point we can pick the best way to
+# launch the job by walkin the list given in the configuration until we find one
+# that works.  Note this allows users to prevent the use of the resource manager
+# to launch shadow jobs and also to force the use of pdsh.
 
-        my @hosts = @{ $pcmd{host_list} };
-        if ( $hosts[0] ne hostname() or @hosts > 1 ) {
+    my $mode_list = $conf{launch_mode};
 
-            if ( not find_exe('pdsh') ) {
-                print
-"$conf{rmgr} resource manager on multiple or remote hosts requires pdsh to be installed\n";
-                return;
+# The other three launchers require a host list so in the absence of one force it
+# to use rmgr.
+    if ( not defined $pcmd{host_list} ) {
+        $mode_list = 'rmgr';
+    }
+
+    my @modes = split $COMMA, $mode_list;
+
+    my @hosts = @{ $pcmd{host_list} };
+
+    my $have_pdsh = find_exe('pdsh');
+
+    foreach my $mode (@modes) {
+        if ( $mode eq 'local' ) {
+            my $hc = @hosts;
+            my $h  = hostname();
+            if ( @hosts == 1 and $hosts[0] eq hostname() ) {
+                $pcmd{command} = '';
+                return %pcmd;
             }
+        } elsif ( $mode eq 'rmgr' ) {
+            return %pcmd;
+        } elsif ( $mode eq 'ssh' ) {
+            if ( @hosts == 1 ) {
+                $pcmd{command} = "ssh $hosts[0]";
+                return %pcmd;
+            }
+        } elsif ( $mode eq 'pdsh' and $have_pdsh ) {
 
             $pcmd{require_inner_callback} = 1;
             my $hlist = join q{,}, @hosts;
             $pcmd{command} = "pdsh -w $hlist";
+
+            if ( @hosts > 20 ) {
+                my $fanout = @hosts + 5;
+                $ENV{FANOUT} = $fanout;
+
+                if ( @hosts > 128 ) {
+                    print "Pdsh backend not recommended for such large jobs\n";
+                }
+            }
+
+            return %pcmd;
+
+        } else {
+            print "Backend invalid: $mode\n";
         }
     }
-    return %pcmd;
+
+    print "No suitable backend found (perhaps try installing pdsh?)!\n";
+    return;
+
 }
 
 ###############################################################################
