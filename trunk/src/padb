@@ -9984,7 +9984,7 @@ sub inner_loop_for_comms {
     my $hostname = $inner_conf{hostname};
     my $key      = rand;
 
-    my $outer_timeout = $inner_conf{interval} * 2;
+    my $outer_timeout = ( $inner_conf{interval} * 2 ) + 10;
 
     if ( defined $outerloc ) {
         my ( $ohost, $oport ) = split $COLON, $outerloc;
