@@ -8018,6 +8018,20 @@ sub show_task_stat_file {
     return;
 }
 
+sub show_task_cmdline {
+    my ( $vp, $dir ) = @_;
+
+    local $/ = "\0";
+    open my $FD, '<', "$dir/cmdline" or return;
+    my @args;
+    while (<$FD>) {
+        chomp;
+        push @args, $_;
+    }
+    proc_output( $vp, 'cmdline', "@args" );
+    return;
+}
+
 sub show_task_dir {
     my ( $carg, $vp, $pid, $dir ) = @_;
 
@@ -8030,6 +8044,9 @@ sub show_task_dir {
         show_task_file( $vp, "$dir/status" );
         show_task_file( $vp, "$dir/wchan", 'wchan' );
         show_task_file( $vp, "$dir/stat", 'stat' );
+
+        show_task_cmdline( $vp, $dir );
+
         if ( $carg->{proc_shows_stat} ) {
             show_task_stat_file( $vp, "$dir/stat" );
         }
