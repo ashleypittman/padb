@@ -3835,10 +3835,28 @@ sub sort_proc_hashes {
     my $key  = shift;
     my @all  = (@_);
 
-    if ( $carg->{reverse_sort_order} ) {
-        return ( reverse sort { $a->{$key} <=> $b->{$key} } @all );
+    my $numeric = 1;
+
+    foreach my $a (@all) {
+        if ( not $a->{$key} =~ m{\A\d+\z} ) {
+            $numeric = 0;
+            last;
+        }
+    }
+
+    my @sorted;
+
+    if ($numeric) {
+        @sorted = sort { $a->{$key} <=> $b->{$key} } @all;
     } else {
-        return ( sort { $a->{$key} <=> $b->{$key} } @all );
+        @sorted = sort { $a->{$key} cmp $b->{$key} } @all;
+
+    }
+
+    if ( $carg->{reverse_sort_order} ) {
+        return ( reverse @sorted );
+    } else {
+        return (@sorted);
     }
 }
 
