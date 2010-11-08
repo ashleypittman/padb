@@ -3761,13 +3761,16 @@ sub setup_job {
                 return %pcmd;
             }
         } elsif ( $mode eq 'rmgr' ) {
-            return %pcmd;
+            if ( defined $pcmd{command} ) {
+                return %pcmd;
+            }
         } elsif ( $mode eq 'ssh' ) {
             if ( @hosts == 1 ) {
                 $pcmd{command} = "ssh $hosts[0]";
                 return %pcmd;
             }
-        } elsif ( $mode eq 'pdsh' and $have_pdsh ) {
+        } elsif ( $mode eq 'pdsh' ) {
+            next unless ($have_pdsh);
 
             $pcmd{require_inner_callback} = 1;
             my $hlist = join q{,}, @hosts;
