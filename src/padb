@@ -2763,34 +2763,53 @@ sub pbs_is_installed {
 # for each one.
 sub pbs_get_lqsub {
     my ( $user, $server ) = @_;
-    my $job;
-    my $cmd = "qstat -w -n -u $user \@$server";
+    my $cmd = "qstat -n -u $user \@$server";
+
+    my $job = undef;
 
     my @output = slurp_cmd($cmd);
-    foreach (@output) {
-        if (/\d+\.$server/i) {
-            $_ =~ s/^ +//;    # suppress leading space(for sure)
-            my @champs = split(/\s+/);    # split by space
-            if ( $champs[9] eq 'R' ) {    # take only Running
-                ($job) = split qr{\.}, $champs[0];
-                $pbs_tabjobs{$job}{nproc} = $champs[6];
-            } else {
-                $job = undef;
+    foreach my $line (@output) {
+
+# If we have previously matched a job (see below) then extract the hostlist.
+# This line of outpuas has the form:
+# " xn8/0*2+xn9/0*2+xn10/0*2"
+# all we care about from this is the hostname (xn[8-10]) so split on '+' and then
+# strip everything after the first '/'
+        if ( defined $job ) {
+
+            $line =~ s/^ +//;    # suppress blank in front of line
+            $line =~ s/^\+//;    # suppress first + sign
+            my @champs = split( /\+/, $line );    # split by '+'
+            foreach my $word (@champs) {
+                my ($host) = split "/", $word;
+                push( @{ $pbs_tabjobs{$job}{hosts} }, $host );
             }
-        } elsif ( defined $job ) {
-            $_ =~ s/^ +//;                # suppress blank in front of line
-            $_ =~ s/^\+//;                # suppress first + sign
-            my @champs = split(/\+/);     # split by '+'
-            if ( defined $pbs_tabjobs{$job}{server} ) {
-                printf("Warning, job $job exists on multiple servers\n");
+            $job = undef;
+            next;
+        }
+
+# See if this line of output matches a job id, it has to be of the correct user and running.
+# If this is a running job set $job to it's identifier so the code above can match the hostlist
+# which will be on the next line of output.
+        my @parts = split $SPACE, $line;
+        if ( $#parts == 10 and $parts[1] eq $user and $parts[9] eq 'R' ) {
+            my ( $job_id, $job_server ) = split $PERIOD, $parts[0];
+
+            if ( defined $pbs_tabjobs{$job_id}{server} ) {
+                printf("Warning, job $job_id exists on multiple servers\n");
                 next;
             }
-            $pbs_tabjobs{$job}{server} = $server;
-            foreach my $word (@champs) {
-                chomp($word);
-                $word =~ s/\/.*//;        # take all from /
-                push( @{ $pbs_tabjobs{$job}{hosts} }, $word );
+            $job = $job_id;
+
+# This test is perfectly "safe" and should never fail apart from the case where the job id
+# and the server name don't fit inside the 15 characters allowed.  This can be worked around
+# by setting the -w flag which tells pbs_pro to print up to 30 characters but that doesn't
+# work on Torque or plain pbs so only check this value if the string is shorter than that.
+            if ( length $parts[0] < 15 and $job_server ne $server ) {
+                printf("Warning, job is listed with unexpected server\n");
             }
+            $pbs_tabjobs{$job_id}{nproc}  = $parts[6];
+            $pbs_tabjobs{$job_id}{server} = $server;
         }
     }
     return;
