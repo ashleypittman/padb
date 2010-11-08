@@ -3996,7 +3996,8 @@ sub show_proc_format {
             my $value = $lines->{$tag}{$key};
             next unless defined $proc_format_lengths{$key} or $show_fields;
 
-            if ( length $value > $proc_format_lengths{$key} ) {
+            if ( defined $value and length $value > $proc_format_lengths{$key} )
+            {
                 $proc_format_lengths{$key} = length $value;
             }
 
@@ -8338,27 +8339,29 @@ sub show_proc_all {
 
             next unless defined $proc->{stat_end};
 
-            proc_output(
-                $vp, 'pcpu',
-                pcpu_total(
-                    $cpucount,           $elapsed,
-                    $proc->{stat_start}, $proc->{stat_end}
-                )
-            );
-            proc_output(
-                $vp, 'pucpu',
-                pcpu_user(
-                    $cpucount,           $elapsed,
-                    $proc->{stat_start}, $proc->{stat_end}
-                )
-            );
-            proc_output(
-                $vp, 'pscpu',
-                pcpu_sys(
-                    $cpucount,           $elapsed,
-                    $proc->{stat_start}, $proc->{stat_end}
-                )
-            );
+            if ( $elapsed > 0 ) {
+                proc_output(
+                    $vp, 'pcpu',
+                    pcpu_total(
+                        $cpucount,           $elapsed,
+                        $proc->{stat_start}, $proc->{stat_end}
+                    )
+                );
+                proc_output(
+                    $vp, 'pucpu',
+                    pcpu_user(
+                        $cpucount,           $elapsed,
+                        $proc->{stat_start}, $proc->{stat_end}
+                    )
+                );
+                proc_output(
+                    $vp, 'pscpu',
+                    pcpu_sys(
+                        $cpucount,           $elapsed,
+                        $proc->{stat_start}, $proc->{stat_end}
+                    )
+                );
+            }
         }
     }
 
