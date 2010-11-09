@@ -3748,7 +3748,10 @@ sub setup_job {
 
     my @modes = split $COMMA, $mode_list;
 
-    my @hosts = @{ $pcmd{host_list} };
+    my @hosts;
+    if ( defined $pcmd{host_list} ) {
+        @hosts = @{ $pcmd{host_list} };
+    }
 
     my $have_pdsh = find_exe('pdsh');
 
@@ -3771,6 +3774,7 @@ sub setup_job {
             }
         } elsif ( $mode eq 'pdsh' ) {
             next unless ($have_pdsh);
+            next if ( @hosts == 0 );
 
             $pcmd{require_inner_callback} = 1;
             my $hlist = join q{,}, @hosts;
