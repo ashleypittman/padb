@@ -27,7 +27,7 @@
 
 #include <unistd.h>
 
-#include <edb.h>
+#include "edb.h"
 
 #include <elan4/library.h>
 

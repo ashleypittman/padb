@@ -7,7 +7,7 @@
 /*             /cvs/master/quadrics/elan4lib/edb/ptrace.c,v */
 
 
-#include <edb.h>
+#include "edb.h"
 
 #define MACRO_BEGIN {
 #define MACRO_END   }
