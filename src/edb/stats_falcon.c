@@ -11,7 +11,7 @@
 #include <stdio.h>
 #include <inttypes.h>
 
-#include <edb.h>
+#include "edb.h"
 
 #include <ctype.h>
 

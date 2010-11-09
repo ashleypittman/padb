@@ -10,7 +10,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
-#include <edb.h>
+#include "edb.h"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>

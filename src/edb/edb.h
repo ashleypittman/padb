@@ -140,7 +140,7 @@ extern int fetchti64 (struct etrace_ops cb, uint64_t tip, struct elan4_trap_info
 extern int dump_stats_eagle(void *pages, size_t size, size_t pagesize);
 
 /* New, can do lots of things with it */
-#include <sf.h>
+#include "sf.h"
 
 /* elf.c */
 extern void fetch_data_dead (char *cname, char *ename, int trap_dump);

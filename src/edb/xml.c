@@ -5,7 +5,7 @@
 #ident "xml.c,v 1.3 2005/02/03 15:26:08 ashley Exp"
 /*             /cvs/master/quadrics/elan4lib/edb/xml.c,v */
 
-#include <edb.h>
+#include "edb.h"
 
 /***********************************************************
  *                                                         *
