@@ -73,85 +73,155 @@
 static uint64_t
 find_sym_in_tablesTSIZE (struct etrace_ops *ops,
 		      struct link_map *map,
+		      uint64_t hash,
 		      int nchains,
 		      uint64_t symtab,
 		      uint64_t strtab,
 		      char *sym_name)
 {
     ElfTSIZE_Sym sym;
+    ElfTSIZE_Sym *sym_p;
     char str[128];
     int i = 0;
     int check;
     
     if ( verbose > 3 )
 	printf("New table mapped at %#"PRIx64" containing %d chains\n",strtab,nchains);
-    
-    while (i < nchains) {
+    if (hash) {
+	while (i < nchains) {
 	
-	if ( ops->rcopy(ops->handle,
-			(uint64_t)(uintptr_t)((unsigned long)symtab + (i * sizeof(ElfTSIZE_Sym))),
-			&sym,
-			sizeof(ElfTSIZE_Sym)) == -1 ) {
-	    printf("Failed to read from process\n");
-	    return 0;
-	}
-	
-	i++;
-	check = 0;
-		
-	if ( sym.st_info == (unsigned char)ELFTSIZE_ST_INFO(STB_GLOBAL,STT_OBJECT))
-	    check = 1;
-	
-	if ( sym.st_value == 6 )
-	    check = 0;
-	
-	if ( ELFTSIZE_ST_TYPE(sym.st_info) == (unsigned char)STT_FILE )
-	    check = 0;
-	
-	if ( check ) {
-	    /* read symbol name from the string table */
-	    
-//	    str = (char *) strtab + sym.st_name;
-	    
-	    if ( fetch_string(ops,&str[0],strtab + sym.st_name,128) == -1 ) {
-		if ( verbose > 2 )
-		    printf("Failed to find string, returning nothing\n");
+	    if ( ops->rcopy(ops->handle,
+			    (uint64_t)(uintptr_t)((unsigned long)symtab + (i * sizeof(ElfTSIZE_Sym))),
+			    &sym,
+			    sizeof(ElfTSIZE_Sym)) == -1 ) {
+		printf("Failed to read from process\n");
 		return 0;
 	    }
 	    
-	    if ( verbose > 2 )
-		printf("String is type %x bind %x other %x size %x value "TARGET_PTR" shndx %x name %lx '%s'\n",
-		       (int) ELFTSIZE_ST_TYPE(sym.st_info),
-		       (int) ELFTSIZE_ST_BIND(sym.st_info),
-		       (int) sym.st_other,
-		       (int) sym.st_size,
-		       sym.st_value,
-		       (int) sym.st_shndx,
-		       (long) sym.st_name,
-		       str);
+	    i++;
+	    check = 0;
+		
+	    if ( sym.st_info == (unsigned char)ELFTSIZE_ST_INFO(STB_GLOBAL,STT_OBJECT))
+		check = 1;
+	
+	    if ( sym.st_value == 6 )
+		check = 0;
+	
+	    if ( ELFTSIZE_ST_TYPE(sym.st_info) == (unsigned char)STT_FILE )
+		check = 0;
+	
+	    if ( check ) {
+		/* read symbol name from the string table */
 	    
-	    /* compare it with our symbol*/
-	    if (strcmp(&str[0], sym_name) == 0) {
-		
+//	    str = (char *) strtab + sym.st_name;
+	    
+		if ( fetch_string(ops,&str[0],strtab + sym.st_name,128) == -1 ) {
+		    if ( verbose > 2 )
+			printf("Failed to find string, returning nothing\n");
+		    return 0;
+		}
+	    
 		if ( verbose > 2 )
-		    printf("\nSuccess: got it %s "TARGET_PTR" "TARGET_PTR" "TARGET_PTR"\n",
-			   &str[0],
-			   (TARGET_TYPE)map->l_addr,
+		    printf("String is type %x bind %x other %x size %x value "TARGET_PTR" shndx %x name %lx '%s'\n",
+			   (int) ELFTSIZE_ST_TYPE(sym.st_info),
+			   (int) ELFTSIZE_ST_BIND(sym.st_info),
+			   (int) sym.st_other,
+			   (int) sym.st_size,
 			   sym.st_value,
-			   (TARGET_TYPE)map->l_addr + sym.st_value);
+			   (int) sym.st_shndx,
+			   (long) sym.st_name,
+			   str);
 		
-		if ( sym.st_value ) {
-		    return (uint64_t)(map->l_addr + sym.st_value);
+		/* compare it with our symbol*/
+		if (strcmp(&str[0], sym_name) == 0) {
+		    
+		    if ( verbose > 2 )
+			printf("\nSuccess: got it %s "TARGET_PTR" "TARGET_PTR" "TARGET_PTR"\n",
+			       &str[0],
+			       (TARGET_TYPE)map->l_addr,
+			       sym.st_value,
+			       (TARGET_TYPE)map->l_addr + sym.st_value);
+		    
+		    if ( sym.st_value ) {
+			return (uint64_t)(map->l_addr + sym.st_value);
+		    }
 		}
 	    }
 	}
+	
+	if ( verbose > 2 )
+	    printf("Found nothing\n");
+	
+	/* no symbol found, return 0 */
+	return 0;
+    } else {
+	/* If there is no DT_HASH, we can still walk the symbol table linearly until we find what we're after
+	   or we get an invalid memory reference */
+         /* First entry is always blank, second one always has no name */
+	sym_p = (void *)symtab;
+	sym_p += 2;
+
+	if ( ops->rcopy(ops->handle, (uint64_t)(uintptr_t)sym_p,
+	                &sym, sizeof(ElfTSIZE_Sym)) == -1 ) {
+	    printf("Failed to read from process\n");
+	    return 0;
+	}
+
+	while (sym.st_name != 0) {
+	    int check = 0;
+	    if ( sym.st_info == (unsigned char)ELFTSIZE_ST_INFO(STB_GLOBAL,STT_OBJECT))
+		check = 1;
+	
+	    if ( sym.st_value == 6 )
+		check = 0;
+	
+	    if ( ELFTSIZE_ST_TYPE(sym.st_info) == (unsigned char)STT_FILE )
+		check = 0;
+
+	    if ( check ) {
+		if ( fetch_string(ops,&str[0],strtab + sym.st_name,128) == -1 ) {
+		    if ( verbose > 2 )
+			printf("Failed to find string, returning nothing\n");
+		    return 0;
+		}
+
+		if ( verbose > 2 )
+		    printf("String is type %x bind %x other %x size %x value "TARGET_PTR" shndx %x name %lx '%s'\n",
+			    (int) ELFTSIZE_ST_TYPE(sym.st_info),
+			    (int) ELFTSIZE_ST_BIND(sym.st_info),
+			    (int) sym.st_other,
+			    (int) sym.st_size,
+			    sym.st_value,
+			    (int) sym.st_shndx,
+			    (long) sym.st_name,
+			    str);
+
+		/* compare it with our symbol*/
+		if (strcmp(&str[0], sym_name) == 0) {
+
+		    if ( verbose > 2 )
+			printf("\nSuccess: got it %s "TARGET_PTR" "TARGET_PTR" "TARGET_PTR"\n",
+				&str[0],
+				(TARGET_TYPE)map->l_addr,
+				sym.st_value,
+				(TARGET_TYPE)map->l_addr + sym.st_value);
+
+		    if ( sym.st_value ) {
+			return (uint64_t)(map->l_addr + sym.st_value);
+		    }
+		}
+	    }
+
+	    sym_p++;
+	    if ( ops->rcopy(ops->handle, (uint64_t)(uintptr_t)sym_p,
+			&sym, sizeof(ElfTSIZE_Sym)) == -1 ) {
+		printf("Failed to read from process\n");
+		return 0;
+	    }
+	}
+
+	return 0;
     }
-    
-    if ( verbose > 2 )
-	printf("Found nothing\n");
-    
-    /* no symbol found, return 0 */
-    return 0;
 }
 
 static void
@@ -338,6 +408,7 @@ resolv_tablesTSIZE (struct etrace_ops *ops, struct link_map *map)
 {
     ElfTSIZE_Dyn dyn;
     uint64_t addr;
+    uint64_t hash = 0;
     int nchains;
     uint64_t symtab = 0;
     uint64_t strtab = 0;
@@ -356,22 +427,18 @@ resolv_tablesTSIZE (struct etrace_ops *ops, struct link_map *map)
 	    
 	    if ( verbose > 2 )
 		printf("Read nchains from "TARGET_PTR" %p\n",dyn.d_un.d_ptr, (void *)map->l_addr);
-	    
-	    /*
-	     * This smacks of being wrong but having looked at how RHAS3.0
-	     * handles things I don't see any other way it can work.
-	     *
-	     * Maybe it isn't so bad because the d_ptr is always 0x120 and
-	     * l_addr is page aligned so logical or won't ever require bit
-	     * carry and it should always get the right answer.
-	     *
-	     * ashley@quadrics.com 03th March 2004
-	     */
+
 	    if (ops->rcopy(ops->handle,
-			   (uint64_t)(uintptr_t)((dyn.d_un.d_ptr | map->l_addr) + 4),
+				    (uint64_t)(uintptr_t)dyn.d_un.d_ptr, &hash, sizeof(hash)) == -1) {
+		    return 0;
+	    }
+	    
+	    if (ops->rcopy(ops->handle,
+			   (uint64_t)(uintptr_t)(dyn.d_un.d_ptr + 4),
 			   &nchains,
-			   sizeof(nchains)) == -1 )
+			   sizeof(nchains)) == -1 ) {
 		return 0;
+	    }
 	    break;
 	case DT_STRTAB:
 	    strtab = dyn.d_un.d_ptr;
@@ -383,10 +450,11 @@ resolv_tablesTSIZE (struct etrace_ops *ops, struct link_map *map)
 	    break;
 	}
 	addr += sizeof(ElfTSIZE_Dyn);
-	if (ops->rcopy(ops->handle,addr, &dyn, sizeof(ElfTSIZE_Dyn))==-1)
+	if (ops->rcopy(ops->handle,addr, &dyn, sizeof(ElfTSIZE_Dyn))==-1) {
 	    return 0;
+	}
     }
-    return (find_sym_in_tablesTSIZE(ops,map,nchains,symtab,strtab,"elan_base"));
+    return (find_sym_in_tablesTSIZE(ops,map,hash,nchains,symtab,strtab,"elan_base"));
 }
 
 
@@ -482,6 +550,7 @@ uint64_t locate_linkmapTSIZE (struct etrace_ops *ops, int pid)
     
     do {
 	uint64_t b;
+	char name[4];
 	
 	if ( verbose > 2 )
 	    printf("The link_map looks like %p %p %p %p %p\n",
@@ -491,7 +560,16 @@ uint64_t locate_linkmapTSIZE (struct etrace_ops *ops, int pid)
 		   link->l_next,
 		   link->l_prev);
 	
-	b = (uint64_t)resolv_tablesTSIZE(ops,link);
+
+	/* Grab 4 bytes because ptrace won't allow less */
+	ops->rcopy(ops->handle, (uint64_t)(uintptr_t)link->l_name, &name, 4);
+	if ( *name == 0 ) {
+	    if ( verbose > 2 )
+		printf("Skipping anonymous map\n");
+	    b = 0;
+	} else {
+	    b = (uint64_t)resolv_tablesTSIZE(ops,link);
+	}
 	if ( b ) {
 	    free(link);
 	    return b;
