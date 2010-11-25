@@ -6052,6 +6052,7 @@ sub gdb_start {
         tracepid => -1,
         attached => 0,
         pa       => 0,
+        lang     => 'auto',
         debug    => 0,
         seq      => 1,
     };
@@ -6163,6 +6164,7 @@ sub gdb_attach_post {
     }
 
     gdb_n_send( $gdb, '-gdb-set print address off' );
+    gdb_n_send( $gdb, '-gdb-set language auto' );
 
     return;
 }
@@ -6315,9 +6317,32 @@ sub _gdb_set_print_address {
     return;
 }
 
+sub _gdb_set_lang {
+    my ( $gdb, $lang ) = @_;
+
+    if ( $lang eq $gdb->{lang} ) {
+        return;
+    }
+
+    $gdb->{lang} = $lang;
+
+    _gdb_send_real( $gdb, "-gdb-set language $lang" );
+
+    return;
+}
+
 sub gdb_n_send {
     my ( $gdb, $cmd ) = @_;
     _gdb_set_print_address( $gdb, 0 );
+    _gdb_set_lang( $gdb, 'auto' );
+    return _gdb_send_real( $gdb, $cmd );
+}
+
+# Send a command in the c language
+sub gdb_send_c {
+    my ( $gdb, $cmd ) = @_;
+    _gdb_set_print_address( $gdb, 1 );
+    _gdb_set_lang( $gdb, 'c' );
     return _gdb_send_real( $gdb, $cmd );
 }
 
@@ -6325,6 +6350,7 @@ sub gdb_n_send {
 sub gdb_send_addr {
     my ( $gdb, $cmd ) = @_;
     _gdb_set_print_address( $gdb, 1 );
+    _gdb_set_lang( $gdb, 'auto' );
     return _gdb_send_real( $gdb, $cmd );
 }
 
@@ -6662,7 +6688,7 @@ sub gdb_type_size {
 # adding extra text after the value which is causing hex to throw warnings.
 sub gdb_type_offset {
     my ( $gdb, $type, $field ) = @_;
-    my %p = gdb_send_addr( $gdb,
+    my %p = gdb_send_c( $gdb,
         "-data-evaluate-expression \"(void *)&(($type *)0)->$field\"" );
     return unless ( $p{status} eq 'done' );
     return hex gdb_strip_value( $p{reason} );
