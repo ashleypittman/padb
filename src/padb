@@ -4107,8 +4107,15 @@ sub default_output_handler {
 
     my $cargs = $req->{cargs};
 
-    # Warn on missing output here...
-    return unless exists $d->{target_output};
+    # Warn on missing output here, be sure to check both standard output and
+    # namespace output because if we are using a tree then there won't be any
+    # standard output.
+    if ( not exists $d->{target_output} and not exists $d->{target_ns_output} )
+    {
+        return;
+    }
+
+    #return unless exists $d->{target_output};
 
     my $lines = $d->{target_output};
     my $mode  = $req->{mode};
@@ -8664,8 +8671,6 @@ sub stack_trace_from_pid {
               ( $frame->{file} || '?' ),
               ( $frame->{line} || '?' );
 
-            output( $vp, $l );
-
             if ( $carg->{out_format} eq 'tree' ) {
 
                 output_namespace( $vp, $thread->{id}, $l );
@@ -8719,6 +8724,8 @@ sub stack_trace_from_pid {
                     }
                 }
             } else {
+                output( $vp, $l );
+
                 if ( $carg->{stack_shows_params} ) {
                     show_stack_vars( $vp, $frame, 'params' );
                 }
