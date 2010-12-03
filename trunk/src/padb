@@ -575,7 +575,7 @@ $conf{port_range} = undef;
 
 $conf{tree_width} = '4';
 
-$conf{launch_mode} = 'local,rmgr,ssh,pdsh';
+$conf{launch_mode} = 'local,rmgr,ssh,pdsh,clush';
 
 # Config options which take boolean values.
 my @conf_bool = qw(watch_clears_screen inner_callback);
@@ -3753,7 +3753,8 @@ sub setup_job {
         @hosts = @{ $pcmd{host_list} };
     }
 
-    my $have_pdsh = find_exe('pdsh');
+    my $have_pdsh  = find_exe('pdsh');
+    my $have_clush = find_exe('clush');
 
     foreach my $mode (@modes) {
         if ( $mode eq 'local' ) {
@@ -3791,12 +3792,25 @@ sub setup_job {
 
             return %pcmd;
 
+        } elsif ( $mode eq 'clush' ) {
+            next unless ($have_clush);
+            next if ( @hosts == 0 );
+
+            my $fanout = @hosts + 5;
+
+            $pcmd{require_inner_callback} = 1;
+            my $hlist = join q{,}, @hosts;
+            $pcmd{command} = "clush -f $fanout --nostdin -w $hlist";
+
+            return %pcmd;
+
         } else {
             print "Backend invalid: $mode\n";
         }
     }
 
-    print "No suitable backend found (perhaps try installing pdsh?)!\n";
+    print
+      "No suitable backend found (perhaps try installing pdsh or clush ?)!\n";
     return;
 
 }
