@@ -3777,17 +3777,14 @@ sub setup_job {
             next unless ($have_pdsh);
             next if ( @hosts == 0 );
 
+            my $fanout = @hosts + 5;
+
             $pcmd{require_inner_callback} = 1;
             my $hlist = join q{,}, @hosts;
-            $pcmd{command} = "pdsh -w $hlist";
+            $pcmd{command} = "pdsh -f $fanout -w $hlist";
 
-            if ( @hosts > 20 ) {
-                my $fanout = @hosts + 5;
-                $ENV{FANOUT} = $fanout;
-
-                if ( @hosts > 128 ) {
-                    print "Pdsh backend not recommended for such large jobs\n";
-                }
+            if ( @hosts > 128 ) {
+                print "Pdsh backend not recommended for such large jobs\n";
             }
 
             return %pcmd;
