@@ -636,15 +636,18 @@ sub check_and_convert_time {
     exit 1;
 }
 
+sub is_digit {
+    my ($str) = @_;
+
+    return $str =~ m{\A     # Start of line
+		   \d+    # A number
+		   \z}x
+}
+
 sub check_int {
     my ($str) = @_;
 
-    return
-      if (
-        $str =~ m{\A     # Start of line
-                  \d+    # A number
-                  \z}x
-      );
+    return if ( is_digit($str) );
 
     printf {*STDERR} "Integer value \"%s\" not recognised, aborting.\n", $str;
     exit 1;
@@ -3248,26 +3251,36 @@ sub open_get_data {
         next if ( $l eq $EMPTY_STRING );
 
         my @elems = split qr{\s*\|\s*}, $l;
+        next unless @elems >= 4;
 
-        if ( @elems == 4 ) {
+# We used to check for the number of elements here and then match the jobid seperatly but that doesn't
+# work for all cases as sometimes Open-Mpi has extra checkpoint-restart related data on the end
+# of each line changing the element count and hence the test to fail.  Now we check the element count
+# is at least as long as we expect, we check that all fields that should be integers are actually integers
+# and I've moved the regexp for matching the job ID into the line test.
+# For performance reasons I've put the per-rank test before the per-job test as it triggers more often.
+        if (    @elems >= 6
+            and ( $elems[1] =~ m{\A\[\[(\d+)\,(\d+)\]\,(\d+)\]}x )
+            and is_digit( $elems[2] )
+            and is_digit( $elems[3] ) )
+        {
+            my $job  = $1;
+            my $step = $2;
+            my $rank = $3;
+            my $pid  = $elems[3];
+            my $host = $elems[4];
+            $open_jobs{$job}{$step}{hosts}{$host}++;
+            $open_jobs{$job}{$step}{ranks}{$host}{$rank} = $pid;
+
+        } elsif ( @elems >= 4
+            and ( $elems[0] =~ m{\A\[(\d+)\,(\d+)]\z}x )
+            and is_digit( $elems[2] )
+            and is_digit( $elems[3] ) )
+        {
             my $nprocs = $elems[3];
-            my $name   = $elems[0];
-            if ( $name =~ m{\A\[(\d+)\,(\d+)]\z}x ) {
-                my $job  = $1;
-                my $step = $2;
-                $open_jobs{$job}{$step}{nprocs} = $nprocs;
-            }
-        } elsif ( @elems == 6 ) {
-            my $name = $elems[1];
-            if ( $name =~ m{\A\[\[(\d+)\,(\d+)\]\,(\d+)\]}x ) {
-                my $job  = $1;
-                my $step = $2;
-                my $rank = $3;
-                my $pid  = $elems[3];
-                my $host = $elems[4];
-                $open_jobs{$job}{$step}{hosts}{$host}++;
-                $open_jobs{$job}{$step}{ranks}{$host}{$rank} = $pid;
-            }
+            my $job    = $1;
+            my $step   = $2;
+            $open_jobs{$job}{$step}{nprocs} = $nprocs;
         }
     }
     return;
