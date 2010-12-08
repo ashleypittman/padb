@@ -386,7 +386,7 @@ if ( $svn_revision_string =~ m{(\d+)} ) {
 }
 
 my $prog    = basename $0;
-my $version = "3.2 (Revision $svn_revision)";
+my $version = "3.3 (Revision $svn_revision)";
 
 my %conf;
 
