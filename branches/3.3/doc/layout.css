@@ -1,0 +1,51 @@
+
+body {
+ background-color: #FFFFD0;
+}
+
+#header {
+ clear: both;
+}
+
+#navigation {
+ float: left;
+ width: 14em;
+}
+
+#content {
+ margin-left: 15em;
+}
+
+table.news {
+ background-color: #FFFFA0;
+}
+
+table.example {
+ margin: 2em;
+ padding: 1em;
+ background-color: #707070;
+}
+
+table.rmgrs {
+ background-color: #f0f0f0;
+}
+
+#footer {
+ clear: both;
+ font-size: 75%;
+ text-align: center;
+}
+
+pre.code {
+background-color: #f0f0f0;
+padding: 10px;
+border: 1px solid; 
+}
+
+span.menu_heading {
+font-size: 110%;
+}
+
+span.menu_subheading {
+font-size: 80%;
+}

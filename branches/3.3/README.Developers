@@ -1,0 +1,19 @@
+
+Padb is managed by autoconf and all the normal build rules apply,
+"./configure && make && make install" being the normal build mechanism.
+
+A file called "autogen.sh" is provided to convert a raw Subversion tree
+into a tree which is buildable in the standard autoconf way.  After a
+checkout of the source all a developer needs to do is to execute the
+following command once and he can then build as normal.
+
+$ ./autogen.sh
+
+No dependency on any particular version of autoconf is known, I have tested
+with 2.61 and 2.65 at this time.
+
+
+It is still possible to build and run this package without using autoconf,
+padb itself is a stand-alone perl program contained in a single file.  The
+helper program, minfo, is a c program can be compiled with the command
+"make -f Makefile-simple" executed from the src directory.

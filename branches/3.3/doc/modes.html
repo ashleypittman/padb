@@ -1,0 +1,726 @@
+<div id="content">
+<h1>Modes of operation.</h1>
+
+<i>Padb</i> has a number of modes of operation depending on what data you want it to report or what action 
+you want it to perform, some like <b>--kill</b> generate no output but others can generate significant 
+amounts of data.  This page attempts to give a summary of available modes.
+
+<p>
+
+Some modes of operation, for example stack traces, generate information per
+process in a parallel job, some modes collate information from multiple processes
+into a single status report for the job.  For modes where information is 
+process specific a number of options are offered to reduce the amount of
+information displayed to the screen.  Without any of these options specified
+<i>padb</i> will prefix each line of output with the rank followed by a colon ":".
+The <b>--compress-long</b> option will print a header for each process and
+display the information for that rank below the header without any per-line prefix.
+The <b>--compress</b> option will do the same however will also attempt to merge
+output where multiple processes in the job report identical output into a single
+report.
+Finally there is a <b>--tree</b> option which works well with stack traces.
+
+<p>
+
+For modes where each rank is treated independently the <b>--rank</b> can be given to target a specific processes only,
+this option can be specified multiple times to specify multiple ranks.
+
+<p>
+
+<i>Padb</i> can be told to loop, performing the same query over and over again.  This is enabled by the <b>--watch</b> flag
+and further controlled by <b>--config-option interval=&lt;seconds&gt;</b> and <b>--config-option watch-clears-screen=&lt;bool&gt;</b>
+options, the default values for these options are 10 and 1 respectively.
+
+<p>
+
+All examples on this page show <i>padb</i> targeting a single specific job, either by providing a number <i>job identifier</i>
+on the command line or via the <b>--all</b> or <b>--any</b> options.  See <a href=usage.html>usage</a> page for information
+on selecting which jobs.
+
+<div class=mode>
+ <a name=proc-summary></a>
+ <h2>Process state</h2>
+</div>
+The <b>--proc-summary</b> mode shows basic information about running
+processes, presented one process per line.  Users can control which information
+is shown using the <b>--proc-format</b> option.
+<table class=example>
+<tr><td>
+<pre class=code>
+$ padb --all --proc-summary
+</pre>
+</td></tr>
+<tr><td>
+<pre class=code>
+vpid  hostname  pid   vmsize     vmrss    S  %cpu  command
+   7        i3  2623  160336 kB  4464 kB  R    49    a.out
+   6        i2  2616  160336 kB  4464 kB  R    48    a.out
+   5        i1  2615  160336 kB  4460 kB  R    47    a.out
+   4     fnarp  2789  160336 kB  4464 kB  R    44    a.out
+   3        i3  2622  160336 kB  4464 kB  R    49    a.out
+   2        i2  2615  160336 kB  4464 kB  R    49    a.out
+   1        i1  2614  160336 kB  4468 kB  R    47    a.out
+   0     fnarp  2788  160336 kB  4464 kB  R    44    a.out
+</pre>
+</td></tr>
+</table>
+
+The config option <b>proc-sort-key</b> controls which column the table is sorted by, the default is vpid.
+
+<div class=mode>
+ <a name=proc-info></a>
+ <h3>Per-process process state</h3>
+</div>
+The <b>--proc-info</b> mode reports a much more complete report about the state of the process but doesn't easily reduce
+when run across multiple ranks.  It can be controlled by the <b>proc-shows-proc</b> (default: 1), <b>proc-shows-task</b>
+(default: 0), <b>proc-shows-fds</b> (default:1 ) and <b>proc-shows-maps</b> (default: 0) configuration options.  This output
+also shows possible columns when running in "Process state" mode.
+<table class=example>
+<tr><td>
+<pre class=code>
+$ padb --all --rank=0 --proc-info
+</pre>
+</td></tr>
+<tr><td>
+<pre class=code>
+hostname:fnarp
+exe:/home/ashley/IMB/imb/src/IMB-MPI1
+Name:	IMB-MPI1
+State:	R (running)
+Tgid:	7743
+Pid:	7743
+PPid:	7739
+TracerPid:	0
+Uid:	1000	1000	1000	1000
+Gid:	1000	1000	1000	1000
+FDSize:	64
+Groups:	1000 
+VmPeak:	  251056 kB
+VmSize:	  251056 kB
+VmLck:	       0 kB
+VmHWM:	   99820 kB
+VmRSS:	   99820 kB
+VmData:	   93792 kB
+VmStk:	      84 kB
+VmExe:	      68 kB
+VmLib:	    5320 kB
+VmPTE:	     408 kB
+Threads:	1
+SigQ:	0/16382
+SigPnd:	0000000000000000
+ShdPnd:	0000000000000000
+SigBlk:	0000000000000000
+SigIgn:	0000000000000000
+SigCgt:	00000001800104e0
+CapInh:	0000000000000000
+CapPrm:	0000000000000000
+CapEff:	0000000000000000
+voluntary_ctxt_switches:	1200
+nonvoluntary_ctxt_switches:	27417502
+wchan: 0
+stat: 7743 (IMB-MPI1) R 7739 7739 2505 768 7739 4202496 35270 0 6 0 44352 110655 0 0 20 0 1 0 372663 257081344 24955 18446744073709551615 4194304 4261588 140733227100464 18446744073709551615 140479664939751 0 0 0 66784 0 0 0 17 0 0 0 0 0 0
+fd0: pipe:[56964] (0 00)
+fd1: /dev/pts/5 (0 0100002)
+fd2: pipe:[56965] (0 01)
+fd3: socket:[56977] (0 04002)
+fd4: socket:[56978] (0 02)
+fd5: socket:[56983] (0 04002)
+fd6: socket:[56985] (0 04002)
+fd7: socket:[56992] (0 04002)
+fd8: socket:[57010] (0 04002)
+fd9: socket:[57012] (0 04002)
+fd10: socket:[57016] (0 04002)
+fd11: socket:[57017] (0 04002)
+fd12: socket:[57022] (0 04002)
+fd13: socket:[57023] (0 04002)
+fd14: socket:[57024] (0 04002)
+fd15: socket:[57026] (0 04002)
+fd29: pipe:[56966] (0 01)
+pcpu: 47
+</pre>
+</td></tr>
+</table>
+
+<div class=mode>
+ <a name=stack-trace></a>
+ <h2>Stack traces</h2>
+</div>
+The <b>--stack-trace</b> option, best used as shown here with the <b>--tree</b> option
+shows stack traces for each process in the job.  Stack traces are shown "backwards" with main()
+at the top to facilitate the tree view shown here.
+<table class=example>
+<tr><td>
+<pre class=code>
+$ padb --all --stack-trace --tree
+</pre>
+</td></tr>
+<tr><td>
+<pre class=code>
+-----------------
+[0-1] (2 processes)
+-----------------
+main() at IMB.c:262
+  IMB_init_buffers_iter() at IMB_mem_manager.c:798
+    -----------------
+    0 (1 processes)
+    -----------------
+    IMB_pingpong() at IMB_pingpong.c:170
+      PMPI_Recv() at ?:?
+        mca_pml_ob1_recv() at ?:?
+          opal_progress() at ?:?
+    -----------------
+    1 (1 processes)
+    -----------------
+    IMB_pingpong() at IMB_pingpong.c:194
+      PMPI_Recv() at ?:?
+        mca_pml_ob1_recv() at ?:?
+          opal_progress() at ?:?
+-----------------
+[2-15] (14 processes)
+-----------------
+main() at IMB.c:276
+  PMPI_Barrier() at ?:?
+    ompi_coll_tuned_barrier_intra_dec_fixed() at ?:?
+      ompi_coll_tuned_barrier_intra_recursivedoubling() at ?:?
+        ompi_coll_tuned_sendrecv_actual() at ?:?
+          ompi_request_default_wait_all() at ?:?
+            opal_progress() at ?:?
+</pre>
+</td></tr>
+</table>
+
+The config options <b>stack-shows-locals</b> and <b>stack-shows-params</b> can be enabled to display more information in the stack
+trace, these are disabled by default and make the tree based reporting very difficult so are best used in conjunction with the <b>--rank</b> option as shown here.
+
+<table class=example>
+<tr><td>
+<pre class=code>
+$ padb --any --stack-trace --rank 0 -O stack-shows-locals=1 -Ostack-shows-params=1
+</pre>
+</td></tr>
+<tr><td>
+<pre class=code>
+main() at ?:?
+PMPI_Barrier() at /mnt/home/ashley/mpich2/mpich2-1.1.1p1/src/mpi/coll/barrier.c:421
+  params:
+    MPI_Comm comm = -2080374780
+  locals:
+    MPICH_PerThread_t * MPIR_Thread = (MPICH_PerThread_t *) 0x80e9740
+    int                   mpi_errno = 10001568
+    MPID_Comm *            comm_ptr = (MPID_Comm *) 0x80da8e0
+MPIR_Barrier_or_coll_fn() at /mnt/home/ashley/mpich2/mpich2-1.1.1p1/src/mpi/coll/barrier.c:244
+  params:
+    MPID_Comm * comm_ptr = (MPID_Comm *) 0x198
+  locals:
+    int mpi_errno = 0
+MPIR_Barrier() at /mnt/home/ashley/mpich2/mpich2-1.1.1p1/src/mpi/coll/barrier.c:75
+  params:
+    MPID_Comm * comm_ptr = (MPID_Comm *) 0x80da9e8
+  locals:
+    int           size = 8
+    int           rank = 0
+    int           mask = 1
+    int      mpi_errno = &lt;value optimized out&gt;
+    MPI_Comm      comm = -2080374779
+MPIC_Sendrecv() at /mnt/home/ashley/mpich2/mpich2-1.1.1p1/src/mpi/coll/helper_fns.c:163
+  params:
+    void *         sendbuf = (void *) 0x0
+    int          sendcount = 0
+    MPI_Datatype  sendtype = 1275068685
+    int               dest = 1
+    int            sendtag = 1
+    void *         recvbuf = (void *) 0x0
+    int          recvcount = 0
+    MPI_Datatype  recvtype = 1275068685
+    int             source = 7
+    int            recvtag = 1
+    MPI_Comm          comm = -2080374779
+    MPI_Status *    status = (MPI_Status *) 0x1
+  locals:
+    MPID_Request * recv_req_ptr = (MPID_Request *) 0x80e9ac0
+    MPID_Request * send_req_ptr = (MPID_Request *) 0x80e9c94
+    int               mpi_errno = &lt;value optimized out&gt;
+    MPID_Comm *        comm_ptr = (MPID_Comm *) 0x80da9e8
+MPIC_Wait() at /mnt/home/ashley/mpich2/mpich2-1.1.1p1/src/mpi/coll/helper_fns.c:404
+  params:
+    MPID_Request * request_ptr = (MPID_Request *) 0x80e9ac0
+  locals:
+    MPID_Progress_state progress_state = {ch = {completion_count = 16}}
+    int                      mpi_errno = 134869472
+MPIDI_CH3I_Progress() at /mnt/home/ashley/mpich2/mpich2-1.1.1p1/src/mpid/ch3/channels/nemesis/nemesis/include/mpid_nem_inline.h:1088
+  params:
+    MPID_Progress_state * progress_state = (MPID_Progress_state *) 0xbfc69eec
+    int                      is_blocking = 1
+  locals:
+    MPID_nem_fbox_mpich2_t *        pbox = (MPID_nem_fbox_mpich2_t *) 0x80
+    unsigned int             completions = 16
+    int                        mpi_errno = &lt;value optimized out&gt;
+    int                         complete = -1077502728
+    int                        pollcount = 0
+sched_yield() at ?:?
+__kernel_vsyscall() at ?:?
+</pre>
+</td></tr>
+</table>
+
+<p>
+Stack traces on Linux often show functions below main(), these are automatically stripped unless the flag
+<b>--nostrip-below-main</b> is provided.  Likewise <i>padb</i> knows the core "progression" functions for several parallel
+stacks and will strip functions of the other end of stacks unless the <b>--nostrip-above-wait</b> flag is given.  The list of function names to strip beyond can be set with the <b>stack-strip-above</b> and <b>stack-strip-below</b> configuration options, each one
+taking a comma separated list of function names.
+
+<h2>MPI Specific modes</h2>
+
+<div class=mode>
+ <a name=mpi-queue></a>
+ <a name=message-queue></a>
+ <h3>MPI message queues</h3>
+</div>
+The option <b>--mpi-queue</b> will tell <i>padb</i> to read the MPI message
+queues from your application if possible.  Here shown with the <b>--compress</b> option.
+
+<p>
+The option <b>--message-queue</b> shows the tport queues on QsNet systems.  On non-QsNet systems it automatically falls back
+to <b>--mpi-queue</b>.
+<table class=example>
+<tr><td>
+<pre class=code>
+$ padb --all --compress --mpi-queue
+</pre>
+</td></tr>
+<tr><td>
+<pre class=code>
+----------------
+0
+----------------
+comm0: name: 'MPI_COMM_WORLD'
+comm0: rank: '0'
+comm0: size: '2'
+comm0: id: '(nil)'
+comm0: Rank: local 0 global 0
+comm0: Rank: local 1 global 1
+comm1: name: 'MPI_COMM_SELF'
+comm1: rank: '0'
+comm1: size: '1'
+comm1: id: '0x1'
+comm2: name: 'MPI_COMM_NULL'
+comm2: rank: '-2'
+comm2: size: '0'
+comm2: id: '0x2'
+comm3: name: 'MPI COMMUNICATOR 4 DUP FROM 0'
+comm3: rank: '0'
+comm3: size: '2'
+comm3: id: '0x4'
+comm3: Rank: local 0 global 0
+comm3: Rank: local 1 global 1
+comm4: name: 'MPI COMMUNICATOR 5 DUP FROM 0'
+comm4: rank: '0'
+comm4: size: '2'
+comm4: id: '0x5'
+comm4: Rank: local 0 global 0
+comm4: Rank: local 1 global 1
+comm5: name: 'MPI COMMUNICATOR 28 SPLIT FROM 4'
+comm5: rank: '0'
+comm5: size: '1'
+comm5: id: '0x1c'
+----------------
+1
+----------------
+comm0: name: 'MPI_COMM_WORLD'
+comm0: rank: '1'
+comm0: size: '2'
+comm0: id: '(nil)'
+comm0: Rank: local 0 global 0
+comm0: Rank: local 1 global 1
+comm1: name: 'MPI_COMM_SELF'
+comm1: rank: '0'
+comm1: size: '1'
+comm1: id: '0x1'
+comm2: name: 'MPI_COMM_NULL'
+comm2: rank: '-2'
+comm2: size: '0'
+comm2: id: '0x2'
+comm3: name: 'MPI COMMUNICATOR 4 DUP FROM 0'
+comm3: rank: '1'
+comm3: size: '2'
+comm3: id: '0x4'
+comm3: Rank: local 0 global 0
+comm3: Rank: local 1 global 1
+comm4: name: 'MPI COMMUNICATOR 5 DUP FROM 0'
+comm4: rank: '1'
+comm4: size: '2'
+comm4: id: '0x5'
+comm4: Rank: local 0 global 0
+comm4: Rank: local 1 global 1
+comm5: name: 'MPI COMMUNICATOR 28 SPLIT FROM 4'
+comm5: rank: '0'
+comm5: size: '1'
+comm5: id: '0x1c'
+</pre>
+</td></tr>
+</table>
+
+<div class=mode>
+ <a name=deadlock></a>
+ <h3>Collective information</h3>
+</div>
+If you are using a <a href=extensions.html>patched MPI library</a> it's also possible for <i>padb</i> to 
+display the state of collective operations across your job using the <b>--deadlock</b> mode.
+<table class=example>
+<tr><td>
+<pre class=code>
+$ padb --all --deadlock
+</pre>
+
+<tr><td>
+<pre class=code>
+Information for group '0x4' (MPI COMMUNICATOR 4 DUP FROM 0)
+Group members [1-3] (size 4) are in call 2 to Barrier.
+Group member 0 (size 4) has completed call 1 to Barrier.
+Group member 0 (size 4) is not in a call to the collectives.
+Information for group '0x5' (MPI COMMUNICATOR 5 DUP FROM 0)
+Group member 0 (size 4) is in call 2 to Barrier.
+Group members [1-3] (size 4) have completed call 1 to Barrier.
+Group members [1-3] (size 4) are not in a call to the collectives.
+Total: 6 groups of which 2 are in use.
+</pre>
+</td></tr>
+</table>
+
+<div class=mode>
+ <a name=kill></a>
+ <h2>Signal delivery</h2>
+</div>
+To deliver signals to processes in a job use the <b>--kill</b> mode together with the optional
+<b>--signal=&lt;name&gt;</b> option.  No output is produced by this mode.
+
+<h2>Quadrics specific modes</h2>
+The <b>--set-debug</b>, <b>--group</b> and <b>--statistics</b> modes are QsNet specific.  The <b>--deadlock</b> mode
+performs the same function as <b>--group</b> for MPI programs.
+
+<div class=mode>
+ <a name=mpi-watch></a>
+ <h2>Process watch</h2>
+</div>
+The <b>--mpi-watch</b> mode in <i>padb</i> will cause padb to inspect the parallel job and write a single
+line of output to the screen, each character representing a process in the parallel job.  Each character
+has a different value depending on the state of that process at the time of sampling.  This provides a quick
+way to see the state of the program and if individual ranks are blocked in comms or actively working.
+
+<p>
+
+When used with the <b>--watch</b> and <b>--config-option=watch-clears-screen=0</b> option it becomes possible
+to see progress of the application over time, this trace shows the popular IMB benchmarking application, those
+familiar with it will immediately see the different stages of benchmark and how each stage uses more and more processes
+over time with any unused ones blocking in MPI_Barrier.
+<table class=example>
+<tr><td>
+<pre class=code>
+$ padb --all --mpi-watch --watch -Owatch-clears-screen=no
+</pre>
+<tr><td>
+<pre class=code>
+u: unexpected messages U: unexpected and other messages
+s: sending messages r: receiving messages m: sending and receiving
+b: Barrier B: Broadcast g: Gather G: AllGather r: reduce: R: AllReduce
+a: alltoall A: alltoalls w: waiting
+.: consuming CPU cycles ,: using CPU but no queue data -: sleeping *: error
+0....5....1....5....
+,,bbbbbbbbbbbbbbbbbb
+,,bbbbbbbbbbbbbbbbbb
+,,bbbbbbbbbbbbbbbbbb
+,,bbbbbbbbbbbbbbbbbb
+,,bbbbbbbbbbbbbbbbbb
+,,bbbbbbbbbbbbbbbbbb
+,,bbbbbbbbbbbbbbbbbb
+,,bbbbbbbbbbbbbbbbbb
+,,bbbbbbbbbbbbbbbbbb
+,,bbbbbbbbbbbbbbbbbb
+,,bbbbbbbbbbbbbbbbbb
+,,bbbbbbbbbbbbbbbbbb
+,,bbbbbbbbbbbbbbbbbb
+,,bbbbbbbbbbbbbbbbbb
+,,bbbbbbbbbbbbbbbbbb
+,,bbbbbbbbbbbbbbbbbb
+,,bbbbbbbbbbbbbbbbbb
+ssbbbbbbbbbbbbbbbbbb
+ssbbbbbbbbbbbbbbbbbb
+ssbbbbbbbbbbbbbbbbbb
+ssbbbbbbbbbbbbbbbbbb
+ssbbbbbbbbbbbbbbbbbb
+ssbbbbbbbbbbbbbbbbbb
+ssbbbbbbbbbbbbbbbbbb
+,,,,,,,,,,,,,,,,bbbb
+,,,,,,,,,,,,,,,,bbbb
+,,,,,,,,,,,,,,,,bbbb
+,,,,,,,,,,,,,,,,bbbb
+,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,
+ssssssssssssssssbbbb
+ssssssssssssssssbbbb
+ssssssssssssssssbbbb
+ssssssssssssssssbbbb
+ssssssssssssssssbbbb
+ssssssssssssssssbbbb
+ssssssssssssssssbbbb
+ssssssssssssssssssss
+ssssssssssssssssssss
+ssssssssssssssssssss
+ssssssssssssssssssss
+ssssssssssssssssssss
+ssssssssssssssssssss
+ssssssssssssssssssss
+ssRRRRRRRRRRRRRRRRRs
+RRRRRRRRRRRRRRRRbbbb
+RRRRRRRRRRRRRRRRbbbb
+RRRRRRRRRRRRRRRRbbbb
+RRRRRRRRRRRRRRRRbbbb
+RRRRRRRRRRRRRRRRbbbb
+RRRRRRRRRRRRRRRRbbbb
+RRRRRRRRRRRRRRRRbbbb
+RRRRRRRRRRRRRRRRbbbb
+RRRRRRRRRRRRRRRRRRRR
+RRRRRRRRRRRRRRRRRRRR
+RRRRRRRRRRRRRRRRRRRR
+RRRRRRRRRRRRRRRRRRRR
+RRRRRRRRRRRRRRRRRRRR
+RRRRRRRRRRRRRRRRRRRR
+RRRRRRRRRRRRRRRRRRRR
+RRRRRRRRRRRRRRRRRRRR
+RRRRRRRRRRRRRRRRRRRR
+RRRRRRRRRRRRRRRRRRRR
+rrrrrrrrrrrrrrrrbbbb
+rrrrrrrrrrrrrrrrbbbb
+rrrrrrrrrrrrrrrrbbbb
+rrrrrrrrrrrrrrrrbbbb
+rrrrrrrrrrrrrrrrbbbb
+rrrrrrrrrrrrrrrrbbbb
+rrrrrrrrrrrrrrrrbbbb
+rrrrrrrrrrrrrrrrbbbb
+rrrrrrrrrrrrrrrrrrrr
+rrrrrrrrrrrrrrrrrrrr
+rrrrrrrrrrrrrrrrrrrr
+rrrrrrrrrrrrrrrrrrrr
+rrrrrrrrrrrrrrrrrrrr
+rrrrrrrrrrrrrrrrrrrr
+rrrrrrrrrrrrrrrrrrrr
+rrrrrrrrrrrrrrrrrrrr
+rrrRrRrRrrrrrrrrrrrr
+,,,,,,,,,,,,,,,,bbbb
+,,,,,,,,,,,,,,,,bbbb
+,,,,,,,,,,,,,,,,bbbb
+,,,,,,,,,,,,,,,,bbbb
+,,,,,,,,,,,,,,,,bbbb
+,,,,,,,,RRRRRRRRRRRR
+,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,
+GGGGGGGGGGGGGGGGbbbb
+GGGGGGGGGGGGGGGGbbbb
+GGGGGGGGGGGGGGGGbbbb
+GGGGGGGGGGGGGGGGbbbb
+GGGGGGGGGGGGGGGGbbbb
+GGGGGGGGGGGGGGGGbbbb
+GGGGGGGGGGGGGGGGbbbb
+GGGGGGGGGGGGGGGGbbbb
+GGGGGGGGGGGGGGGGbbbb
+gbbbbbbbbbbbbbbbbbbb
+GGGGGGGGGGGGGGGGbbbb
+GGGGGGGGGGGGGGGGbbbb
+gb,bbbbbbbbbbbbbbbbb
+GGGGGGGGGGGGGGGGbbbb
+GGGGGGGGGGGGGGGGGGGG
+GGGGGGGGGGGGGGGGGGGG
+GGGGGGGGGGGGGGGGGGGG
+GGGGGGGGGGGGGGGGGGGG
+GGGGGGGGGGGGGGGGGGGG
+GGGGGGGGGGGGGGGGGGGG
+GGGGGGGGGGGGGGGGGGGG
+GGGGGGGGGGGGGGGGGGGG
+GGGGGGGGGGGGGGGGGGGG
+GGGGGGGGGGGGGGGGGGGG
+GGGGGGGGGGGGGGGGGGGG
+GGGGGGGGGGGGGGGGGGGG
+GGGGGGGGbbbbGGGGGGGG
+bbbbbbbbbbbbbbbbbbbb
+GGGGGGGGGGGGGGGGGGGG
+GGGGGGGGGGRRRRGGGGGG
+GGGGGGGGRRRRRRRRRRRG
+GGGGGGGGGGGGGGGGGGGG
+GGGGGGGGGGGGGGGGGGGG
+GGGGGGGGGGGGGGGGGGGG
+GGGGGGGGGGGGGGGGGGGG
+GGGGGGGGGGGGGGGbGGGG
+bbbbbbbGGGGGbbbbbbbb
+,,,,,,,,,,,,,,,,bbbb
+*RRRRRRR,RRRRRRRbbbb
+,,,,,,,,bb,,,,,,bbbb
+,bbbb*******bbbbbbbb
+,,,,,,,bb,,,,,,,bbbb
+b,bbbbbb********bbbb
+bbbbbbbbbbbbbbbbbbbb
+,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,RR,,,,,,,,
+bbbbbbbbbbbbbbbb*,bb
+*,************b**,,*
+*,********bbbbb*,***
+********bbbbbbbb**,*
+,bbbbbbbbbbbbbbb**bb
+******,,*,,,,,,,,,,,
+,,,,,*,,,,,,,,,,,,,,
+*,,,,,,,,,,,,,,,,,,,
+,,,*,,,,,,,,,,,,,,,,
+,,,,,,,,*,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,
+,,,,*,,,,,,,,,,,,,,,
+,,,,,,,,,,*,,,,,,,,,
+,,,,,,*,,,,,,,,,R,,,
+,,,,,,,,,,,,,,,RR,,,
+,,,*,,,,,,,,,,RRRR,,
+*,,,*,,,,,,,RRRRRRR,
+*,*,***********,****
+***,***********,,,,,
+,,,,,*,,*,,,,,,,,,,*
+,*,,*,,*,,,,,,,,*,*,
+,,,*,,,,*,,,,,,,,,,,
+*,,*,,,*,,,,,,,,,*,,
+,,,,*,,,*,,,,,,,,,*,
+,,,,,,,,,*,,,,,,,,,,
+,,,,*,*,,,,,,,,,,,,,
+,,,,,,,,*,*,,,,,,,,,
+,,,,,,,*,,,,,,,,,,,,
+*,,,,*,,*,*,,,,,,,,,
+,,,,*,,*,,*,,,,,,,,,
+,,,,,,,,,,,,,,,,,,,,
+,,,,,,,,,*,,,,,,,,,,
+,,,,,,*,*,,,,,,,,,*,
+,,,,,*,,,,,,,,,,,,,,
+,,,,,,,,*,,,,,,,,,,,
+,,,*,,,*,,,*,,,,,,,,
+*,,,*,,,,,,,,,,,,,,,
+,,,,,,*,,,,,,,,,,,,,
+*,*,,,,,,,,,,,,,,,,,
+*,,,,,,,,,,,,*,,,,,,
+,,,*,*,*,*,,,,,,,,,,
+*,,,,,,*,,*,,,,,,,,,
+,,,,,,,,,,,,,,,*,,,,
+,,,,*,,,,,,,,,,bb,,,
+,,,*,,,,,,,,,,bbbb,,
+,,,*,,,,,,,,bbbbbb,,
+*,,,,*,,,bbbbbbbbbb,
+ggggggggggggggggbbbb
+ggggggggggggggggbbbb
+*,bbbbbbbbbbbbbbbbbb
+ggggggggggggggggbbbb
+b,,*bbbbbbbbbbbbbbbb
+*,***,**bbbbbbbbbbbb
+bbb*bbbbbbbbbbbbbbbb
+bgbgbbbgbbbbbbbgbbbb
+bbbb***********bbbbb
+bbbbb*******bbbbbbbb
+bbbbbb**bbb*bbbbbbbb
+ggggggggggggggggbbbb
+*****bbb********bbbb
+,,,*bbbbbb******bbbb
+**,*bbbbbbb*****bbbb
+*b*bbbbbbbbb*b**bbbb
+,bbbbbbbbbbbbbbbbbbb
+ggbbbgbgggbbbgbgbbbb
+gggggggggggggggggggg
+gggggggggggggggggggg
+gggggggggggggggggggg
+gggggggggggggggggggg
+gggRRRgRRRgRRRRRRRgR
+bbbbbbbbbbbbbbbb***b
+gggggggggggggggggggg
+bbbbbbbbbbbbbbbb****
+bbbbbbbbbbbbbbbb****
+bbbbbbbbbbbbbbbbbbb*
+*,,*****************
+***,****************
+*,******************
+*,******************
+*,,,****************
+*,******************
+********************
+*,**************,***
+***********,********
+***************b****
+*,,,*******,*b*b****
+,*bbbb*b*bbbbbbb****
+bbbbbbbbbbbbbbbbbbbb
+gggRgRgRgRRRgRRRgRRR
+gRRRgRRRgRRRRRRRgRRR
+gRRRRRRRgRRRRRRRgRRR
+gRRRRRRRgRRRRRRRgRRR
+,,,,,,,,,,,,,,,,bbbb
+bbbbbbbbbbbbbbbbbbbb
+b,b******b**bbbbbbbb
+b,,*b*bb*bbbbbbbbbbb
+b***************bbbb
+b,,*****bbb*bbbbbbbb
+,,,,,,,,,,,,,,,,bbbb
+b,,*************bbbb
+b,,,**,********bbbbb
+b**,********bbbbbbbb
+b,*b****bbbbbbbbbbbb
+,,,,,,,,,,,,,,,,bbbb
+b,**,***,*******bbbb
+b,**************bbbb
+b,,*************bbbb
+b,,,************bbbb
+b,,*************bbbb
+b,,,************bbbb
+b,,********,***bbbbb
+b,,**********bbbbbbb
+b,****bb*bbbbbbbbbbb
+b,,***bbbbbbbbbbbbbb
+b*,bbbbbbbbbbbbbbbbb
+bbbbbbbbbbbbbbbbbbbb
+,,,,,,,,,,,,,,,,,,,,
+bbbbbbbbbbbbbbbbbbbb
+bbbbbbbbbbbbbbbbbbbb
+bbbbbbbbbbbbbbbbb*bb
+bbbbbbbbbbbbbbbb****
+bbbbbbbbbbbbbbbb****
+,,,,,,bbbbbb,,,,,,,,
+**,*****************
+*,******************
+**,,,***************
+**,*****************
+********************
+*,,*****************
+*******,************
+***,****************
+**,*****************
+**,**********b*b****
+bbbbbbbbbbbbbbbb**bb
+,,R,,,,,,,,,,,,,,,,,
+,,RRR,,,R,,,,,,,R,,,
+,RRRR,,,R,,,R,,,R,,R
+,RRRRRR,RR,,RRR,R,,R
+,RRRRRRRRRRRRRRRR,,R
+*,,,,,,,,,,,,,,,bbbb
+,,,,,,,,,,,,,,,,bbbb
+,,,,,,,,,,,,,,,,bbbb
+,,,,,,,,,,,,,,,,bbbb
+,,,,,,,,,,,,,,,,bbbb
+*,****bbbbbbbbbbbbbb
+,,,,,,,,,,,,,,,,bbbb
+,,,RRRRRRRR,,,,,bbbb
+b*bb*****b*b*bbbbbbb
+</pre>
+</td></tr>
+</table>
+</div>
+<div id="footer">
+ <hr>
+ <p>Page maintained by Ashley Pittman. $Date$ $Revision$</p>
+</div>
