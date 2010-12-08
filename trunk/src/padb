@@ -10,7 +10,7 @@
 # or email padb-users@pittman.org.uk
 
 # Copyright (C) 2005-2007 Quadrics.
-# Copyright (C) 2009 Ashley Pittman.
+# Copyright (C) 2009-2010 Ashley Pittman.
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -28,6 +28,42 @@
 
 # Revision history
 
+# Version 3.3
+#  * Add a 'launch-mode' option to controll the back-end used to launch
+#    the inner processes, previously padb would use the underlying resource
+#    manager if possible and pdsh if not, now this is configurable and
+#    padb can be told to use either, the resource manager, pdsh or clush.
+#    The default setting for this value is "local,rmgr,ssh,pdsh,clush" which
+#    mimics the old behaviour but offers the user more choice about the
+#    specifics
+#  * Change the default to be not to show paramaters and locals in
+#    stack traces, it's very useful to have but adds a lot of noise
+#    which makes it harder to spot simple problems.
+#  * Add proper support for viewing stack traces in threaded
+#    programmes, show a full tree-based stack view for each thread-id
+#  * Add limited for LSF jobs.
+#  * Better handling of gdb errors, add a catch-all signal handler
+#    for sigpipe such that if any undetected error occours we can
+#    report it rather than crash.
+#  * Detect errors introduced by the "yama" security feature in new
+#    kernels, this prevents padb from attaching to running jobs if
+#    it's enabled.
+#  * Convert between hostnames and fully-qualified-domain-names as
+#    required to work on systems which use either or a combination
+#    of both.
+#  * Sort values properly in proc-summary mode, if a value is numeric
+#    for all ranks then do a numberical sort, otherwise perform a
+#    dictionary sort.
+#  * Modify the PBS resource manager to also work on Torque.  These
+#    two resource managers are fundamentally the same but differ
+#    slightly in the command line options they accept.
+#  * Build fixes for edb (For Quadrics systems)
+#  * Fix a problem with reading MPI message queues from Fortran programmes,
+#    switch gdb into the 'c' language mode when required rather than just
+#    using the default all the time.
+#  * Fix orte support for systems where OpenMPI was built with check-point
+#    restart enabled.
+#
 # Version 3.2
 #  * Support of PBS Pro
 #  * Support for OpenMPI jobs run by mpirun under a slurm allocation.
@@ -85,7 +121,7 @@
 #    callback handle it.  This means that persistent attachments can
 #    be used in full-report mode.
 #  * Speed up attaching gdb to the target job greatly by attaching to
-#    all target processes on a not simultanously rather than one at
+#    all target processes on a node simultanously rather than one at
 #    a time.
 #  * Better handling of jobs that dissapear whilst we are monitoring them,
 #    there should be no perl errors shown if this happens.
