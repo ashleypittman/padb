@@ -6152,7 +6152,7 @@ sub gdb_quit {
         }
         return;
     }
-    gdb_send( $gdb, 'quit' );
+    gdb_send( $gdb, '-gdb-exit' );
     waitpid $gdb->{gdbpid}, 0;
     foreach my $fdname (qw(rdr wtr err)) {
         next unless exists $gdb->{$fdname};
@@ -6177,7 +6177,7 @@ sub gdb_attach {
     }
 
     send_cont_signal($pid);
-    my %p = gdb_n_send( $gdb, "attach $pid" );
+    my %p = gdb_n_send( $gdb, "-target-attach $pid" );
 
     if ( not defined $p{status} ) {
         $gdb->{error} = 'Failed to attach to process';
@@ -6249,7 +6249,7 @@ sub gdb_attach_async_start {
 
     send_cont_signal($pid);
 
-    _gdb_send_real_async_start( $gdb, "attach $pid" );
+    _gdb_send_real_async_start( $gdb, "-target-attach $pid" );
 
     return;
 }
