@@ -7885,7 +7885,9 @@ sub gdb_dump_frames_per_thread {
             next unless $thread_id eq $id;
         }
         my %t = ( id => $id );
-        gdb_send( $gdb, "-thread-select $id" );
+        if ( $data->{'number-of-threads'} != 1 ) {
+            gdb_send( $gdb, "-thread-select $id" );
+        }
         @{ $t{frames} } = gdb_dump_frames( $gdb, $detail );
         push @th, \%t;
     }
