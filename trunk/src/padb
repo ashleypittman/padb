@@ -8567,6 +8567,7 @@ sub global_detach {
     foreach my $proc ( @{$procs} ) {
         if ( defined $proc->{gdb_handle} ) {
             gdb_detach( $proc->{gdb_handle} );
+            gdb_quit( $proc->{gdb_handle} );
             delete $proc->{gdb_handle};
         }
     }
