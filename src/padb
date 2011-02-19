@@ -6257,7 +6257,7 @@ sub gdb_attach_async_start {
 sub gdb_attach_async_end {
     my ( $gdb, $pid ) = @_;
 
-    my %p = _gdb_send_real_async_wait( $gdb, "attach $pid" );
+    my %p = _gdb_send_real_async_wait( $gdb, "-target-attach $pid" );
 
     if ( not defined $p{status} ) {
         $gdb->{error} = 'Failed to attach to process';
@@ -6697,7 +6697,7 @@ sub gdb_n_next_result {
         #if (/\&\"(.*)\"\n/) {    #"
         #    $res{debug} .= $1;
         #}
-        if (m{\A(\d+)\^(done|error),?(.*)\Z}x) {
+        if (m{\A(\d+)\^(done|error|RESULT_UNKNOWN),?(.*)\Z}x) {
             my $seq    = $1;
             my $status = $2;
             my $reason = $3;
