@@ -7810,8 +7810,29 @@ sub gdb_expand_vars {
     return;
 }
 
+# As gdb_expand_vars but takes $vars as provided by gdb and populates the two
+# arrays from that.
+sub gdb_expand_vars_raw {
+    my ( $gdb, $frame, $vars ) = @_;
+
+    foreach my $arg ( @{$vars} ) {
+
+        my $value = gdb_expand_var( $gdb, $arg );
+        if ( defined $arg->{arg} ) {
+            push @{ $frame->{'params'} }, $arg;
+        } else {
+            push @{ $frame->{'locals'} }, $arg;
+        }
+        if ( defined $value ) {
+            $arg->{value} = $value;
+        }
+    }
+
+    return;
+}
+
 sub gdb_dump_frames {
-    my ( $gdb, $detail ) = @_;
+    my ( $gdb, $detail, $thread ) = @_;
     my %result = gdb_n_send( $gdb, '-stack-list-frames' );
     my $data = gdb_parse_reason( $result{reason}, 'frame' );
     if ( not defined $data->{stack} ) {
@@ -7819,6 +7840,19 @@ sub gdb_dump_frames {
     }
     if ( defined $detail ) {
         foreach my $frame ( @{ $data->{stack} } ) {
+
+            # Try the new way first, and if that works then great, if not then
+            # revert back to the old method.
+
+            my %all_vars = gdb_send_addr( $gdb,
+"-stack-list-variables --thread $thread --frame $frame->{level} 2"
+            );
+            if ( $all_vars{status} eq 'done' ) {
+                my $args = gdb_parse_reason( $all_vars{reason} );
+                gdb_expand_vars_raw( $gdb, $frame, $args->{variables} );
+                next;
+            }
+
             gdb_send( $gdb, "-stack-select-frame $frame->{level}" );
 
             my %r = gdb_send_addr( $gdb,
@@ -7863,7 +7897,7 @@ sub gdb_dump_frames_per_thread {
     # code here however.
     if ( $data->{'number-of-threads'} == 0 ) {
         my %t = ( id => 0 );
-        @{ $t{frames} } = gdb_dump_frames( $gdb, $detail );
+        @{ $t{frames} } = gdb_dump_frames( $gdb, $detail, 0 );
         push @th, \%t;
         return @th;
     }
@@ -7888,7 +7922,7 @@ sub gdb_dump_frames_per_thread {
         if ( $data->{'number-of-threads'} != 1 ) {
             gdb_send( $gdb, "-thread-select $id" );
         }
-        @{ $t{frames} } = gdb_dump_frames( $gdb, $detail );
+        @{ $t{frames} } = gdb_dump_frames( $gdb, $detail, $t{id} );
         push @th, \%t;
     }
     return @th;
