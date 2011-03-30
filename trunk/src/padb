@@ -407,7 +407,7 @@ if ( -d '/proc/1/path' ) {
 # Config options the inner knows about, only forward options if they are in
 # this list.
 my @inner_conf =
-  qw(edb edbopt rmgr scripts slurm_job_step pbs_server lsf_mode lsfmpi_server lsfmpi_mpirpid lsfmpi_port);
+  qw(edb edbopt rmgr scripts slurm_job_step pbs_server lsf_mode lsfmpi_server lsfmpi_mpirpid lsfmpi_port backend_debugger);
 
 # More options the inner knows about, these are forwarded on the
 # command line rather than over the sockets.
@@ -600,6 +600,9 @@ $conf{slurm_job_step} = undef;
 $conf{orte_job_step}  = undef;
 
 $conf{pbs_server} = undef;
+
+# Backend debugger to use, can be either idb or gdb.
+$conf{backend_debugger} = 'gdb';
 
 # These settings are passed onto inner only.
 $conf{edbopt} = undef;
@@ -6125,6 +6128,9 @@ sub gdb_start {
     };
 
     my $cmd = 'gdb --interpreter=mi -q';
+    if ( $inner_conf{backend_debugger} eq 'idb' ) {
+        $cmd = 'idb --interpreter=mi2 -q';
+    }
     if ( defined $core ) {
         $cmd .= " $exe $core";
     }
@@ -6234,8 +6240,10 @@ sub gdb_attach_post {
         $gdb->{runtime}{mpich2} = 1;
     }
 
-    gdb_n_send( $gdb, '-gdb-set print address off' );
-    gdb_n_send( $gdb, '-gdb-set language auto' );
+    if ( $inner_conf{backend_debugger} ne 'idb' ) {
+        gdb_n_send( $gdb, '-gdb-set print address off' );
+        gdb_n_send( $gdb, '-gdb-set language auto' );
+    }
 
     return;
 }
@@ -6263,6 +6271,10 @@ sub gdb_attach_async_end {
 
     my %p = _gdb_send_real_async_wait( $gdb, "-target-attach $pid" );
 
+    if ( $inner_conf{backend_debugger} eq 'idb' ) {
+        gdb_attach_post( $gdb, $pid );
+        return $pid;
+    }
     if ( not defined $p{status} or $p{status} eq 'error' ) {
         %p = gdb_n_send( $gdb, "attach $pid" );
     }
@@ -6302,7 +6314,7 @@ sub gdb_detach {
     my ($gdb) = @_;
     my $result = gdb_send( $gdb, '-target-detach' );
 
-    return if ( $result eq 'error' );
+    return if ( not defined $result or $result eq 'error' );
 
     $gdb->{attached} = 0;
 
@@ -6334,7 +6346,10 @@ sub _gdb_send_real {
         print { $gdb->{debugfd} } "$seq$cmd\n";
     }
     my %r = gdb_n_next_result( $gdb, $seq );
-    if ( $gdb->{attached} and $r{seq} ne $seq ) {
+    if (    $inner_conf{backend_debugger} ne 'idb'
+        and $gdb->{attached}
+        and $r{seq} ne $seq )
+    {
         croak(
 "Invalid sequence number from gdb, expecting $seq got $r{seq} cmd=\"$cmd\""
         );
@@ -6361,6 +6376,9 @@ sub _gdb_send_real_async_start {
 sub _gdb_send_real_async_wait {
     my ( $gdb, $cmd ) = @_;
     my $seq = $gdb->{seq};
+    if ( $inner_conf{backend_debugger} eq 'idb' ) {
+        return;
+    }
     my %r = gdb_n_next_result( $gdb, $seq );
     if ( $gdb->{attached} and $r{seq} ne $seq ) {
         croak(
@@ -6381,6 +6399,10 @@ sub _gdb_set_print_address {
         return;
     }
 
+    if ( $inner_conf{backend_debugger} eq 'idb' ) {
+        return;
+    }
+
     $gdb->{pa} = $flag;
 
     if ($flag) {
@@ -6395,6 +6417,10 @@ sub _gdb_set_lang {
     my ( $gdb, $lang ) = @_;
 
     if ( $lang eq $gdb->{lang} ) {
+        return;
+    }
+
+    if ( $inner_conf{backend_debugger} eq 'idb' ) {
         return;
     }
 
@@ -6734,6 +6760,12 @@ sub gdb_n_next_result {
     #    $res{debug} =~ s/\\n/\n/g;
     #    chomp $res{debug};
     #}
+
+    # As idb doesn't confirm that it's attached properly it's impossible
+    # to do this test correctly here.
+    if ( $inner_conf{backend_debugger} eq 'idb' ) {
+        return %res;
+    }
 
     if ( $gdb->{attached} ) {
         croak("Unexpected EOF from gdb");
@@ -7862,8 +7894,13 @@ sub gdb_dump_frames {
 
             gdb_send( $gdb, "-stack-select-frame $frame->{level}" );
 
+            my $print_cmd = '2';
+            if ( $inner_conf{backend_debugger} eq 'idb' ) {
+                $print_cmd = '1';
+            }
             my %r = gdb_send_addr( $gdb,
-                "-stack-list-arguments 2 $frame->{level} $frame->{level}" );
+"-stack-list-arguments $print_cmd $frame->{level} $frame->{level}"
+            );
             my $args = gdb_parse_reason( $r{reason} );
 
             if ( defined $args->{'stack-args'}[0]{frame}{args} ) {
@@ -7873,7 +7910,7 @@ sub gdb_dump_frames {
                 gdb_expand_vars( $gdb, $frame, 'params' );
             }
 
-            my %s = gdb_n_send( $gdb, '-stack-list-locals --simple-values' );
+            my %s = gdb_n_send( $gdb, '-stack-list-locals 2' );
             if ( $s{status} eq 'done' ) {
                 my $flocals = gdb_parse_reason( $s{reason} );
                 if ( defined $flocals->{locals} ) {
