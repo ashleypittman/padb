@@ -6177,7 +6177,7 @@ sub gdb_attach {
     }
 
     send_cont_signal($pid);
-    my %p = gdb_n_send( $gdb, "-target-attach $pid" );
+    my %p = gdb_n_send( $gdb, "attach $pid" );
 
     if ( not defined $p{status} ) {
         $gdb->{error} = 'Failed to attach to process';
@@ -6249,7 +6249,7 @@ sub gdb_attach_async_start {
 
     send_cont_signal($pid);
 
-    _gdb_send_real_async_start( $gdb, "-target-attach $pid" );
+    _gdb_send_real_async_start( $gdb, "attach $pid" );
 
     return;
 }
@@ -6257,7 +6257,7 @@ sub gdb_attach_async_start {
 sub gdb_attach_async_end {
     my ( $gdb, $pid ) = @_;
 
-    my %p = _gdb_send_real_async_wait( $gdb, "-target-attach $pid" );
+    my %p = _gdb_send_real_async_wait( $gdb, "attach $pid" );
 
     if ( not defined $p{status} ) {
         $gdb->{error} = 'Failed to attach to process';
