@@ -9219,7 +9219,7 @@ sub mpi_watch_all {
             my @frames = @{ $thread->{frames} };
             foreach my $i ( reverse 0 .. $#frames ) {
                 my $frame = $frames[$i];
-                if ( defined $fns->{fns}{ $frame->{func} } ) {
+                if ( defined $frame->{func} and defined $fns->{fns}{ $frame->{func} } ) {
                     $fnmode = $fns->{fns}{ $frame->{func} };
                     last;
                 }
