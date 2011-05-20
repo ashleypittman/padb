@@ -2532,7 +2532,7 @@ sub slurm_is_installed {
 
 sub slurm_get_jobs {
     my $user = shift;
-    my @res  = slurp_cmd("squeue -t running -u $user -h -o %i");
+    my @res  = slurp_cmd("squeue -a -t running -u $user -h -o %i");
     chomp @res;
     return @res;
 }
@@ -2542,7 +2542,7 @@ sub slurm_get_jobs {
 sub slurm_job_to_ncpus {
     my $job   = shift;
     my $s     = "$job." . $conf{slurm_job_step};
-    my @steps = slurp_cmd("squeue -s $s -o %i,%A");
+    my @steps = slurp_cmd("squeue -a -s $s -o %i,%A");
 
     # The %A option is new so ensure we have the TASKS output before we
     # believe what we see here...  Mind you %A is several years old now so
@@ -2562,7 +2562,7 @@ sub slurm_job_to_ncpus {
 # Query the nodecount for the "job" as that is what we shall be running on.
 sub slurm_job_to_nodecount {
     my $job  = shift;
-    my @jobs = slurp_cmd('squeue -o %i,%D');
+    my @jobs = slurp_cmd('squeue -a -o %i,%D');
 
     chomp @jobs;
     foreach my $step (@jobs) {
@@ -2578,7 +2578,7 @@ sub slurm_job_to_nodecount {
 sub slurm_job_to_nodelist {
     my $job   = shift;
     my $s     = "$job." . $conf{slurm_job_step};
-    my @steps = slurp_cmd("squeue -s $s -o %i,%N");
+    my @steps = slurp_cmd("squeue -a -s $s -o %i,%N");
 
     chomp @steps;
     foreach my $step (@steps) {
@@ -2590,7 +2590,7 @@ sub slurm_job_to_nodelist {
 
 sub slurm_job_is_running {
     my $job    = shift;
-    my @s      = slurp_cmd("squeue -h -j $job -o %T");
+    my @s      = slurp_cmd("squeue -a -h -j $job -o %T");
     my $status = lc $s[0];
     chomp $status;
     return ( $status eq 'running' );
@@ -2604,7 +2604,7 @@ sub slurm_setup_job {
     # step ids slurm thinks are running and pick the first one.
     # Previously this value just defaulted to zero.
     if ( not defined $conf{slurm_job_step} ) {
-        my @all_steps = slurp_cmd("squeue -s -o %i");
+        my @all_steps = slurp_cmd("squeue -a -s -o %i");
         my @valid_steps;
         foreach my $step (@all_steps) {
             chomp $step;
