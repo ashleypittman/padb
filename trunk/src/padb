@@ -4377,8 +4377,9 @@ sub add_data_to_tree {
 }
 
 sub _display_tree {
-    my ( $tree, $parent, $indent, $path, $enforce_spec ) = @_;
+    my ( $tree, $parent, $indent_count, $path, $enforce_spec ) = @_;
 
+    my $indent = sprintf( "%3d: %*s", $indent_count, $indent_count, '' );
     my $ret = $EMPTY_STRING;
 
     # Sort peers by lowest rank of each branch.
@@ -4405,8 +4406,11 @@ sub _display_tree {
         }
 
         if ( defined $tree->{$peer}->{desc} ) {
-            $ret .= _display_tree( $tree->{$peer}->{desc},
-                $vpspec, "$indent  ", "$path,$peer", $child_enforce_spec );
+            $ret .= _display_tree(
+                $tree->{$peer}->{desc}, $vpspec,
+                $indent_count + 1,      "$path,$peer",
+                $child_enforce_spec
+            );
         }
     }
     return $ret;
@@ -4414,7 +4418,7 @@ sub _display_tree {
 
 sub display_tree {
     my ( $tree, ) = @_;
-    return _display_tree( $tree, "no-parent", $EMPTY_STRING, $EMPTY_STRING, 1 );
+    return _display_tree( $tree, "no-parent", 0, $EMPTY_STRING, 1 );
 }
 
 # An experimental new tree format.
