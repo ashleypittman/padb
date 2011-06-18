@@ -4377,7 +4377,7 @@ sub add_data_to_tree {
 }
 
 sub _display_tree {
-    my ( $tree, $parent, $indent_count, $path, $enforce_spec ) = @_;
+    my ( $tree, $nproc, $parent, $indent_count, $path, $enforce_spec ) = @_;
 
     my $indent = sprintf( "%3d: %*s", $indent_count, $indent_count, '' );
     my $ret = $EMPTY_STRING;
@@ -4392,7 +4392,14 @@ sub _display_tree {
         my $vpspec = rng_convert_to_user( $tree->{$peer}->{range} );
         if ( @peers != 1 or $parent ne $vpspec or $enforce_spec ) {
             $ret .= "$indent-----------------\n";
-            $ret .= "$indent$vpspec ($tree->{$peer}->{count} processes)\n";
+            my $count = $tree->{$peer}->{count};
+
+            $ret .= sprintf(
+                "$indent$vpspec ($count %s %.3g%%)\n",
+                $count > 1 ? 'processes' : 'process',
+                ( $count / $nproc ) * 100
+            );
+
             $ret .= "$indent-----------------\n";
         }
 
@@ -4407,9 +4414,9 @@ sub _display_tree {
 
         if ( defined $tree->{$peer}->{desc} ) {
             $ret .= _display_tree(
-                $tree->{$peer}->{desc}, $vpspec,
-                $indent_count + 1,      "$path,$peer",
-                $child_enforce_spec
+                $tree->{$peer}->{desc},
+                $nproc, $vpspec, $indent_count + 1,
+                "$path,$peer", $child_enforce_spec
             );
         }
     }
@@ -4417,14 +4424,16 @@ sub _display_tree {
 }
 
 sub display_tree {
-    my ( $tree, ) = @_;
-    return _display_tree( $tree, "no-parent", 0, $EMPTY_STRING, 1 );
+    my ( $tree, $nproc ) = @_;
+    return _display_tree( $tree, $nproc, "no-parent", 0, $EMPTY_STRING, 1 );
 }
 
 # An experimental new tree format.
 sub new_tree {
     my ( $lines, $d ) = @_;
     my %tree;
+
+    my $nprocesses = keys %{$lines};
     debug_log( 'tree', $d, 'Making the tree' );
     foreach my $tag ( sort { $a <=> $b } keys %{$lines} ) {
         add_tag_to_tree( \%tree, $tag, $lines->{$tag} );
@@ -4432,7 +4441,7 @@ sub new_tree {
     debug_log( 'tree', \%tree, 'Enhancing the tree' );
     add_data_to_tree( \%tree, undef, $d );
     debug_log( 'tree', \%tree, 'Formatting the tree' );
-    my $t = display_tree( \%tree, );
+    my $t = display_tree( \%tree, $nprocesses );
     debug_log( 'tree', undef, 'Displaying the tree' );
     print $t;
     debug_log( 'tree', undef, 'Done' );
@@ -4444,6 +4453,7 @@ sub new_ns_tree {
     my ( $d, $ns ) = @_;
 
     my %tree;
+    my $nprocesses = keys %{ $d->{target_ns_output} };
     debug_log( 'tree', undef, 'Making the tree' );
     my @tags;
     foreach my $tag ( keys %{ $d->{target_ns_output} } ) {
@@ -4457,7 +4467,7 @@ sub new_ns_tree {
     debug_log( 'tree', \%tree, 'Enhancing the tree' );
     add_data_to_tree( \%tree, $ns, $d );
     debug_log( 'tree', \%tree, 'Formatting the tree' );
-    my $t = display_tree( \%tree, );
+    my $t = display_tree( \%tree, $nprocesses );
     debug_log( 'tree', undef, 'Displaying the tree' );
     print "Stack trace(s) for thread: $ns\n";
     print $t;
