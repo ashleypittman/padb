@@ -4285,8 +4285,10 @@ sub _add_data_to_point_on_tree {
         my @values = keys %{ $d->{target_data}{$key} };
 
         if ( @values == 1 ) {
-            my $line = "  $vref->{type_name} = '$values[0]' "
-              . rng_convert_to_user( $d->{target_data}{$key}{ $values[0] } );
+            my $line =
+              "  $vref->{type_name} = '$values[0]' "
+              . rng_convert_to_user_truncate(
+                $d->{target_data}{$key}{ $values[0] } );
             push @{ $tree->{$peer}->{aux} }, $line;
         } elsif ( @values > $max_show ) {
             my $line = "  $vref->{type_name}: "
@@ -4295,8 +4297,10 @@ sub _add_data_to_point_on_tree {
         } else {
             push @{ $tree->{$peer}->{aux} }, "  $vref->{type_name}:";
             foreach my $value ( sort @values ) {
-                my $line = "      '$value' "
-                  . rng_convert_to_user( $d->{target_data}{$key}{$value} );
+                my $line =
+                  "      '$value' "
+                  . rng_convert_to_user_truncate(
+                    $d->{target_data}{$key}{$value} );
                 push @{ $tree->{$peer}->{aux} }, $line;
 
             }
@@ -4389,7 +4393,7 @@ sub _display_tree {
     my $child_enforce_spec = 0;
     foreach my $peer (@peers) {
 
-        my $vpspec = rng_convert_to_user( $tree->{$peer}->{range} );
+        my $vpspec = rng_convert_to_user_truncate( $tree->{$peer}->{range} );
         if ( @peers != 1 or $parent ne $vpspec or $enforce_spec ) {
             $ret .= "$indent-----------------\n";
             my $count = $tree->{$peer}->{count};
@@ -5213,6 +5217,19 @@ sub rng_convert_to_user {
     my $range = join q{,},
       map { $_->{l} == $_->{u} ? $_->{l} : $_->{l} . q{-} . $_->{u} } @{$rg};
     return "[$range]";
+}
+
+sub rng_convert_to_user_truncate {
+    my ($rg) = @_;
+
+    my $max_rankspec_length = 5;
+    my @spec =
+      map { $_->{l} == $_->{u} ? $_->{l} : $_->{l} . q{-} . $_->{u} } @{$rg};
+    if ( $#spec >= $max_rankspec_length ) {
+        return sprintf( "[%s...]",
+            join q{,}, @spec[ 0 .. $max_rankspec_length - 1 ] );
+    }
+    return sprintf( "[%s]", join q{,}, @spec );
 }
 
 sub rng_shift {
