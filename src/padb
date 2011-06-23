@@ -9285,6 +9285,9 @@ sub mpi_watch_all {
 sub register_target_process {
     my ( $rank, $pid ) = @_;
 
+    if ( $pid == $$ ) {
+        croak("Error locating processes, refusing to debug self");
+    }
     $inner_conf{rmpids}{$pid}{rank} = $rank;
     return;
 }
@@ -10325,7 +10328,7 @@ sub inner_loop_for_comms {
                 my $count = sysread $s, $d, 65536;
 
                 # Dead connection.
-                if ( not defined $d or $count == 0 ) {
+                if ( not defined $d or not defined $count or $count == 0 ) {
 
                     if ( eof $s ) {
                         $sel->remove($s);
