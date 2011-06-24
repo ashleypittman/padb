@@ -9359,8 +9359,8 @@ sub slurm_find_pids {
     foreach my $proc (@procs) {
         my ( $pid, $job, $step, undef, $global ) = split $SPACE, $proc;
         next if ( $global eq '-' );
-        next if ( $pid == $$ );
         next unless ( $job eq $jobid );
+        next if ( $pid == $$ );
         next unless ( $step == $inner_conf{slurm_job_step} );
         next if ( is_resmgr_process($pid) );
         register_target_process( $global, $pid );
