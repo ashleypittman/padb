@@ -4383,7 +4383,7 @@ sub add_data_to_tree {
 sub _display_tree {
     my ( $tree, $nproc, $parent, $indent_count, $path, $enforce_spec ) = @_;
 
-    my $indent = sprintf( "%3d: %*s", $indent_count, $indent_count, '' );
+    my $indent = sprintf( "%3d:%*s", $indent_count + 1, $indent_count, '' );
     my $ret = $EMPTY_STRING;
 
     # Sort peers by lowest rank of each branch.
@@ -4391,28 +4391,31 @@ sub _display_tree {
       sort { $tree->{$a}->{min} <=> $tree->{$b}->{min} } keys %{$tree};
 
     my $child_enforce_spec = 0;
+    my $branch_index       = 1;
     foreach my $peer (@peers) {
 
         my $vpspec = rng_convert_to_user_truncate( $tree->{$peer}->{range} );
         if ( @peers != 1 or $parent ne $vpspec or $enforce_spec ) {
-            $ret .= "$indent-----------------\n";
+            $ret .= "$indent -----------------\n";
             my $count = $tree->{$peer}->{count};
 
             $ret .= sprintf(
-                "$indent$vpspec ($count %s %.3g%%)\n",
+                "$indent Branch %d of %d, $count %s, %.3g%% of total $vpspec\n",
+                $branch_index,
+                $#peers + 1,
                 $count > 1 ? 'processes' : 'process',
                 ( $count / $nproc ) * 100
             );
 
-            $ret .= "$indent-----------------\n";
+            $ret .= "$indent -----------------\n";
         }
 
-        $ret .= "$indent$peer\n";
+        $ret .= "$indent $peer\n";
 
         if ( defined $tree->{$peer}->{aux} ) {
             $child_enforce_spec = 1;
             foreach my $line ( @{ $tree->{$peer}->{aux} } ) {
-                $ret .= "$indent      $line\n";
+                $ret .= "$indent       $line\n";
             }
         }
 
@@ -4423,6 +4426,7 @@ sub _display_tree {
                 "$path,$peer", $child_enforce_spec
             );
         }
+        $branch_index += 1;
     }
     return $ret;
 }
