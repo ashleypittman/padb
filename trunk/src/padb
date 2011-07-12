@@ -614,6 +614,18 @@ $conf{port_range} = undef;
 
 $conf{tree_width} = '4';
 
+# The number of elements to display when showing rankspec in tree displays.
+# By elements here it means each comma seperated block, hence [1,3-4,6-7] counts
+# as a rankspec_length of 3.  Rankspecs which have more elements than this value
+# are truncated at this value and an ellipses is shown to indicate there is missing
+# data.  A value of 0 means never truncate rankspecs.
+$conf{rankspec_length} = '5';
+
+# The number of spaces to indent each new level by when displaying trees.  This
+# value used to be 2 until I added the indentation count in the left column, now
+# we have that reduce this number to use less screen space.
+$conf{tree_indent}     = '1';
+
 $conf{launch_mode} = 'local,rmgr,ssh,pdsh,clush';
 
 # Config options which take boolean values.
@@ -623,7 +635,8 @@ my @conf_bool = qw(watch_clears_screen inner_callback);
 my @conf_time = qw(prun_exittimeout prun_timeout interval);
 
 # Config options which take an integer.
-my @conf_int = qw(lsf_job_offset slurm_job_step orte_job_step tree_width);
+my @conf_int =
+  qw(lsf_job_offset slurm_job_step orte_job_step tree_width rankspec_length tree_indent);
 
 my $norc       = 0;
 my $configfile = '/etc/padb.conf';
@@ -4383,7 +4396,9 @@ sub add_data_to_tree {
 sub _display_tree {
     my ( $tree, $nproc, $parent, $indent_count, $path, $enforce_spec ) = @_;
 
-    my $indent = sprintf( "%3d:%*s", $indent_count + 1, $indent_count, '' );
+    my $indent = sprintf( "%3d:%*s",
+        $indent_count + 1,
+        $indent_count * $conf{tree_indent}, '' );
     my $ret = $EMPTY_STRING;
 
     # Sort peers by lowest rank of each branch.
@@ -5226,10 +5241,10 @@ sub rng_convert_to_user {
 sub rng_convert_to_user_truncate {
     my ($rg) = @_;
 
-    my $max_rankspec_length = 5;
+    my $max_rankspec_length = $conf{rankspec_length};
     my @spec =
       map { $_->{l} == $_->{u} ? $_->{l} : $_->{l} . q{-} . $_->{u} } @{$rg};
-    if ( $#spec >= $max_rankspec_length ) {
+    if ( $max_rankspec_length > 0 and $#spec >= $max_rankspec_length ) {
         return sprintf( "[%s...]",
             join q{,}, @spec[ 0 .. $max_rankspec_length - 1 ] );
     }
