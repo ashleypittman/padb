@@ -624,7 +624,7 @@ $conf{rankspec_length} = '5';
 # The number of spaces to indent each new level by when displaying trees.  This
 # value used to be 2 until I added the indentation count in the left column, now
 # we have that reduce this number to use less screen space.
-$conf{tree_indent}     = '1';
+$conf{tree_indent} = '1';
 
 $conf{launch_mode} = 'local,rmgr,ssh,pdsh,clush';
 
@@ -6177,8 +6177,14 @@ sub gdb_start {
         seq      => 1,
     };
 
+    if ( defined $inner_conf{backend_debugger} ) {
+        $gdb->{backend_debugger} = $inner_conf{backend_debugger};
+    } else {
+        $gdb->{backend_debugger} = $conf{backend_debugger};
+    }
+
     my $cmd = 'gdb --interpreter=mi -q';
-    if ( $inner_conf{backend_debugger} eq 'idb' ) {
+    if ( $gdb->{backend_debugger} eq 'idb' ) {
         $cmd = 'idb --interpreter=mi2 -q';
     }
     if ( defined $core ) {
@@ -6290,7 +6296,7 @@ sub gdb_attach_post {
         $gdb->{runtime}{mpich2} = 1;
     }
 
-    if ( $inner_conf{backend_debugger} ne 'idb' ) {
+    if ( $gdb->{backend_debugger} ne 'idb' ) {
         gdb_n_send( $gdb, '-gdb-set print address off' );
         gdb_n_send( $gdb, '-gdb-set language auto' );
     }
@@ -6321,7 +6327,7 @@ sub gdb_attach_async_end {
 
     my %p = _gdb_send_real_async_wait( $gdb, "-target-attach $pid" );
 
-    if ( $inner_conf{backend_debugger} eq 'idb' ) {
+    if ( $gdb->{backend_debugger} eq 'idb' ) {
         gdb_attach_post( $gdb, $pid );
         return $pid;
     }
@@ -6396,7 +6402,7 @@ sub _gdb_send_real {
         print { $gdb->{debugfd} } "$seq$cmd\n";
     }
     my %r = gdb_n_next_result( $gdb, $seq );
-    if (    $inner_conf{backend_debugger} ne 'idb'
+    if (    $gdb->{backend_debugger} ne 'idb'
         and $gdb->{attached}
         and $r{seq} ne $seq )
     {
@@ -6426,7 +6432,7 @@ sub _gdb_send_real_async_start {
 sub _gdb_send_real_async_wait {
     my ( $gdb, $cmd ) = @_;
     my $seq = $gdb->{seq};
-    if ( $inner_conf{backend_debugger} eq 'idb' ) {
+    if ( $gdb->{backend_debugger} eq 'idb' ) {
         return;
     }
     my %r = gdb_n_next_result( $gdb, $seq );
@@ -6449,7 +6455,7 @@ sub _gdb_set_print_address {
         return;
     }
 
-    if ( $inner_conf{backend_debugger} eq 'idb' ) {
+    if ( $gdb->{backend_debugger} eq 'idb' ) {
         return;
     }
 
@@ -6470,7 +6476,7 @@ sub _gdb_set_lang {
         return;
     }
 
-    if ( $inner_conf{backend_debugger} eq 'idb' ) {
+    if ( $gdb->{backend_debugger} eq 'idb' ) {
         return;
     }
 
@@ -6813,7 +6819,7 @@ sub gdb_n_next_result {
 
     # As idb doesn't confirm that it's attached properly it's impossible
     # to do this test correctly here.
-    if ( $inner_conf{backend_debugger} eq 'idb' ) {
+    if ( $gdb->{backend_debugger} eq 'idb' ) {
         return %res;
     }
 
@@ -7945,7 +7951,7 @@ sub gdb_dump_frames {
             gdb_send( $gdb, "-stack-select-frame $frame->{level}" );
 
             my $print_cmd = '2';
-            if ( $inner_conf{backend_debugger} eq 'idb' ) {
+            if ( $gdb->{backend_debugger} eq 'idb' ) {
                 $print_cmd = '1';
             }
             my %r = gdb_send_addr( $gdb,
