@@ -1158,7 +1158,7 @@ sub parse_args_outer {
         $rank_rng = rng_convert_from_user( shift @ranks );
 
         foreach my $rank (@ranks) {
-            rng_merge( $rank_rng, rng_convert_from_user($rank) );
+	    $rank_rng = rng_merge($rank_rng, rng_convert_from_user($rank));
         }
     }
 
@@ -5212,7 +5212,7 @@ sub rng_convert_from_user {
 
     my @user_parts = split $COMMA, $newrange;
 
-    my @parts;
+    my $user_range = rng_create_empty();
 
     foreach my $part (@user_parts) {
         my %part;
@@ -5225,9 +5225,13 @@ sub rng_convert_from_user {
         } else {
             confess("Failed to recognise $part as range\n");
         }
+	my @parts;
         push @parts, \%part;
+	$user_range = rng_merge($user_range, \@parts);
+
     }
-    return \@parts;
+
+    return $user_range;
 }
 
 sub rng_convert_to_user {
@@ -5335,14 +5339,56 @@ sub rng_add_value {
 }
 
 sub rng_merge {
-    my ( $rg, $new ) = @_;
-
-    # Need to use defined here as zero is a valid value to store in a
-    # range.
-    while ( defined( my $val = rng_shift($new) ) ) {
-        rng_add_value( $rg, $val );
+    my ( $left, $right ) = @_;
+    
+    
+    if ( not defined $left or rng_empty($left) ) {
+	return $right;
     }
-    return;
+    
+    my $combined = rng_create_empty();
+    
+    while ( @{$left} != 0 and @{$right} != 0 ) {
+
+	my $elem;
+	if ( $left->[0]->{l} < $right->[0]->{l} ) {
+	    $elem = shift @{$left};
+	} else {
+	    $elem = shift @{$right};
+	}
+	
+	if ( @{$combined} == 0 ) {
+	    push @{$combined}, $elem;
+	} elsif ( $elem->{l} == $combined->[-1]->{u} + 1 ) {
+	    $combined->[-1]->{u} = $elem->{u};
+	} elsif ( $elem->{l} >= $combined->[-1]->{l} and $elem->{l} <= $combined->[-1]->{u} ) {
+	    if ( $elem->{u} > $combined->[-1]->{u} ) {
+		$combined->[-1]->{u} = $elem->{u};
+	    }
+	} else {
+	    push @{$combined}, $elem;
+	}
+    }
+    
+    if ( @{$left} == 0 ) {
+	$left = $right;
+    }
+
+    if ( $left->[0]->{l} == $combined->[-1]->{u} + 1 ) {
+	my $elem = shift @{$left};
+	$combined->[-1]->{u} = $elem->{u};
+    } elsif ( $left->[0]->{l} >= $combined->[-1]->{l} and $left->[0]->{l} <= $combined->[-1]->{u} ) {
+	my $elem = shift @{$left};
+	if ( $elem->{u} > $combined->[-1]->{u} ) {
+	    $combined->[-1]->{u} = $elem->{u};
+	}
+    }
+    
+    if ( @{$left} != 0 ) {
+	push @{$combined}, @{$left};
+    }
+
+    return $combined;
 }
 
 sub rng_dup {
@@ -9783,18 +9829,8 @@ sub reply_from_child {
         if ( exists $handle->{all_replys}->{target_data} ) {
             foreach my $key ( keys %{ $r->{target_data} } ) {
                 foreach my $value ( keys %{ $r->{target_data}{$key} } ) {
-                    if (
-                        defined $handle->{all_replys}
-                        ->{target_data}{$key}{$value} )
-                    {
-                        rng_merge(
-                            $handle->{all_replys}->{target_data}{$key}{$value},
-                            $r->{target_data}{$key}{$value}
-                        );
-                    } else {
-                        $handle->{all_replys}->{target_data}{$key}{$value} =
-                          $r->{target_data}{$key}{$value};
-                    }
+		    $handle->{all_replys}->{target_data}{$key}{$value} = rng_merge($handle->{all_replys}->{target_data}{$key}{$value},
+										     $r->{target_data}{$key}{$value})
                 }
             }
         } else {
@@ -9805,14 +9841,9 @@ sub reply_from_child {
     # Merge in local target responses.
     foreach my $key ( keys %local_target_data ) {
         foreach my $value ( keys %{ $local_target_data{$key} } ) {
-            if ( defined $handle->{all_replys}->{target_data}{$key}{$value} ) {
-                rng_merge( $handle->{all_replys}->{target_data}{$key}{$value},
-                    $local_target_data{$key}{$value} );
-            } else {
-                $handle->{all_replys}->{target_data}{$key}{$value} =
-                  $local_target_data{$key}{$value};
-            }
-        }
+	    $handle->{all_replys}->{target_data}{$key}{$value} = rng_merge($handle->{all_replys}->{target_data}{$key}{$value},
+									     $local_target_data{$key}{$value})
+	}
     }
 
     %local_target_data = ();
