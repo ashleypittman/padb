@@ -5376,12 +5376,12 @@ sub rng_empty {
 }
 
 sub create_local_port {
-    my ($range) = @_;
+    my ($range, $listen_count) = @_;
 
     my %options = (
         Reuse  => 1,
         Proto  => 'tcp',
-        Listen => 2,
+        Listen => $listen_count,
     );
 
     if ( not defined $range ) {
@@ -5408,7 +5408,7 @@ sub go_parallel {
 
     my $sel = IO::Select->new();
     if ( $conf{inner_callback} ) {
-        my $sl = create_local_port( $conf{port_range} );
+        my $sl = create_local_port( $conf{port_range}, $nhosts );
 
         $comm_data->{listen} = $sl;
         my $port     = $sl->sockport();
@@ -10287,7 +10287,7 @@ sub command_from_outer {
 sub inner_loop_for_comms {
     my ($outerloc) = @_;
 
-    my $server = create_local_port( $inner_conf{port_range} );
+    my $server = create_local_port( $inner_conf{port_range}, 4 );
 
     my $lport    = $server->sockport();
     my $hostname = $inner_conf{hostname};
