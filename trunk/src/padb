@@ -792,7 +792,7 @@ XXXX
 
 -O [opt1=val,<opt2=val>] Set internal config options for padb, advanced use only.
   Options in this version (these are liable to change)
-  Use -Ohelp for showing current settings
+  Use -Ohelp=1 for showing current settings
 
   General options:
   verbose              Set verbosity level.
@@ -5851,7 +5851,10 @@ sub outer_main {
 
         $key =~ s{-}{_}gx;
 
-        if (    not exists $conf{$key}
+	if ( $key eq "help" ) {
+	    config_help($mode);
+	    exit(0);
+	} elsif (    not exists $conf{$key}
             and not exists $conf{mode_options_reverse}{$key} )
         {
             print "Error, unknown config option '$name'\n";
