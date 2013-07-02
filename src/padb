@@ -6836,7 +6836,13 @@ sub gdb_n_next_result {
 sub gdb_strip_value {
     my ($str) = @_;
     if ( $str =~ m{\Avalue="([^"]+)"\z}x ) {
-        return $1;
+        # Somewhere between gdb 7.2.x and 7.5.x, gdb started printing
+        # additional information at the end of the value= line that
+        # needs to be stripped off.  This secondary regex will strip
+        # off this extra gorp if it's there.
+        my $tmp = $1;
+        $tmp =~ s/(.+?)\s<\S+>$/$1/;
+        return $tmp;
     }
     return;
 }
