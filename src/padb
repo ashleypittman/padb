@@ -7355,6 +7355,7 @@ sub run_minfo {
         $stderr .= $_;
     }
     if ($have_error_messages) {
+        chomp($stderr);
         target_error( $vp, "Stderr from minfo:\n$stderr" );
     }
 
