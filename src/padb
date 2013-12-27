@@ -3517,7 +3517,7 @@ sub mpirun_setup_job {
 
     # Whilst it's possible to dip inside the struct in the process to
     # extract this information some builds don't associate a type with
-    # MPIR_proctable which means in those cases this methhod won't work.
+    # MPIR_proctable which means in those cases this method won't work.
     # Instead use a set of hardcoded values for offset and size as defined
     # by the interface and do the maths for finding each element ourselves.
 
