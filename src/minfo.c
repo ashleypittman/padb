@@ -52,21 +52,6 @@ struct type {
 
 struct dll_entry_points dll_ep = {};
 
-char *collective_names[] = { "Barrier",
-			     "Bcast",
-			     "Allgather",
-			     "Allgatherv",
-			     "Allreduce",
-			     "Alltoall",
-			     "Alltoallv",
-			     "Reduce_Scatter",
-			     "Reduce",
-			     "Gather",
-			     "Gatherv",
-			     "Scan",
-			     "Scatter",
-			     "Scatterv" };
-
 char *op_types[] = { "pending_send",
 		     "pending_receive",
 		     "unexpected_message" };
@@ -476,11 +461,10 @@ void show_comm_coll_state (mqs_process *target_process, mqs_communicator *comm, 
 	int r = dll_ep.get_comm_coll_state(target_process,i,&seq,&active);
 	if ( r == mqs_ok ) {
 	    if ( seq != 0 )
-		printf("comm%d: Collective '%s': call count %d, %sactive\n",
-		       comm_id,
-		       collective_names[i],
+		printf("col: id:%d count:%d active:%d\n",
+		       i,
 		       seq,
-		       active ? "" : "not ");
+		       active ? 1 : 0);
 	} else if ( r != mqs_no_information ) {
 	    show_dll_error_code(r);
 	}
