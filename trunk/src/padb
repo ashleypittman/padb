@@ -1158,7 +1158,7 @@ sub parse_args_outer {
         $rank_rng = rng_convert_from_user( shift @ranks );
 
         foreach my $rank (@ranks) {
-	    $rank_rng = rng_merge($rank_rng, rng_convert_from_user($rank));
+            $rank_rng = rng_merge( $rank_rng, rng_convert_from_user($rank) );
         }
     }
 
@@ -1394,7 +1394,8 @@ sub estats_show_bin {
                 $scale++;
             }
 
-            $ret .= sprintf
+            $ret .=
+              sprintf
 "%16s: min $d->{$bin}{raw}[32] max $d->{$bin}{raw}[33] total $d->{$bin}{raw}[34] (%0.2f $scales[$scale])\n",
               $d->{$bin}{name}, $total;
 
@@ -5225,9 +5226,9 @@ sub rng_convert_from_user {
         } else {
             confess("Failed to recognise $part as range\n");
         }
-	my @parts;
+        my @parts;
         push @parts, \%part;
-	$user_range = rng_merge($user_range, \@parts);
+        $user_range = rng_merge( $user_range, \@parts );
 
     }
 
@@ -5340,52 +5341,55 @@ sub rng_add_value {
 
 sub rng_merge {
     my ( $left, $right ) = @_;
-    
-    
+
     if ( not defined $left or rng_empty($left) ) {
-	return $right;
+        return $right;
     }
-    
+
     my $combined = rng_create_empty();
-    
+
     while ( @{$left} != 0 and @{$right} != 0 ) {
 
-	my $elem;
-	if ( $left->[0]->{l} < $right->[0]->{l} ) {
-	    $elem = shift @{$left};
-	} else {
-	    $elem = shift @{$right};
-	}
-	
-	if ( @{$combined} == 0 ) {
-	    push @{$combined}, $elem;
-	} elsif ( $elem->{l} == $combined->[-1]->{u} + 1 ) {
-	    $combined->[-1]->{u} = $elem->{u};
-	} elsif ( $elem->{l} >= $combined->[-1]->{l} and $elem->{l} <= $combined->[-1]->{u} ) {
-	    if ( $elem->{u} > $combined->[-1]->{u} ) {
-		$combined->[-1]->{u} = $elem->{u};
-	    }
-	} else {
-	    push @{$combined}, $elem;
-	}
+        my $elem;
+        if ( $left->[0]->{l} < $right->[0]->{l} ) {
+            $elem = shift @{$left};
+        } else {
+            $elem = shift @{$right};
+        }
+
+        if ( @{$combined} == 0 ) {
+            push @{$combined}, $elem;
+        } elsif ( $elem->{l} == $combined->[-1]->{u} + 1 ) {
+            $combined->[-1]->{u} = $elem->{u};
+        } elsif ( $elem->{l} >= $combined->[-1]->{l}
+            and $elem->{l} <= $combined->[-1]->{u} )
+        {
+            if ( $elem->{u} > $combined->[-1]->{u} ) {
+                $combined->[-1]->{u} = $elem->{u};
+            }
+        } else {
+            push @{$combined}, $elem;
+        }
     }
-    
+
     if ( @{$left} == 0 ) {
-	$left = $right;
+        $left = $right;
     }
 
     if ( $left->[0]->{l} == $combined->[-1]->{u} + 1 ) {
-	my $elem = shift @{$left};
-	$combined->[-1]->{u} = $elem->{u};
-    } elsif ( $left->[0]->{l} >= $combined->[-1]->{l} and $left->[0]->{l} <= $combined->[-1]->{u} ) {
-	my $elem = shift @{$left};
-	if ( $elem->{u} > $combined->[-1]->{u} ) {
-	    $combined->[-1]->{u} = $elem->{u};
-	}
+        my $elem = shift @{$left};
+        $combined->[-1]->{u} = $elem->{u};
+    } elsif ( $left->[0]->{l} >= $combined->[-1]->{l}
+        and $left->[0]->{l} <= $combined->[-1]->{u} )
+    {
+        my $elem = shift @{$left};
+        if ( $elem->{u} > $combined->[-1]->{u} ) {
+            $combined->[-1]->{u} = $elem->{u};
+        }
     }
-    
+
     if ( @{$left} != 0 ) {
-	push @{$combined}, @{$left};
+        push @{$combined}, @{$left};
     }
 
     return $combined;
@@ -5422,7 +5426,7 @@ sub rng_empty {
 }
 
 sub create_local_port {
-    my ($range, $listen_count) = @_;
+    my ( $range, $listen_count ) = @_;
 
     my %options = (
         Reuse  => 1,
@@ -5817,8 +5821,7 @@ sub _config_help {
         my $name = $key;
         $name =~ s{_}{-}gx;
         if ( defined $conf{mode_options}{$mode}{$key} ) {
-            printf
-              " %$max_len" . "s = '%s'\n",
+            printf " %$max_len" . "s = '%s'\n",
               $name, $conf{mode_options}{$mode}{$key};
         } else {
             printf " %$max_len" . "s = undef\n", $name;
@@ -5897,10 +5900,10 @@ sub outer_main {
 
         $key =~ s{-}{_}gx;
 
-	if ( $key eq "help" ) {
-	    config_help($mode);
-	    exit(0);
-	} elsif (    not exists $conf{$key}
+        if ( $key eq "help" ) {
+            config_help($mode);
+            exit(0);
+        } elsif ( not exists $conf{$key}
             and not exists $conf{mode_options_reverse}{$key} )
         {
             print "Error, unknown config option '$name'\n";
@@ -6882,6 +6885,7 @@ sub gdb_n_next_result {
 sub gdb_strip_value {
     my ($str) = @_;
     if ( $str =~ m{\Avalue="([^"]+)"\z}x ) {
+
         # Somewhere between gdb 7.2.x and 7.5.x, gdb started printing
         # additional information at the end of the value= line that
         # needs to be stripped off.  This secondary regex will strip
@@ -8165,7 +8169,7 @@ sub stack_from_core {
                     }
                 }
             } else {
-                printf( ( $$frame{func} || '?' ) 
+                printf( ( $$frame{func} || '?' )
                     . '() at '
                       . ( $$frame{file} || '?' ) . ':'
                       . ( $$frame{line} || '?' )
@@ -9830,8 +9834,10 @@ sub reply_from_child {
         if ( exists $handle->{all_replys}->{target_data} ) {
             foreach my $key ( keys %{ $r->{target_data} } ) {
                 foreach my $value ( keys %{ $r->{target_data}{$key} } ) {
-		    $handle->{all_replys}->{target_data}{$key}{$value} = rng_merge($handle->{all_replys}->{target_data}{$key}{$value},
-										     $r->{target_data}{$key}{$value})
+                    $handle->{all_replys}->{target_data}{$key}{$value} =
+                      rng_merge(
+                        $handle->{all_replys}->{target_data}{$key}{$value},
+                        $r->{target_data}{$key}{$value} );
                 }
             }
         } else {
@@ -9842,9 +9848,10 @@ sub reply_from_child {
     # Merge in local target responses.
     foreach my $key ( keys %local_target_data ) {
         foreach my $value ( keys %{ $local_target_data{$key} } ) {
-	    $handle->{all_replys}->{target_data}{$key}{$value} = rng_merge($handle->{all_replys}->{target_data}{$key}{$value},
-									     $local_target_data{$key}{$value})
-	}
+            $handle->{all_replys}->{target_data}{$key}{$value} =
+              rng_merge( $handle->{all_replys}->{target_data}{$key}{$value},
+                $local_target_data{$key}{$value} );
+        }
     }
 
     %local_target_data = ();
