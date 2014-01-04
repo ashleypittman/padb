@@ -7286,6 +7286,33 @@ sub run_minfo {
             } else {
                 target_error( $vp, "UNPARSEABLE MINFO: $r" );
             }
+        } elsif ( $cmd eq 'col:' ) {
+            $stats{out}++;
+            if (
+                $r =~ m{\A
+                        col:
+                        [ ]
+                        id:(\d+)
+                        [ ]?
+                        count:(\d+)
+                        [ ]?
+                        active:(\d+)
+                        \z
+                        }x
+              )
+            {
+                my $call = {
+                    id     => $1,
+                    count  => $2,
+                    active => $3,
+                };
+
+                push @{ $communicator_descriptor{coll} }, $call;
+
+            } else {
+                target_error( $vp, "UNPARSEABLE MINFO: $r" );
+            }
+
         } elsif ( $cmd eq 'Msg:' ) {
             $stats{msg}++;
             if (
@@ -7393,6 +7420,13 @@ sub run_minfo {
 sub minfo_to_array {
     my ($cd) = @_;
 
+    my @coll_name_lookup = (
+        "Barrier",   "Bcast",    "Allgather", "Allgatherv",
+        "Allreduce", "Alltoall", "Alltoallv", "Reduce_Scatter",
+        "Reduce",    "Gather",   "Gatherv",   "Scan",
+        "Scatter",   "Scatterv"
+    );
+
     my @mq;
     foreach my $comm ( @{$cd} ) {
 
@@ -7409,6 +7443,13 @@ sub minfo_to_array {
         }
 
         my $mid = 0;
+
+        foreach my $cc ( @{ $comm->{coll} } ) {
+            my $coll_name = $coll_name_lookup[ $cc->{id} ];
+            my $active_desc = $cc->{active} ? "active" : "not active";
+            push @mq,
+"comm$comm->{mid}: Collective '$coll_name': call count $cc->{count}, $active_desc";
+        }
 
         foreach my $m ( @{ $comm->{messages} } ) {
             my @op_desc = qw(pending_send pending_receive unexpected_message);
