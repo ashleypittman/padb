@@ -431,7 +431,7 @@ int msg_id = 0;
 
 int show_comm (struct process *p, mqs_communicator *comm, int c)
 {
-    if ( comm->local_rank >= 0 )
+    if ( (int)comm->local_rank >= 0 )
 	printf("out: c:%d rank:%d\n",
 	       c,
 	       (int)comm->local_rank);
