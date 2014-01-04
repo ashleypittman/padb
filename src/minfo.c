@@ -142,7 +142,9 @@ void *find_sym (char *type, char *name) {
     
     i = sscanf(ans, "%lx",(long *)&addr);
     if ( i != 1 ) {
-	printf("Failed sscanf %d 0x%lx\n",i,(long)addr);
+	char message[256];
+	sprintf(message,"Failed sscanf looking for '%s': %d 0x%lx",name,i,(long)addr);
+	show_warning(message);
 	return NULL;
     }
     

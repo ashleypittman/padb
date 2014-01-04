@@ -7197,6 +7197,10 @@ sub run_minfo {
         if ( defined $bytes_to_read ) {
             $str_value .= $r;
             if ( length $str_value eq $bytes_to_read + 1 ) {
+
+                # Chomp twice here, once to remove the newline that minfo
+                # added, once to remove any newline from the message itself.
+                chomp $str_value;
                 chomp $str_value;
                 if ($str_global) {
                     $global{$str_name} = $str_value;
@@ -7559,8 +7563,8 @@ sub mpi_queue_output_handler {
     my ( $carg, $lines, $three ) = @_;
 
     my %headers = (
-        ihqm            => 'Message from DLL',
-        phqm            => 'Message from DLL',
+        ihqm            => 'Message from DLL (mqs_image_has_queues)',
+        phqm            => 'Message from DLL (mqs_process_has_queues)',
         dllerror        => 'Error string from DLL',
         warning         => 'Warning message from minfo',
         dlldebugmessage => 'Debug message from DLL',
@@ -10603,6 +10607,7 @@ sub common_main {
     };
 
     $allfns{mqueue} = {
+        out_handler => \&mpi_queue_output_handler,
         handler_one => \&show_mpi_queue_one,
         needs_gdb   => 1,
         arg_long    => 'mpi-queue',
