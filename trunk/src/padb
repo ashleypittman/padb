@@ -6885,14 +6885,7 @@ sub gdb_n_next_result {
 sub gdb_strip_value {
     my ($str) = @_;
     if ( $str =~ m{\Avalue="([^"]+)"\z}x ) {
-
-        # Somewhere between gdb 7.2.x and 7.5.x, gdb started printing
-        # additional information at the end of the value= line that
-        # needs to be stripped off.  This secondary regex will strip
-        # off this extra gorp if it's there.
-        my $tmp = $1;
-        $tmp =~ s/(.+?)\s<\S+>$/$1/;
-        return $tmp;
+        return $1;
     }
     return;
 }
@@ -6925,11 +6918,16 @@ sub gdb_func_addr {
     return $hex;
 }
 
+# Somewhere between gdb 7.2.x and 7.5.x, gdb started printing additional
+# information at the end of the value= line that needs to be stripped off.
+# Strip this off by splitting on spaces and returning the first value.
 sub gdb_var_addr {
     my ( $gdb, $var ) = @_;
     my %p = gdb_send_addr( $gdb, "-data-evaluate-expression \"&($var)\"" );
     return unless ( $p{status} eq 'done' );
-    return gdb_strip_value( $p{reason} );
+    my $value = gdb_strip_value( $p{reason} );
+    my @a = split $SPACE, $value;
+    return $a[0];
 }
 
 sub gdb_read_raw {
@@ -7966,6 +7964,10 @@ sub gdb_expand_var {
 
         if ( $pointer eq '0x0' ) {
             return pretify_variable('null pointer');
+        }
+
+        if ( $pointer eq '<optimized out>' ) {
+            return pretify_variable('<optimized out>');
         }
 
         # Try and print the contents of the pointer, this works fine
