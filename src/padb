@@ -9473,6 +9473,7 @@ sub is_resmgr_process {
         pbs_attach => 1,
         orted      => 1,
         mpirun     => 1,
+        pmi_proxy  => 1,
     };
     return 1 if ( defined $mgrs->{$name} );
     return;
@@ -9525,18 +9526,30 @@ sub slurm_find_pids {
         next unless defined $env{SLURM_JOB_ID};
         next if ( $env{SLURM_JOB_ID} != $jobid );
 
-        next unless defined $env{OMPI_COMM_WORLD_RANK};
+        if ( defined $env{OMPI_COMM_WORLD_RANK} ) {
+            # If this is defined check it's correct, it might be missing though.
+            if ( defined $env{SLURM_JOB_STEP} ) {
+                next if $env{SLURM_JOB_STEP} != $inner_conf{slurm_job_step};
+            }
 
-        # If this is defined check it's correct, it might be missing though.
-        if ( defined $env{SLURM_JOB_STEP} ) {
-            next if $env{SLURM_JOB_STEP} != $inner_conf{slurm_job_step};
+            if ( defined $env{OMPI_COMM_WORLD_SIZE} ) {
+                target_key_pair( $vp, "JOB_SIZE", $env{OMPI_COMM_WORLD_SIZE} );
+            }
+
+            register_target_process( $env{OMPI_COMM_WORLD_RANK}, $pid );
+        } elsif ( defined $env{PMI_RANK} ) {
+
+            # If this is defined check it's correct, it might be missing though.
+            if ( defined $env{SLURM_JOB_STEP} ) {
+                next if $env{SLURM_JOB_STEP} != $inner_conf{slurm_job_step};
+            }
+
+            if ( defined $env{PMI_SIZE} ) {
+                target_key_pair( $vp, "PMI_SIZE", $env{PMI_SIZE} );
+            }
+
+            register_target_process( $env{PMI_RANK}, $pid );
         }
-
-        if ( defined $env{OMPI_COMM_WORLD_SIZE} ) {
-            target_key_pair( $vp, "JOB_SIZE", $env{OMPI_COMM_WORLD_SIZE} );
-        }
-
-        register_target_process( $env{OMPI_COMM_WORLD_RANK}, $pid );
     }
 
     return;
