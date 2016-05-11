@@ -9514,6 +9514,9 @@ sub slurm_find_pids {
     # they belong to.
     foreach my $pid ( get_process_list($target_user) ) {
 
+        # Skip self
+        next if ($pid == $$ );
+
         # Skip over resource manager processes.
         next if ( is_resmgr_process($pid) );
 
