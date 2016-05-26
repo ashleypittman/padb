@@ -9514,6 +9514,9 @@ sub slurm_find_pids {
     # they belong to.
     foreach my $pid ( get_process_list($target_user) ) {
 
+        # Skip self
+        next if ($pid == $$ );
+
         # Skip over resource manager processes.
         next if ( is_resmgr_process($pid) );
 
@@ -9528,8 +9531,8 @@ sub slurm_find_pids {
 
         if ( defined $env{OMPI_COMM_WORLD_RANK} ) {
             # If this is defined check it's correct, it might be missing though.
-            if ( defined $env{SLURM_JOB_STEP} ) {
-                next if $env{SLURM_JOB_STEP} != $inner_conf{slurm_job_step};
+            if ( defined $env{SLURM_STEP_ID} ) {
+                next if $env{SLURM_STEP_ID} != $inner_conf{slurm_job_step};
             }
 
             if ( defined $env{OMPI_COMM_WORLD_SIZE} ) {
@@ -9540,8 +9543,8 @@ sub slurm_find_pids {
         } elsif ( defined $env{PMI_RANK} ) {
 
             # If this is defined check it's correct, it might be missing though.
-            if ( defined $env{SLURM_JOB_STEP} ) {
-                next if $env{SLURM_JOB_STEP} != $inner_conf{slurm_job_step};
+            if ( defined $env{SLURM_STEP_ID} ) {
+                next if $env{SLURM_STEP_ID} != $inner_conf{slurm_job_step};
             }
 
             if ( defined $env{PMI_SIZE} ) {
