@@ -6391,6 +6391,7 @@ sub gdb_attach_async_end {
         if ( not find_exe('gdb') ) {
             $gdb->{error} = 'Failed to attach to process (is gdb installed?)';
         }
+        send_cont_signal($pid);
         return;
     }
 
@@ -8813,6 +8814,7 @@ sub global_detach {
             gdb_quit( $proc->{gdb_handle} );
             delete $proc->{gdb_handle};
         }
+        send_cont_signal($proc->{pid});
     }
     return;
 }
