@@ -5591,6 +5591,9 @@ sub create_padb_secret {
 sub find_padb_secret {
 
     my $file = "$ENV{HOME}/.padb-secret";
+    if ( !-f $file ) { # First just try to just create it
+        create_padb_secret();
+    }
     if ( !-f $file ) {
         print "No secret file ($file)\n";
         return;
