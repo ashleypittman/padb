@@ -2625,6 +2625,7 @@ sub slurm_setup_job {
             next if $step eq "STEPID";
             my ( $job_id, $job_step ) = split $PERIOD, $step;
             next unless $job_id == $job;
+            next if ("$job_step" eq "batch");
             push @valid_steps, $job_step;
         }
         if (@valid_steps) {
