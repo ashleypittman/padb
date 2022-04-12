@@ -2624,7 +2624,7 @@ sub slurm_setup_job {
             chomp $step;
             next if $step eq "STEPID";
             my ( $job_id, $job_step ) = split $PERIOD, $step;
-            next unless $job_id == $job;
+            next unless "$job_id" == "$job";
             push @valid_steps, $job_step;
         }
         if (@valid_steps) {
