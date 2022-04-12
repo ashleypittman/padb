@@ -5463,6 +5463,9 @@ sub go_parallel {
         $comm_data->{listen} = $sl;
         my $port     = $sl->sockport();
         my $hostname = hostname();
+	# If you get a Failed to connect to outer in inner_loop_for_comms, then you might need
+	# to change the external hostname to the internal hostname on the login node
+	# $hostname =~ s/\.mycluster.gov//g;
         config_set_internal( 'outer', "$hostname:$port" );
         $sel->add($sl);
 
@@ -10395,6 +10398,7 @@ sub inner_loop_for_comms {
     my $outer_timeout = ( $inner_conf{interval} * 2 ) + 10;
 
     if ( defined $outerloc ) {
+        # If this fails to connect, it might be related to hostnames, see go_parallel above
         my ( $ohost, $oport ) = split $COLON, $outerloc;
         my $os = IO::Socket::INET->new(
             PeerAddr => $ohost,
