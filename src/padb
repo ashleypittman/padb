@@ -2644,7 +2644,7 @@ sub slurm_setup_job {
     $pcmd{nhosts}     = $nc;
     $pcmd{command}    = "srun --jobid=$job";
     return %pcmd;
-
+    # If the srun command hangs forever then you might need add the version specific overcommit/oversubscribe flag
 }
 
 ###############################################################################
