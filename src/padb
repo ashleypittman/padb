@@ -5466,6 +5466,9 @@ sub go_parallel {
 	# If you get a Failed to connect to outer in inner_loop_for_comms, then you might need
 	# to change the external hostname to the internal hostname on the login node
 	# $hostname =~ s/\.mycluster.gov//g;
+	# Another possibility is that you might need to specify the network interface such as one of these:
+	# $hostname =~ s/\.local/\.ib/g;
+	# $hostname =~ s/\.ib/\.local/g;
         config_set_internal( 'outer', "$hostname:$port" );
         $sel->add($sl);
 
