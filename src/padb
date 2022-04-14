@@ -2642,7 +2642,7 @@ sub slurm_setup_job {
     my %pcmd;
     $pcmd{nprocesses} = $cpus;
     $pcmd{nhosts}     = $nc;
-    $pcmd{command}    = "srun --jobid=$job";
+    $pcmd{command}    = "srun -s --jobid=$job";
     return %pcmd;
 
 }
